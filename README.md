@@ -154,10 +154,10 @@ Sẽ triển khai:
 
 ## Tài liệu tham khảo
 
-- [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) — Master implementation plan
-- [02_Backend_Engineering.md](../02_Backend_Engineering.md) — Backend architecture
-- [05_Integration_Security.md](../05_Integration_Security.md) — Security & OMS
-- [06_Development_Standards_Rules.md](../06_Development_Standards_Rules.md) — Coding standards
+- [IMPLEMENTATION_PLAN.md](docs/plans/IMPLEMENTATION_PLAN.md) — Master implementation plan
+- [02_Backend_Engineering.md](docs/blueprints/02_Backend_Engineering.md) — Backend architecture
+- [05_Integration_Security.md](docs/blueprints/05_Integration_Security.md) — Security & OMS
+- [06_Development_Standards_Rules.md](docs/blueprints/06_Development_Standards_Rules.md) — Coding standards
 
 ## License
 
