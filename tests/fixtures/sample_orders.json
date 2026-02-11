@@ -1,0 +1,9 @@
+{
+  "orders": [
+    {"order_id": "ord-001", "symbol": "FPT", "side": "BUY", "order_type": "LO", "quantity": 1000, "price": "98500", "status": "MATCHED"},
+    {"order_id": "ord-002", "symbol": "VNM", "side": "SELL", "order_type": "LO", "quantity": 500, "price": "72000", "status": "PENDING"},
+    {"order_id": "ord-003", "symbol": "FPT", "side": "BUY", "order_type": "ATO", "quantity": 2000, "price": "0", "status": "CREATED"},
+    {"order_id": "ord-004", "symbol": "MWG", "side": "BUY", "order_type": "LO", "quantity": 300, "price": "55000", "status": "REJECTED"},
+    {"order_id": "ord-005", "symbol": "VIC", "side": "SELL", "order_type": "LO", "quantity": 100, "price": "46000", "status": "CANCELLED"}
+  ]
+}

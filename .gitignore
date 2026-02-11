@@ -1,0 +1,60 @@
+# ═══════════════════════════════════════════════════════════════
+# .gitignore — Security-critical exclusions
+# Ref: 05_Integration_Security.md §1.7
+# ═══════════════════════════════════════════════════════════════
+
+# ── Security: NEVER commit these ──────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ──────────────────────────────────────
+.venv/
+venv/
+ENV/
+
+# ── Type checking / Linting cache ─────────────────────────────
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# ── Coverage ──────────────────────────────────────────────────
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# ── Runtime data (DuckDB, Parquet, models) ────────────────────
+data/
+*.duckdb
+*.duckdb.wal
+
+# ── IDE ───────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── uv ────────────────────────────────────────────────────────
+# uv.lock is committed (reproducible builds)

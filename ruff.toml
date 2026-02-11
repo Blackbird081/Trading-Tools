@@ -1,0 +1,37 @@
+# ruff.toml (workspace root — shared across all packages)
+# Ref: 06_Development_Standards_Rules.md §1.7
+target-version = "py312"
+line-length = 99
+
+[lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade (modernize syntax)
+    "B",      # flake8-bugbear (common bugs)
+    "S",      # flake8-bandit (security)
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking (TYPE_CHECKING blocks)
+    "RUF",    # Ruff-specific rules
+    "ASYNC",  # flake8-async (async anti-patterns)
+    "PT",     # flake8-pytest-style
+]
+ignore = [
+    "S101",   # assert is fine in tests
+    "S311",   # random is fine for jitter (not crypto)
+    "TC001",  # typing-only imports: entities need runtime imports
+    "TC002",  # typing-only imports: entities need runtime imports
+    "TC003",  # typing-only imports: entities need runtime imports
+]
+
+[lint.per-file-ignores]
+"tests/**" = ["S101", "S106", "S608"]  # Allow assert, hardcoded passwords, SQL strings in tests
+"**/duckdb/*.py" = ["S608"]  # SQL with f-strings for paths is safe in DuckDB
+
+[format]
+quote-style = "double"
+indent-style = "space"

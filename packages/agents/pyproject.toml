@@ -1,0 +1,18 @@
+[project]
+name = "agents"
+version = "0.1.0"
+description = "Agent layer — LangGraph orchestration, data/screener/technical/risk agents."
+requires-python = ">=3.12"
+dependencies = [
+    "core",
+    "adapters",
+    "langgraph>=0.2",
+]
+
+[tool.uv.sources]
+core = { workspace = true }
+adapters = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

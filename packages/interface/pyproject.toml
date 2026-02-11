@@ -1,0 +1,21 @@
+[project]
+name = "interface"
+version = "0.1.0"
+description = "Interface layer — FastAPI, WebSocket, CLI entrypoint."
+requires-python = ">=3.12"
+dependencies = [
+    "core",
+    "adapters",
+    "agents",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+]
+
+[tool.uv.sources]
+core = { workspace = true }
+adapters = { workspace = true }
+agents = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

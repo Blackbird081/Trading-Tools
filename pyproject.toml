@@ -1,0 +1,36 @@
+[project]
+name = "algo-trading"
+version = "0.1.0"
+description = "Enterprise Algo-Trading Platform on Hybrid AI"
+requires-python = ">=3.12"
+dependencies = [
+    "core",
+    "adapters",
+    "agents",
+    "interface",
+    "openvino>=2025.4.1",
+    "openvino-genai>=2025.4.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "mypy>=1.11",
+    "ruff>=0.6",
+]
+
+[tool.uv.workspace]
+members = [
+    "packages/core",
+    "packages/adapters",
+    "packages/agents",
+    "packages/interface",
+]
+
+[tool.uv.sources]
+core = { workspace = true }
+adapters = { workspace = true }
+agents = { workspace = true }
+interface = { workspace = true }

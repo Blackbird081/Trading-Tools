@@ -1,0 +1,21 @@
+[project]
+name = "adapters"
+version = "0.1.0"
+description = "Adapter layer — DuckDB, SSI, Vnstock, OpenVINO implementations."
+requires-python = ">=3.12"
+dependencies = [
+    "core",
+    "duckdb>=1.1",
+    "pyarrow>=17.0",
+    "pycryptodome>=3.20",
+    "httpx>=0.27",
+    "websockets>=13.0",
+    "pydantic>=2.9",
+]
+
+[tool.uv.sources]
+core = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

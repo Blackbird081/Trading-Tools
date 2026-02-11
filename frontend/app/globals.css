@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+:root {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --border: #27272a;
+  --ring: #d4d4d8;
+  --accent: #18181b;
+  --accent-foreground: #fafafa;
+  --destructive: #ef4444;
+  --positive: #34d399;
+  --negative: #f87171;
+  --ceiling: #d946ef;
+  --floor: #22d3ee;
+  --reference: #fbbf24;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+}
+
+/* AG Grid dark theme overrides */
+.ag-theme-alpine-dark {
+  --ag-background-color: #0a0a0f;
+  --ag-header-background-color: #141420;
+  --ag-header-foreground-color: #e2e8f0;
+  --ag-odd-row-background-color: #0e0e16;
+  --ag-row-hover-color: #1c1c32;
+  --ag-selected-row-background-color: #1e293b;
+  --ag-border-color: #1e1e30;
+  --ag-font-size: 13px;
+  --ag-row-border-color: transparent;
+  --ag-cell-horizontal-padding: 8px;
+}
+
+/* Price board: header titles — sáng, dễ đọc */
+.price-board .ag-header-cell-label {
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #f1f5f9;
+}
+.price-board .ag-header-cell {
+  color: #f1f5f9;
+}
+.price-board .ag-header-icon {
+  color: #94a3b8;
+}
+
+.price-board .ag-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.price-board .ag-row:hover {
+  background-color: #1a1a35 !important;
+}
+
+.price-board .ag-row-selected {
+  background-color: #172554 !important;
+}
+
+/* Price color classes */
+.price-up {
+  color: #4ade80;
+}
+.price-down {
+  color: #fb7185;
+}
+.price-ref {
+  color: #fbbf24;
+}
+
+/* Flash animations for real-time updates */
+@keyframes flash-green {
+  0% { background-color: rgba(74, 222, 128, 0.2); }
+  100% { background-color: transparent; }
+}
+@keyframes flash-red {
+  0% { background-color: rgba(251, 113, 133, 0.2); }
+  100% { background-color: transparent; }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* Shimmer animation for progress bars */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
