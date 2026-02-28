@@ -48,6 +48,25 @@ class ConnectionManager:
                 for ws in disconnected:
                     self._connections.discard(ws)
 
+    async def close_all(self) -> None:
+        """Close all WebSocket connections gracefully (for shutdown)."""
+        async with self._lock:
+            snapshot = set(self._connections)
+            self._connections.clear()
+
+        for ws in snapshot:
+            try:
+                await ws.close(code=1001)  # 1001 = Going Away
+            except Exception:
+                pass
+
+        logger.info("All WebSocket connections closed")
+
     @property
     def connection_count(self) -> int:
         return len(self._connections)
+
+
+# ── Module-level singleton ────────────────────────────────────────────────────
+# ★ Used by app.py for graceful shutdown
+ws_manager = ConnectionManager()
