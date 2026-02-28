@@ -157,6 +157,30 @@ class ApprovalManager:
         """Check if there are any pending approval requests."""
         return bool(self._pending_approvals)
 
+    @staticmethod
+    def _format_approval_message(tool: str, args: dict[str, Any]) -> str:
+        """Format human-readable approval message."""
+        if tool == "place_order":
+            symbol = args.get("symbol", "?")
+            side = args.get("side", "?")
+            quantity = args.get("quantity", "?")
+            price = args.get("price", "?")
+            try:
+                value = float(str(price).replace(",", "")) * int(str(quantity).replace(",", ""))
+            except (ValueError, TypeError):
+                value = 0.0
+            return (
+                f"⚠️ Xác nhận đặt lệnh THẬT:\n"
+                f"  {side} {symbol} × {quantity:,} @ {price} VND\n"
+                f"  Giá trị: {value:,.0f} VND\n"
+                f"Bạn có muốn tiếp tục không?"
+            )
+        elif tool == "cancel_order":
+            order_id = args.get("order_id", "?")
+            return f"⚠️ Xác nhận hủy lệnh: {order_id}"
+        else:
+            return f"⚠️ Xác nhận thực thi tool: {tool}\nTham số: {args}"
+
 
 # ── Module-level singleton ────────────────────────────────────────────────────
 
@@ -187,24 +211,3 @@ def handle_approval_response(request_id: str, decision: str) -> bool:
         logger.warning("No ApprovalManager configured — cannot resolve approval")
         return False
     return manager.resolve_approval(request_id, decision)
-
-    @staticmethod
-    def _format_approval_message(tool: str, args: dict[str, Any]) -> str:
-        """Format human-readable approval message."""
-        if tool == "place_order":
-            symbol = args.get("symbol", "?")
-            side = args.get("side", "?")
-            quantity = args.get("quantity", "?")
-            price = args.get("price", "?")
-            value = float(str(price).replace(",", "")) * int(str(quantity).replace(",", "")) if price and quantity else 0
-            return (
-                f"⚠️ Xác nhận đặt lệnh THẬT:\n"
-                f"  {side} {symbol} × {quantity:,} @ {price} VND\n"
-                f"  Giá trị: {value:,.0f} VND\n"
-                f"Bạn có muốn tiếp tục không?"
-            )
-        elif tool == "cancel_order":
-            order_id = args.get("order_id", "?")
-            return f"⚠️ Xác nhận hủy lệnh: {order_id}"
-        else:
-            return f"⚠️ Xác nhận thực thi tool: {tool}\nTham số: {args}"

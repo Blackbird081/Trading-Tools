@@ -201,30 +201,34 @@ def _identify_dominant_driver(
     asset_turnover: float | None,
     financial_leverage: float | None,
 ) -> str:
-    """Xác định thành phần đóng góp nhiều nhất vào ROE."""
-    # Normalize each component relative to "neutral" value
-    # Tax burden: 0.75 is neutral (25% tax rate)
-    # Interest burden: 0.9 is neutral
-    # Operating margin: 0.1 is neutral (10%)
-    # Asset turnover: 1.0 is neutral
-    # Financial leverage: 2.0 is neutral
+    """Xác định thành phần đóng góp nhiều nhất vào ROE.
 
-    scores = {}
-    if operating_margin is not None:
-        scores["Biên lợi nhuận hoạt động"] = operating_margin / 0.10
-    if asset_turnover is not None:
-        scores["Vòng quay tài sản"] = asset_turnover / 1.0
-    if financial_leverage is not None:
-        scores["Đòn bẩy tài chính"] = financial_leverage / 2.0
-    if interest_burden is not None:
-        scores["Gánh nặng lãi vay"] = interest_burden / 0.9
-    if tax_burden is not None:
-        scores["Gánh nặng thuế"] = tax_burden / 0.75
+    ★ Dùng deviation từ neutral (|value/neutral - 1|) để đo mức độ ảnh hưởng.
+    ★ Thành phần có deviation lớn nhất = đóng góp nhiều nhất (tốt hoặc xấu).
+    """
+    # Neutral values: typical "average" company
+    # Tax burden: 0.75 (25% tax rate)
+    # Interest burden: 0.9 (10% interest cost)
+    # Operating margin: 0.10 (10%)
+    # Asset turnover: 1.0 (1x)
+    # Financial leverage: 2.0 (2x)
 
-    if not scores:
+    deviations: dict[str, float] = {}
+    if operating_margin is not None and operating_margin != 0:
+        deviations["Biên lợi nhuận hoạt động"] = abs(operating_margin / 0.10 - 1.0)
+    if asset_turnover is not None and asset_turnover != 0:
+        deviations["Vòng quay tài sản"] = abs(asset_turnover / 1.0 - 1.0)
+    if financial_leverage is not None and financial_leverage != 0:
+        deviations["Đòn bẩy tài chính"] = abs(financial_leverage / 2.0 - 1.0)
+    if interest_burden is not None and interest_burden != 0:
+        deviations["Gánh nặng lãi vay"] = abs(interest_burden / 0.9 - 1.0)
+    if tax_burden is not None and tax_burden != 0:
+        deviations["Gánh nặng thuế"] = abs(tax_burden / 0.75 - 1.0)
+
+    if not deviations:
         return "Không xác định được"
 
-    return max(scores, key=lambda k: scores[k])
+    return max(deviations, key=lambda k: deviations[k])
 
 
 def _build_summary(

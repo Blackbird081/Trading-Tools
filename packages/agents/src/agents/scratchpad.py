@@ -203,14 +203,15 @@ class AgentScratchpad:
         ★ Returns number of results cleared.
         """
         entries = self._read_entries()
+        # Collect sequential indices of tool_result entries (0-based among tool_results only)
         tool_result_indices: list[int] = []
-
-        index = 0
+        tool_result_index = 0
         for entry in entries:
             if entry.get("type") == "tool_result":
-                if index not in self._cleared_tool_indices:
-                    tool_result_indices.append(index)
-                index += 1
+                # Only track indices not already cleared
+                if tool_result_index not in self._cleared_tool_indices:
+                    tool_result_indices.append(tool_result_index)
+                tool_result_index += 1
 
         to_clear = max(0, len(tool_result_indices) - keep_count)
         if to_clear == 0:

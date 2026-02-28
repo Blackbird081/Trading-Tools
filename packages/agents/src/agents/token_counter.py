@@ -93,10 +93,11 @@ class TokenCounter:
         model: str = "unknown",
     ) -> None:
         """Add raw token counts."""
+        # ★ Do NOT pass total_tokens — it's a private field (_total_tokens).
+        # __post_init__ auto-calculates it from input + output.
         self.add(TokenUsage(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
-            total_tokens=input_tokens + output_tokens,
             model=model,
         ))
 

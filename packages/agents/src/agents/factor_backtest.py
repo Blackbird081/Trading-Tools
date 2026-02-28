@@ -322,20 +322,25 @@ class FactorBacktestEngine:
                         except Exception:
                             pass
 
-            # Track NAV
+            # Track NAV (cash + mark-to-market portfolio value)
             nav = capital
             for symbol, (qty, avg_price) in portfolio.items():
-                nav += avg_price * qty  # Simplified: use avg price
+                nav += avg_price * qty  # Simplified: use avg_price as proxy for current price
             daily_nav.append(nav)
 
             current_year += 1
+
+        # ★ final_capital = cash + mark-to-market portfolio value (not just cash)
+        final_nav = capital
+        for symbol, (qty, avg_price) in portfolio.items():
+            final_nav += avg_price * qty
 
         result = FactorBacktestResult(
             factor_name=factor_name,
             start_date=start_date,
             end_date=end_date,
             initial_capital=initial_capital,
-            final_capital=capital,
+            final_capital=final_nav,  # ★ Fixed: include portfolio value
             trades=trades,
             daily_nav=daily_nav,
             ic_series=ic_series,

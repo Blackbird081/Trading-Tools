@@ -114,13 +114,16 @@ def calculate_early_warning(
         if roe_current < 0:
             alerts.append(f"ROE âm ({roe_current * 100:.1f}%) — Doanh nghiệp đang thua lỗ")
             risk_score += 20
+            # ★ No elif here — ROE < 0 already covers ROE < 5%, avoid double-count
         elif roe_current < 0.05:
             alerts.append(f"ROE rất thấp ({roe_current * 100:.1f}%) — Hiệu quả sử dụng vốn kém")
             risk_score += 10
         elif roe_current >= 0.15:
             positive_signals.append(f"ROE tốt ({roe_current * 100:.1f}%)")
 
-        if roe_previous is not None and roe_current < roe_previous * 0.7:
+        # ★ Only check ROE decline if current ROE is not already negative
+        # (negative ROE declining further is already captured by the +20 above)
+        if roe_previous is not None and roe_previous > 0 and roe_current < roe_previous * 0.7:
             alerts.append(f"ROE giảm mạnh: {roe_previous * 100:.1f}% → {roe_current * 100:.1f}% (giảm > 30%)")
             risk_score += 10
 

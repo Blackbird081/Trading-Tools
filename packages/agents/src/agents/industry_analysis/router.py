@@ -28,7 +28,9 @@ INDUSTRY_MAPPING: dict[str, str] = {
 
     # Technology
     "công nghệ": "technology",
+    "công nghệ thông tin": "technology",  # ★ Added: common VN ICB name
     "technology": "technology",
+    "information technology": "technology",
     "software": "technology",
     "phần mềm": "technology",
     "it services": "technology",
@@ -126,11 +128,11 @@ def route_industry(
         # Try exact match
         if icb_code in ICB_CODE_MAPPING:
             return ICB_CODE_MAPPING[icb_code]
-        # Try prefix match (first 2 digits)
+        # Try prefix match (first 2 digits) — sort keys for deterministic behavior
         prefix = icb_code[:2]
-        for code, industry in ICB_CODE_MAPPING.items():
+        for code in sorted(ICB_CODE_MAPPING.keys()):
             if code.startswith(prefix):
-                return industry
+                return ICB_CODE_MAPPING[code]
 
     # Try name match
     if icb_name:
