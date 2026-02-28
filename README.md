@@ -1,6 +1,6 @@
 # Enterprise Algo-Trading Platform on Hybrid AI
 
-**Production-Ready** 🚀 | **Quality Score: 9.4/10** ⭐ | **Commit: `73d7f37`**
+**Production-Ready** 🚀 | **Quality Score: 9.4/10** ⭐ | **Commit: `9812423`**
 
 [![CI](https://github.com/Blackbird081/Trading-Tools/actions/workflows/ci.yml/badge.svg)](https://github.com/Blackbird081/Trading-Tools/actions/workflows/ci.yml)
 
@@ -14,6 +14,9 @@ Hệ thống giao dịch thuật toán doanh nghiệp với AI lai (Hybrid AI) c
 - **Frontend**: Next.js 15 + React 19 + AG Grid + Zustand + Error Boundaries
 - **Brokers**: SSI FastConnect API v2 (HMAC-signed) + DNSE Entrade X (fallback)
 - **DevOps**: Docker + GitHub Actions CI/CD + Health Checks + Graceful Shutdown
+- **Features**: 
+  - Symbol Popup: Click vào mã CP để xem popup chart + chỉ báo kỹ thuật (style fireant.vn)
+  - User Settings Persistence: Lưu preset, years vào localStorage
 
 ## Cấu trúc dự án
 
@@ -60,9 +63,9 @@ algo-trading/
 │       └── middleware/ # rate_limit, validation (Pydantic), audit_log
 ├── frontend/          # Next.js 15 dashboard
 │   ├── app/           # App Router pages: dashboard, orders, portfolio, screener
-│   ├── components/    # Shared: price-cell, command-palette, error-boundary
+│   ├── components/    # Shared: price-cell, command-palette, error-boundary, symbol-popup
 │   ├── providers/     # WebSocketProvider (exponential backoff reconnection)
-│   ├── stores/        # Zustand: market, signal, portfolio, order, ui
+│   ├── stores/        # Zustand: market, signal, portfolio, order, ui (with localStorage persistence)
 │   └── __tests__/     # Vitest: components, stores, integration
 ├── tests/
 │   ├── unit/          # 30+ test files: entities, use cases, agents, golden outputs
@@ -227,4 +230,4 @@ Proprietary — Enterprise Internal Use Only
 
 ---
 
-**Status**: ✅ **Production-Ready** — Quality Score **9.4/10** | 9 commits | 102 Python files + 41 TypeScript files | 38 test files
+**Status**: ✅ **Production-Ready** — Quality Score **9.4/10** | 10 commits | 102 Python files + 42 TypeScript files | 38 test files

@@ -59,6 +59,7 @@ class RiskAssessment:
     approved: bool
     var_95: Decimal
     position_size_pct: Decimal
+    latest_price: Decimal       # ★ FIX: actual market price for order entry
     stop_loss_price: Decimal
     take_profit_price: Decimal
     rejection_reason: str | None
@@ -112,3 +113,7 @@ class AgentState(TypedDict, total=False):
     max_candidates: int
     score_threshold: float
     dry_run: bool
+    # ★ FIX: Configurable screener parameters (Sprint 3.3)
+    screener_min_eps_growth: float    # default 0.10 (10%)
+    screener_max_pe_ratio: float      # default 15.0x
+    screener_volume_spike_threshold: float  # default 2.0x average volume

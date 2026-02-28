@@ -138,7 +138,6 @@ export default function MarketBoardPage() {
 
     return (
         <div className="flex flex-col bg-[#050508] h-full">
-            <MarketIndexBar />
             <DataLoader />
 
             {/* ★ Desktop: Pagination navigation bar */}
@@ -209,6 +208,11 @@ export default function MarketBoardPage() {
                         <SectorColumn title={sector.title} symbols={sector.symbols} />
                     </TradingErrorBoundary>
                 ))}
+            </div>
+
+            {/* ★ Market Index Bar — đặt ở dưới cùng như footer */}
+            <div className="shrink-0 border-t border-zinc-800/60">
+                <MarketIndexBar />
             </div>
         </div>
     );

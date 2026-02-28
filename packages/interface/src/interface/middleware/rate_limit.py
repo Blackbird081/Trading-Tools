@@ -1,5 +1,6 @@
 """Rate limiting middleware — token bucket algorithm with IP eviction."""
 from __future__ import annotations
+import ipaddress
 import logging
 import time
 from typing import Any
@@ -11,6 +12,36 @@ from starlette.types import ASGIApp
 logger = logging.getLogger("interface.rate_limit")
 _EXEMPT_PATHS = {"/api/health", "/api/health/live", "/api/health/ready"}
 _IP_EVICTION_IDLE_SECONDS = 3600.0
+
+# ★ FIX: Only trust X-Forwarded-For from these trusted proxy networks
+_TRUSTED_PROXY_NETWORKS = [
+    ipaddress.ip_network("10.0.0.0/8"),       # Private class A
+    ipaddress.ip_network("172.16.0.0/12"),     # Private class B
+    ipaddress.ip_network("192.168.0.0/16"),    # Private class C
+    ipaddress.ip_network("127.0.0.0/8"),       # Loopback (local dev)
+]
+
+
+def _is_trusted_proxy(host: str) -> bool:
+    """Check if the direct client IP is a trusted proxy."""
+    try:
+        addr = ipaddress.ip_address(host)
+        return any(addr in network for network in _TRUSTED_PROXY_NETWORKS)
+    except ValueError:
+        return False
+
+
+def _get_client_ip(request: Request) -> str:
+    """Get real client IP, only trusting X-Forwarded-For from trusted proxies.
+
+    ★ FIX: Prevents X-Forwarded-For spoofing by untrusted clients.
+    """
+    direct_host = request.client.host if request.client else "unknown"
+    if _is_trusted_proxy(direct_host):
+        forwarded = request.headers.get("X-Forwarded-For", "")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+    return direct_host
 
 
 class TokenBucket:
@@ -69,7 +100,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if path in _EXEMPT_PATHS:
             return await call_next(request)
-        client_ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (request.client.host if request.client else "unknown")
+        # ★ FIX: Use trusted-proxy-aware IP resolution to prevent spoofing
+        client_ip = _get_client_ip(request)
         bucket = self._get_bucket(client_ip, "/orders" in path or "/portfolio" in path)
         if not bucket.consume():
             retry_after = bucket.retry_after

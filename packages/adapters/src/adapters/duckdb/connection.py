@@ -113,8 +113,9 @@ class DuckDBConnectionPool:
         self._shutdown = True
         logger.info("DuckDB pool shutting down...")
 
-        # Give in-flight queries a moment to complete
-        await asyncio.sleep(0.1)
+        # ★ FIX: Give in-flight queries enough time to complete (Sprint 3.4)
+        # 0.1s was too short; 2.0s ensures most queries finish gracefully
+        await asyncio.sleep(2.0)
 
         with self._lock:
             connections = list(self._all_connections)
@@ -145,14 +146,21 @@ class DuckDBConnectionPool:
 # ── Module-level default pool ─────────────────────────────────────────────────
 
 _default_pool: DuckDBConnectionPool | None = None
+_pool_init_lock = threading.Lock()  # ★ FIX: prevent race condition on singleton init
 
 
 def get_default_pool(
     db_path: str | Path = ":memory:",
     max_connections: int = 5,
 ) -> DuckDBConnectionPool:
-    """Get or create the default DuckDB connection pool."""
+    """Get or create the default DuckDB connection pool.
+
+    ★ FIX: Double-checked locking to prevent race condition when called
+    concurrently from multiple threads during startup.
+    """
     global _default_pool  # noqa: PLW0603
     if _default_pool is None:
-        _default_pool = DuckDBConnectionPool(db_path, max_connections=max_connections)
+        with _pool_init_lock:
+            if _default_pool is None:  # Double-checked locking
+                _default_pool = DuckDBConnectionPool(db_path, max_connections=max_connections)
     return _default_pool

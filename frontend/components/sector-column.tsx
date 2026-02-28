@@ -8,7 +8,7 @@
  */
 
 import { useMarketStore } from "@/stores/market-store";
-import { useRouter } from "next/navigation";
+import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
 interface SectorColumnProps {
@@ -91,7 +91,7 @@ function getRowColors(changePct?: number, hasData?: boolean) {
 
 export function SectorColumn({ title, symbols }: SectorColumnProps) {
     const ticks = useMarketStore((s) => s.ticks);
-    const router = useRouter();
+    const openSymbolPopup = useUIStore((s) => s.openSymbolPopup);
 
     // Calculate sector average change
     let totalChangePct = 0;
@@ -158,7 +158,7 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
                     return (
                         <div
                             key={symbol}
-                            onClick={() => router.push(`/company/${symbol}`)}
+                            onClick={() => openSymbolPopup(symbol)}
                             className={cn(
                                 "grid grid-cols-[2.5fr_2.5fr_2.5fr_2fr] px-2 py-[5px]",
                                 "border-b border-zinc-800/40 cursor-pointer transition-colors",

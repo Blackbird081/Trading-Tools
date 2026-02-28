@@ -1,10 +1,14 @@
-"""DuckDB-backed IdempotencyStore — persistent across restarts."""
+"""DuckDB-backed IdempotencyStore — persistent across restarts.
+
+★ Implements core.ports.IdempotencyPort for Dependency Inversion.
+"""
 from __future__ import annotations
 import asyncio
 import json
 import logging
 from datetime import UTC, datetime, timedelta
 import duckdb
+from core.ports.idempotency import IdempotencyPort
 
 logger = logging.getLogger("oms.idempotency")
 
@@ -19,8 +23,11 @@ CREATE INDEX IF NOT EXISTS idx_idempotency_expires ON idempotency_keys(expires_a
 """
 
 
-class DuckDBIdempotencyStore:
-    """Persistent idempotency store backed by DuckDB."""
+class DuckDBIdempotencyStore(IdempotencyPort):
+    """Persistent idempotency store backed by DuckDB.
+
+    ★ Implements IdempotencyPort for Dependency Inversion.
+    """
 
     def __init__(self, conn: duckdb.DuckDBPyConnection, max_age_hours: int = 24) -> None:
         self._conn = conn

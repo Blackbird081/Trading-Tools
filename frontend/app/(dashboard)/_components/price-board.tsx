@@ -7,7 +7,6 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import type { ColDef, GridReadyEvent, ICellRendererParams } from "ag-grid-community";
@@ -125,8 +124,9 @@ const columnDefs: ColDef[] = [
     pinned: "left",
     width: 72,
     sort: "asc",
-    cellClass: "font-bold text-amber-300 text-sm",
+    cellClass: "font-bold text-amber-300 text-sm cursor-pointer hover:underline",
     headerClass: "text-center",
+    tooltipValueGetter: () => "Click để xem biểu đồ kỹ thuật",
   },
   {
     field: "ceiling",
@@ -216,9 +216,8 @@ const EXCHANGE_TABS: { label: string; value: ExchangeFilter }[] = [
 
 export function PriceBoard() {
   const gridRef = useRef<AgGridReact>(null);
-  const router = useRouter();
   const ticks = useMarketStore((s) => s.ticks);
-  const setActiveSymbol = useUIStore((s) => s.setActiveSymbol);
+  const openSymbolPopup = useUIStore((s) => s.openSymbolPopup);
   const [exchange, setExchange] = useState<ExchangeFilter>("ALL");
   const [search, setSearch] = useState("");
 
@@ -242,19 +241,11 @@ export function PriceBoard() {
   const onRowClicked = useCallback(
     (event: { data?: { symbol?: string } }) => {
       if (event.data?.symbol) {
-        setActiveSymbol(event.data.symbol);
+        // ★ Single click → mở popup symbol với chart + chỉ báo kỹ thuật
+        openSymbolPopup(event.data.symbol);
       }
     },
-    [setActiveSymbol]
-  );
-
-  const onRowDoubleClicked = useCallback(
-    (event: { data?: { symbol?: string } }) => {
-      if (event.data?.symbol) {
-        router.push(`/company/${event.data.symbol}`);
-      }
-    },
-    [router]
+    [openSymbolPopup]
   );
 
   return (
@@ -306,11 +297,11 @@ export function PriceBoard() {
           suppressCellFocus={true}
           onGridReady={onGridReady}
           onRowClicked={onRowClicked}
-          onRowDoubleClicked={onRowDoubleClicked}
           headerHeight={28}
           rowHeight={26}
           domLayout="normal"
-          tooltipShowDelay={500}
+          tooltipShowDelay={300}
+          rowClass="cursor-pointer"
         />
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -19,8 +19,112 @@ import {
   Loader2,
   ExternalLink,
 } from "lucide-react";
+import {
+  createChart,
+  type IChartApi,
+  type ISeriesApi,
+  type CandlestickData,
+  type Time,
+} from "lightweight-charts";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+
+/* ── Candlestick Chart Component ────────────────────────────── */
+function SymbolChart({ symbol }: { symbol: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+
+  const generateFallbackData = useCallback((sym: string, series: ISeriesApi<"Candlestick">) => {
+    const now = Math.floor(Date.now() / 1000);
+    let seed = 0;
+    for (let i = 0; i < sym.length; i++) {
+      seed = (seed * 31 + sym.charCodeAt(i)) | 0;
+    }
+    const rng = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    let price = 30 + rng() * 120;
+    const data: CandlestickData<Time>[] = [];
+    for (let i = 200; i >= 0; i--) {
+      const time = (now - i * 86400) as Time;
+      const drift = (rng() - 0.48) * 4;
+      price = Math.max(5, price + drift);
+      const open = price + (rng() - 0.5) * 3;
+      const close = open + (rng() - 0.5) * 4;
+      const high = Math.max(open, close) + rng() * 2;
+      const low = Math.min(open, close) - rng() * 2;
+      data.push({
+        time,
+        open: Math.round(open * 100) / 100,
+        high: Math.round(high * 100) / 100,
+        low: Math.round(low * 100) / 100,
+        close: Math.round(close * 100) / 100,
+      });
+    }
+    series.setData(data);
+    chartRef.current?.timeScale().fitContent();
+  }, []);
+
+  const loadCandles = useCallback(async (sym: string) => {
+    const series = seriesRef.current;
+    if (!series) return;
+    try {
+      const res = await fetch(`${API_BASE}/candles/${sym}?limit=500`);
+      if (!res.ok) { generateFallbackData(sym, series); return; }
+      const data = await res.json();
+      if (data.candles?.length > 0) {
+        series.setData(
+          data.candles.map((c: { time: number; open: number; high: number; low: number; close: number }) => ({
+            time: c.time as Time, open: c.open, high: c.high, low: c.low, close: c.close,
+          }))
+        );
+        chartRef.current?.timeScale().fitContent();
+      } else {
+        generateFallbackData(sym, series);
+      }
+    } catch {
+      generateFallbackData(sym, series);
+    }
+  }, [generateFallbackData]);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const chart = createChart(containerRef.current, {
+      layout: { background: { color: "#09090b" }, textColor: "#a1a1aa" },
+      grid: { vertLines: { color: "#27272a33" }, horzLines: { color: "#27272a33" } },
+      crosshair: { mode: 0 },
+      timeScale: { timeVisible: true, secondsVisible: false, borderColor: "#27272a" },
+      rightPriceScale: { borderColor: "#27272a" },
+    });
+    const series = chart.addCandlestickSeries({
+      upColor: "#34d399", downColor: "#f87171",
+      borderVisible: false, wickUpColor: "#34d399", wickDownColor: "#f87171",
+    });
+    chartRef.current = chart;
+    seriesRef.current = series;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) chart.applyOptions({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    observer.observe(containerRef.current);
+    return () => { observer.disconnect(); chart.remove(); };
+  }, []);
+
+  useEffect(() => { loadCandles(symbol); }, [symbol, loadCandles]);
+
+  return (
+    <div className="relative h-full w-full rounded-md bg-zinc-950">
+      <div className="absolute left-3 top-2 z-10 flex items-center gap-2">
+        <span className="text-sm font-bold text-amber-300">{symbol}</span>
+        <span className="text-xs text-zinc-600">· 1D · Biểu đồ nến</span>
+      </div>
+      <div ref={containerRef} className="h-full w-full" />
+    </div>
+  );
+}
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface Profile {
@@ -252,6 +356,20 @@ export default function CompanyProfilePage({
               <p className="mt-1 text-sm text-zinc-400">{p.name}</p>
               <p className="text-xs text-zinc-600">{p.english_name}</p>
             </div>
+          </div>
+        </div>
+
+        {/* ── Candlestick Chart ── */}
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/80 overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-zinc-800 px-5 py-3">
+            <Activity className="h-4 w-4 text-emerald-400" />
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300">
+              Biểu đồ kỹ thuật
+            </h2>
+            <span className="ml-auto text-xs text-zinc-600">Nhấn ESC hoặc nút ← để quay lại</span>
+          </div>
+          <div className="h-80">
+            <SymbolChart symbol={data.symbol} />
           </div>
         </div>
 

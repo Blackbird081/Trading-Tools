@@ -59,7 +59,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           reconnectTimer.current = setTimeout(connect, backoff);
         };
 
-        ws.onerror = () => ws.close();
+        ws.onerror = (event) => {
+          // ★ FIX: Log error details for production debugging (Sprint 3.5)
+          console.error("[WS] Connection error:", event);
+          ws.close();
+        };
       } catch {
         setStatus("disconnected");
         // ★ Also use backoff for initial connection failures

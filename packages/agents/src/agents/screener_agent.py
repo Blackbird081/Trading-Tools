@@ -23,12 +23,21 @@ class ScreenerAgent:
     async def run(self, state: AgentState) -> dict[str, Any]:
         """LangGraph node function. Reads state, returns partial update."""
         max_candidates = state.get("max_candidates", 10)
+        # ★ FIX: Read configurable screener parameters from state (Sprint 3.3)
+        min_eps_growth = state.get("screener_min_eps_growth", 0.10)
+        max_pe_ratio = state.get("screener_max_pe_ratio", 15.0)
+        volume_spike_threshold = state.get("screener_volume_spike_threshold", 2.0)
 
         # Step 1: Fundamental screening
-        raw_candidates = await self._screen_candidates()
+        raw_candidates = await self._screen_candidates(
+            min_eps_growth=min_eps_growth,
+            max_pe_ratio=max_pe_ratio,
+        )
 
         # Step 2: Volume spike detection
-        spike_symbols = await self._detect_volume_spikes()
+        spike_symbols = await self._detect_volume_spikes(
+            threshold_multiplier=volume_spike_threshold,
+        )
 
         # Step 3: Build watchlist
         watchlist: list[ScreenerResult] = []
@@ -52,13 +61,20 @@ class ScreenerAgent:
             "watchlist": watchlist,
         }
 
-    async def _screen_candidates(self) -> list[dict[str, Any]]:
-        """Fetch candidates from screener port."""
+    async def _screen_candidates(
+        self,
+        min_eps_growth: float = 0.10,
+        max_pe_ratio: float = 15.0,
+    ) -> list[dict[str, Any]]:
+        """Fetch candidates from screener port.
+
+        ★ FIX: Parameters now configurable via AgentState (Sprint 3.3).
+        """
         try:
             if hasattr(self._screener, "screen"):
                 result: list[dict[str, Any]] = await self._screener.screen(
-                    min_eps_growth=0.10,
-                    max_pe_ratio=15.0,
+                    min_eps_growth=min_eps_growth,
+                    max_pe_ratio=max_pe_ratio,
                 )
                 return result
             if hasattr(self._screener, "get_screener_data"):
@@ -69,12 +85,18 @@ class ScreenerAgent:
             logger.exception("Screening failed")
             return []
 
-    async def _detect_volume_spikes(self) -> set[str]:
-        """Detect volume spikes via tick repo."""
+    async def _detect_volume_spikes(
+        self,
+        threshold_multiplier: float = 2.0,
+    ) -> set[str]:
+        """Detect volume spikes via tick repo.
+
+        ★ FIX: threshold_multiplier now configurable via AgentState (Sprint 3.3).
+        """
         try:
             if hasattr(self._tick_repo, "query_volume_spikes"):
                 results = await self._tick_repo.query_volume_spikes(
-                    threshold_multiplier=2.0,
+                    threshold_multiplier=threshold_multiplier,
                 )
                 return {r["symbol"] for r in results}
             return set()
