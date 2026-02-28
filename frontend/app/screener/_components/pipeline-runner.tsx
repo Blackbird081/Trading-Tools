@@ -33,7 +33,7 @@ import {
 
 import { useUIStore } from "@/stores/ui-store";
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 const PAGE_SIZE = 15;
 
 const AGENT_ICONS: Record<string, React.ReactNode> = {
@@ -564,8 +564,8 @@ export function PipelineRunner() {
         <button
           onClick={handleRun}
           className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all shadow-lg ${isRunning
-              ? "bg-red-600 hover:bg-red-500 text-white shadow-red-900/30"
-              : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30"
+            ? "bg-red-600 hover:bg-red-500 text-white shadow-red-900/30"
+            : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30"
             }`}
         >
           {isRunning ? (
@@ -588,8 +588,8 @@ export function PipelineRunner() {
           <div className="relative h-2 overflow-hidden rounded-full bg-zinc-800">
             <div
               className={`absolute inset-y-0 left-0 rounded-full transition-all duration-200 ${isDone
-                  ? "bg-emerald-500"
-                  : "bg-gradient-to-r from-emerald-600 via-emerald-400 to-emerald-600"
+                ? "bg-emerald-500"
+                : "bg-gradient-to-r from-emerald-600 via-emerald-400 to-emerald-600"
                 }`}
               style={{ width: `${state.percent}%` }}
             />
@@ -629,16 +629,16 @@ export function PipelineRunner() {
                 <div
                   key={step.step}
                   className={`rounded-lg border p-2.5 transition-colors ${step.status === "running"
-                      ? "border-emerald-700/60 bg-emerald-950/30"
-                      : "border-zinc-800/60 bg-zinc-900/40"
+                    ? "border-emerald-700/60 bg-emerald-950/30"
+                    : "border-zinc-800/60 bg-zinc-900/40"
                     }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div
                         className={`flex h-6 w-6 items-center justify-center rounded ${step.status === "running"
-                            ? "bg-emerald-600/20 text-emerald-400"
-                            : "bg-zinc-800 text-emerald-500"
+                          ? "bg-emerald-600/20 text-emerald-400"
+                          : "bg-zinc-800 text-emerald-500"
                           }`}
                       >
                         {step.status === "running" ? (
@@ -830,10 +830,10 @@ export function PipelineRunner() {
                       <td className="px-3 py-2.5 text-center">
                         <span
                           className={`inline-flex items-center gap-1 rounded-md px-2.5 py-0.5 text-[11px] font-bold ${r.action === "BUY"
-                              ? "bg-emerald-600/90 text-white"
-                              : r.action === "SELL"
-                                ? "bg-red-600/90 text-white"
-                                : "bg-zinc-700 text-zinc-300"
+                            ? "bg-emerald-600/90 text-white"
+                            : r.action === "SELL"
+                              ? "bg-red-600/90 text-white"
+                              : "bg-zinc-700 text-zinc-300"
                             }`}
                         >
                           {r.action === "BUY" ? (
@@ -884,10 +884,10 @@ export function PipelineRunner() {
                       <td className="px-3 py-2.5 text-center">
                         <span
                           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${r.risk === "LOW"
-                              ? "bg-emerald-900/40 text-emerald-400"
-                              : r.risk === "MEDIUM"
-                                ? "bg-amber-900/40 text-amber-400"
-                                : "bg-red-900/40 text-red-400"
+                            ? "bg-emerald-900/40 text-emerald-400"
+                            : r.risk === "MEDIUM"
+                              ? "bg-amber-900/40 text-amber-400"
+                              : "bg-red-900/40 text-red-400"
                             }`}
                         >
                           {r.risk === "HIGH" && <AlertTriangle className="h-2.5 w-2.5" />}
@@ -967,8 +967,8 @@ export function PipelineRunner() {
                       key={page}
                       onClick={() => setCurrentPage(page)}
                       className={`min-w-[28px] rounded px-1.5 py-1 text-[11px] font-medium transition-colors ${page === currentPage
-                          ? "bg-emerald-600 text-white"
-                          : "text-zinc-400 hover:bg-zinc-800"
+                        ? "bg-emerald-600 text-white"
+                        : "text-zinc-400 hover:bg-zinc-800"
                         }`}
                     >
                       {page}

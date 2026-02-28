@@ -11,7 +11,7 @@ import {
 import { useMarketStore } from "@/stores/market-store";
 import { useUIStore } from "@/stores/ui-store";
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 export function TradingChart() {
   const containerRef = useRef<HTMLDivElement>(null);
