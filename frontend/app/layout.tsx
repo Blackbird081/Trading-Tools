@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/sidebar";
 import { TopNav } from "@/components/top-nav";
 import { BottomNav } from "@/components/bottom-nav";
 import { CommandPalette } from "@/components/command-palette";
+import { SymbolPopup } from "@/components/symbol-popup";
 import { WebSocketProvider } from "@/providers/ws-provider";
 import "./globals.css";
 
@@ -47,6 +48,8 @@ export default function RootLayout({
           </div>
 
           <CommandPalette />
+          {/* ★ Symbol popup — available globally, triggered by openSymbolPopup() */}
+          <SymbolPopup />
         </WebSocketProvider>
       </body>
     </html>

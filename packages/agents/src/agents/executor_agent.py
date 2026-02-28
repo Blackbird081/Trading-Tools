@@ -41,8 +41,8 @@ class ExecutorAgent:
             if action in (SignalAction.HOLD, SignalAction.SKIP):
                 continue
 
-            # ★ FIX: Use take_profit_price as entry price (not stop_loss/0.93)
-            entry_price = risk.take_profit_price
+            # ★ FIX: Use latest_price (actual market price) as entry price
+            entry_price = risk.latest_price
             if entry_price <= 0:
                 continue
             quantity = self._calculate_quantity(
@@ -63,13 +63,13 @@ class ExecutorAgent:
                     action.value,
                     symbol,
                     quantity,
-                    risk.take_profit_price,
+                    entry_price,
                 )
                 plan = ExecutionPlan(
                     symbol=symbol,
                     action=action,
                     quantity=quantity,
-                    price=risk.take_profit_price,
+                    price=entry_price,
                     order_type="LO",
                     broker="SSI",
                     executed=False,
@@ -82,14 +82,14 @@ class ExecutorAgent:
                     symbol=str(symbol),
                     side=action.value,
                     quantity=quantity,
-                    price=risk.take_profit_price,
+                    price=entry_price,
                     idempotency_key=idempotency_key,
                 )
                 plan = ExecutionPlan(
                     symbol=symbol,
                     action=action,
                     quantity=quantity,
-                    price=risk.take_profit_price,
+                    price=entry_price,
                     order_type="LO",
                     broker="SSI",
                     executed=executed,
@@ -101,7 +101,7 @@ class ExecutorAgent:
                     action.value,
                     symbol,
                     quantity,
-                    risk.take_profit_price,
+                    entry_price,
                     order_id,
                 )
 
@@ -132,7 +132,7 @@ class ExecutorAgent:
                     side=side,
                     order_type="LO",
                     quantity=quantity,
-                    price=float(price),
+                    price=str(price),  # ★ FIX: keep Decimal precision, consistent with SSI broker "★ String, not float"
                     idempotency_key=idempotency_key,
                 )
                 return order_id, True

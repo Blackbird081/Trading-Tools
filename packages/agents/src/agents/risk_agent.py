@@ -68,8 +68,12 @@ class RiskAgent:
             # Rule 2: VaR Calculation
             var_95 = await self._calculate_var(symbol, nav)
 
+            # ★ FIX: Fetch latest_price early — needed for position size AND stop/take-profit
+            latest_price = await self._get_latest_price(symbol)
+
             # Rule 3: Position Size Limit (max 20% NAV)
-            position_pct = self._calculate_position_size(nav, purchasing_power)
+            # ★ FIX: Pass latest_price so position size accounts for actual lot rounding
+            position_pct = self._calculate_position_size(nav, purchasing_power, latest_price)
             max_pct = getattr(
                 self._limits,
                 "max_position_pct",
@@ -99,10 +103,12 @@ class RiskAgent:
                     )
                     continue
 
-            # Calculate Stop-Loss / Take-Profit
-            latest_price = await self._get_latest_price(symbol)
-            stop_loss = latest_price * Decimal("0.93")
-            take_profit = latest_price * Decimal("1.10")
+            # Calculate Stop-Loss / Take-Profit using configurable percentages
+            # ★ FIX: stop_loss_pct default 5% (not 7% = price band floor)
+            stop_loss_pct = getattr(self._limits, "stop_loss_pct", Decimal("0.05"))
+            take_profit_pct = getattr(self._limits, "take_profit_pct", Decimal("0.15"))
+            stop_loss = latest_price * (Decimal("1") - stop_loss_pct)
+            take_profit = latest_price * (Decimal("1") + take_profit_pct)
 
             # APPROVED
             assessment = RiskAssessment(
@@ -110,6 +116,7 @@ class RiskAgent:
                 approved=True,
                 var_95=var_95,
                 position_size_pct=position_pct,
+                latest_price=latest_price,   # ★ FIX: store actual market price
                 stop_loss_price=stop_loss,
                 take_profit_price=take_profit,
                 rejection_reason=None,
@@ -135,6 +142,7 @@ class RiskAgent:
             approved=False,
             var_95=Decimal("0"),
             position_size_pct=Decimal("0"),
+            latest_price=Decimal("0"),   # ★ FIX: required field
             stop_loss_price=Decimal("0"),
             take_profit_price=Decimal("0"),
             rejection_reason=reason,
@@ -163,10 +171,25 @@ class RiskAgent:
         self,
         nav: Decimal,
         purchasing_power: Decimal,
+        latest_price: Decimal | None = None,
     ) -> Decimal:
+        """Calculate position size as % of NAV.
+
+        ★ FIX: Takes into account latest_price to compute actual lot-rounded value.
+        Returns the fraction of NAV that will actually be used.
+        """
         if nav <= 0:
             return Decimal("0")
-        return min(purchasing_power / nav, Decimal("0.20"))
+        max_pct = getattr(self._limits, "max_position_pct", Decimal("0.20"))
+        max_order_value = nav * max_pct
+        affordable = min(purchasing_power, max_order_value)
+        if latest_price and latest_price > 0:
+            # Round down to nearest lot (100 shares) to get actual order value
+            lots = int(affordable / latest_price) // 100
+            actual_value = Decimal(lots * 100) * latest_price
+            return actual_value / nav if nav > 0 else Decimal("0")
+        # Fallback: simple ratio without price info
+        return min(affordable / nav, max_pct)
 
     async def _get_latest_price(self, symbol: Any) -> Decimal:
         try:

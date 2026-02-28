@@ -2,7 +2,6 @@
 
 import { Suspense } from "react";
 import { PriceBoard } from "./_components/price-board";
-import { TradingChart } from "./_components/trading-chart";
 import { DataLoader } from "./_components/data-loader";
 import { MarketIndexBar } from "@/components/market-index-bar";
 import { TradingErrorBoundary } from "@/components/error-boundary";
@@ -24,17 +23,10 @@ export default function DashboardPage() {
       {/* ── Data loader bar ── */}
       <DataLoader />
 
-      {/* ── Main content ── */}
-      <div className="grid flex-1 grid-cols-[1fr_380px] grid-rows-[60%_40%] gap-0.5 min-h-0 p-0.5">
-        {/* Chart */}
-        <TradingErrorBoundary>
-          <Suspense fallback={<LoadingSkeleton />}>
-            <TradingChart />
-          </Suspense>
-        </TradingErrorBoundary>
-
-        {/* Price Board — spans 2 rows */}
-        <div className="row-span-2 border border-zinc-800/50 rounded-sm overflow-hidden">
+      {/* ── Main content: Price Board chiếm toàn bộ không gian ── */}
+      <div className="flex flex-1 min-h-0 gap-0.5 p-0.5">
+        {/* Price Board — full width */}
+        <div className="flex-1 border border-zinc-800/50 rounded-sm overflow-hidden">
           <TradingErrorBoundary>
             <Suspense fallback={<LoadingSkeleton />}>
               <PriceBoard />
@@ -42,16 +34,25 @@ export default function DashboardPage() {
           </TradingErrorBoundary>
         </div>
 
-        {/* Agent Signals panel */}
+        {/* Agent Signals panel — sidebar nhỏ bên phải */}
         <TradingErrorBoundary>
-          <div className="bg-zinc-900/80 border border-zinc-800/50 rounded-sm p-3 overflow-auto">
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
-                Agent Signals
-              </h3>
-              <span className="text-xs text-zinc-600">— Real-time AI analysis</span>
+          <div className="w-72 shrink-0 bg-zinc-900/80 border border-zinc-800/50 rounded-sm p-3 overflow-auto flex flex-col gap-3">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+                  Agent Signals
+                </h3>
+                <span className="text-xs text-zinc-600">— AI analysis</span>
+              </div>
+              <p className="text-zinc-600 text-xs">Đang chờ tín hiệu từ pipeline...</p>
             </div>
-            <p className="text-zinc-600 text-xs">Đang chờ tín hiệu từ pipeline...</p>
+
+            {/* Hướng dẫn click-to-chart */}
+            <div className="mt-auto pt-3 border-t border-zinc-800/60">
+              <p className="text-[11px] text-zinc-500 leading-relaxed">
+                💡 <span className="text-zinc-400">Click vào mã cổ phiếu</span> để xem biểu đồ kỹ thuật chi tiết.
+              </p>
+            </div>
           </div>
         </TradingErrorBoundary>
       </div>

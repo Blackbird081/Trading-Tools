@@ -17,11 +17,16 @@ class RiskLimit:
     ★ max_position_pct: Maximum single order as % of NAV.
     ★ max_daily_loss: Daily loss limit (absolute VND).
     ★ kill_switch_active: Emergency halt — blocks ALL trading.
+    ★ stop_loss_pct: Stop-loss distance below entry price (default 5%).
+    ★ take_profit_pct: Take-profit distance above entry price (default 15%).
     """
 
     max_position_pct: Decimal  # e.g., 0.20 = 20% of NAV per order
     max_daily_loss: Decimal  # Maximum acceptable daily loss (VND)
     kill_switch_active: bool  # Emergency halt switch
+    # ★ FIX: Configurable stop-loss/take-profit (not hardcoded ±7%/±10%)
+    stop_loss_pct: Decimal = Decimal("0.05")    # 5% below entry (not 7% = HOSE floor)
+    take_profit_pct: Decimal = Decimal("0.15")  # 15% above entry
 
 
 @dataclass(frozen=True, slots=True)
