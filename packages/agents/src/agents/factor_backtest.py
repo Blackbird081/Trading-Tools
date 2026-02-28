@@ -78,11 +78,45 @@ class FactorBacktestResult:
     ic_series: list[float] = field(default_factory=list)  # Information Coefficient per period
     turnover_series: list[float] = field(default_factory=list)  # Portfolio turnover per period
 
+    # ★ NEW: VN-Index benchmark comparison
+    benchmark_return_pct: float | None = None  # VN-Index return over same period
+    benchmark_nav: list[Decimal] = field(default_factory=list)  # VN-Index NAV series
+
     @property
     def total_return_pct(self) -> float:
         if self.initial_capital == 0:
             return 0.0
         return float((self.final_capital - self.initial_capital) / self.initial_capital)
+
+    @property
+    def alpha(self) -> float | None:
+        """Alpha vs VN-Index benchmark (excess return)."""
+        if self.benchmark_return_pct is None:
+            return None
+        return self.total_return_pct - self.benchmark_return_pct
+
+    @property
+    def information_ratio_vs_benchmark(self) -> float | None:
+        """Information Ratio vs benchmark (alpha / tracking error)."""
+        if not self.daily_nav or not self.benchmark_nav:
+            return None
+        if len(self.daily_nav) != len(self.benchmark_nav):
+            return None
+        # Calculate excess returns
+        excess_returns = []
+        for i in range(1, len(self.daily_nav)):
+            if self.daily_nav[i - 1] > 0 and self.benchmark_nav[i - 1] > 0:
+                port_r = float((self.daily_nav[i] - self.daily_nav[i - 1]) / self.daily_nav[i - 1])
+                bench_r = float((self.benchmark_nav[i] - self.benchmark_nav[i - 1]) / self.benchmark_nav[i - 1])
+                excess_returns.append(port_r - bench_r)
+        if len(excess_returns) < 2:
+            return None
+        mean_excess = sum(excess_returns) / len(excess_returns)
+        variance = sum((r - mean_excess) ** 2 for r in excess_returns) / (len(excess_returns) - 1)
+        std = math.sqrt(variance)
+        if std == 0:
+            return None
+        return (mean_excess / std) * math.sqrt(252)
 
     @property
     def ic_mean(self) -> float | None:
@@ -132,7 +166,7 @@ class FactorBacktestResult:
         return (mean_r / std) * math.sqrt(252)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "factor_name": self.factor_name,
             "total_return_pct": f"{self.total_return_pct * 100:.2f}%",
             "ic_mean": f"{self.ic_mean:.4f}" if self.ic_mean else "N/A",
@@ -141,6 +175,16 @@ class FactorBacktestResult:
             "sharpe_ratio": f"{self.sharpe_ratio:.4f}" if self.sharpe_ratio else "N/A",
             "trade_count": len(self.trades),
         }
+        # ★ NEW: VN-Index benchmark metrics
+        if self.benchmark_return_pct is not None:
+            result["benchmark_return_pct"] = f"{self.benchmark_return_pct * 100:.2f}%"
+        alpha = self.alpha
+        if alpha is not None:
+            result["alpha_vs_vnindex"] = f"{alpha * 100:.2f}%"
+        ir_bench = self.information_ratio_vs_benchmark
+        if ir_bench is not None:
+            result["ir_vs_benchmark"] = f"{ir_bench:.4f}"
+        return result
 
 
 # ── Factor Definitions ────────────────────────────────────────────────────────

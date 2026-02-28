@@ -96,6 +96,7 @@ class FinancialPromptBuilder:
         pe_ratio: float | None = None,
         news_headlines: list[str] | None = None,
         prompt_version: str | None = None,
+        extra_context: str | None = None,  # ★ NEW: early warning + DuPont context
     ) -> tuple[str, PromptVersion]:
         """Build complete prompt for Fundamental Agent."""
         if prompt_version:
@@ -115,6 +116,7 @@ class FinancialPromptBuilder:
             eps_growth=eps_growth,
             pe_ratio=pe_ratio,
             news_headlines=news_headlines,
+            extra_context=extra_context,
         )
 
         full_prompt = (
@@ -136,6 +138,7 @@ class FinancialPromptBuilder:
         eps_growth: float | None,
         pe_ratio: float | None,
         news_headlines: list[str] | None,
+        extra_context: str | None = None,  # ★ NEW
     ) -> str:
         lines = [
             f"Phan tich ma: {symbol} ({company_name})",
@@ -161,6 +164,12 @@ class FinancialPromptBuilder:
             lines.append("## Tin tuc gan day:")
             for headline in news_headlines[:5]:
                 lines.append(f"- {headline}")
+
+        # ★ NEW: Inject early warning + DuPont context
+        if extra_context:
+            lines.append("")
+            lines.append("## Phan tich tai chinh nang cao:")
+            lines.append(extra_context.strip())
 
         lines.append("")
         lines.append("Hay phan tich va dua ra khuyen nghi.")

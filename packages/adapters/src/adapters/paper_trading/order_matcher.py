@@ -2,6 +2,7 @@
 
 ★ Inspired by FinceptTerminal's PaperOrderMatcher.
 ★ Scoped by portfolio_id:symbol to prevent cross-broker contamination.
+★ VN-specific: lot size 100, price band ±7%/±10%/±15%.
 """
 from __future__ import annotations
 import logging
@@ -13,6 +14,18 @@ from core.entities.order import Order, OrderSide, OrderStatus
 from core.value_objects import Symbol
 
 logger = logging.getLogger("paper_trading.matcher")
+
+# ── VN Market Constants ────────────────────────────────────────────────────────
+VN_LOT_SIZE = 100  # VN stock market: orders must be multiples of 100 shares
+
+# Price band by exchange (percentage from reference price)
+# HOSE: ±7%, HNX: ±10%, UPCOM: ±15%
+VN_PRICE_BAND: dict[str, Decimal] = {
+    "HOSE": Decimal("0.07"),
+    "HNX": Decimal("0.10"),
+    "UPCOM": Decimal("0.15"),
+    "DEFAULT": Decimal("0.07"),  # Default to HOSE
+}
 
 
 @dataclass
@@ -54,13 +67,47 @@ class PaperOrderMatcher:
         self._cash[portfolio_id] = initial_cash
         self._positions[portfolio_id] = {}
 
-    def add_order(self, order: Order, portfolio_id: str) -> bool:
+    def add_order(
+        self,
+        order: Order,
+        portfolio_id: str,
+        reference_price: Decimal | None = None,
+        exchange: str = "HOSE",
+    ) -> bool:
+        """Add order to pending queue with VN market validation.
+
+        ★ VN-specific: validates lot size (multiple of 100) and price band.
+        """
         if order.status != OrderStatus.CREATED:
             return False
+
+        # ★ VN Rule 1: Lot size must be multiple of 100
+        if order.quantity % VN_LOT_SIZE != 0:
+            logger.warning(
+                "Order rejected: quantity %d is not a multiple of %d (VN lot size)",
+                order.quantity, VN_LOT_SIZE,
+            )
+            return False
+
+        # ★ VN Rule 2: Price band check (if reference price provided)
+        if reference_price is not None and reference_price > 0 and order.order_type.value == "LO":
+            band_pct = VN_PRICE_BAND.get(exchange, VN_PRICE_BAND["DEFAULT"])
+            order_price = Decimal(str(order.price))
+            ceiling = reference_price * (1 + band_pct)
+            floor = reference_price * (1 - band_pct)
+            if order_price > ceiling or order_price < floor:
+                logger.warning(
+                    "Order rejected: price %s outside band [%s, %s] for %s",
+                    order_price, floor, ceiling, exchange,
+                )
+                return False
+
+        # Cash check for BUY orders
         if order.side == OrderSide.BUY:
             order_value = Decimal(str(order.price)) * order.quantity
             if order_value > self._cash.get(portfolio_id, Decimal("0")):
                 return False
+
         key = self._scoped_key(portfolio_id, str(order.symbol))
         self._pending.setdefault(key, []).append(order)
         return True

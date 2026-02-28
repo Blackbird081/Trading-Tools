@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from core.value_objects import Symbol
 
@@ -100,6 +100,10 @@ class AgentState(TypedDict, total=False):
     execution_plans: list[ExecutionPlan]
     # Fundamental Agent Output (Optional)
     ai_insights: dict[Symbol, str]
+    # ★ NEW: Financial Analysis Results (baocaotaichinh-inspired)
+    early_warning_results: dict[str, Any]   # symbol → EarlyWarningResult.summary
+    industry_analysis_results: dict[str, Any]  # symbol → industry metrics dict
+    dupont_results: dict[str, Any]          # symbol → DuPontResult summary
     # Portfolio Context
     current_nav: Decimal
     current_positions: dict[Symbol, int]

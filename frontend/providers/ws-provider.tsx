@@ -8,9 +8,15 @@ import type { TickData, CandleData, AgentSignal, Position } from "@/types/market
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000/ws/market";
 
+// ★ Exponential backoff constants
+const RECONNECT_BASE_MS = 1_000;   // 1s initial delay
+const RECONNECT_MAX_MS = 30_000;   // 30s max delay
+const RECONNECT_JITTER_MS = 500;   // ±500ms jitter to avoid thundering herd
+
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const attemptRef = useRef<number>(0);  // ★ Track reconnect attempts for backoff
 
   useEffect(() => {
     function connect() {
@@ -20,6 +26,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
         ws.onopen = () => {
           clearTimeout(reconnectTimer.current);
+          attemptRef.current = 0;  // ★ Reset backoff on successful connection
           console.debug("[WS] Connected to", WS_URL);
         };
 
@@ -36,12 +43,27 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         };
 
         ws.onclose = () => {
-          reconnectTimer.current = setTimeout(connect, 2000);
+          // ★ Exponential backoff: delay = min(base * 2^attempt + jitter, max)
+          const attempt = attemptRef.current;
+          const backoff = Math.min(
+            RECONNECT_BASE_MS * Math.pow(2, attempt) + Math.random() * RECONNECT_JITTER_MS,
+            RECONNECT_MAX_MS,
+          );
+          attemptRef.current = attempt + 1;
+          console.debug(`[WS] Disconnected. Reconnecting in ${Math.round(backoff)}ms (attempt ${attempt + 1})`);
+          reconnectTimer.current = setTimeout(connect, backoff);
         };
 
         ws.onerror = () => ws.close();
       } catch {
-        reconnectTimer.current = setTimeout(connect, 5000);
+        // ★ Also use backoff for initial connection failures
+        const attempt = attemptRef.current;
+        const backoff = Math.min(
+          RECONNECT_BASE_MS * Math.pow(2, attempt) + Math.random() * RECONNECT_JITTER_MS,
+          RECONNECT_MAX_MS,
+        );
+        attemptRef.current = attempt + 1;
+        reconnectTimer.current = setTimeout(connect, backoff);
       }
     }
 

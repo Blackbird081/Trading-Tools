@@ -9,6 +9,9 @@ from agents.state import AgentPhase, AgentState, RiskAssessment
 
 logger = logging.getLogger("agents.risk")
 
+# ★ Early warning risk levels that block trading
+_BLOCKED_RISK_LEVELS = frozenset({"critical"})
+
 
 class RiskAgent:
     """Middleware agent — validates every trade signal.
@@ -28,12 +31,15 @@ class RiskAgent:
         nav = state.get("current_nav", Decimal("0"))
         positions = state.get("current_positions", {})
         purchasing_power = state.get("purchasing_power", Decimal("0"))
+        # ★ NEW: Early warning results from FundamentalAgent
+        early_warning_results: dict[str, Any] = state.get("early_warning_results", {})
 
         assessments: list[RiskAssessment] = []
         approved: list[Any] = []
         now = datetime.now(UTC)
 
         for symbol in top_candidates:
+            symbol_str = str(symbol)
             tech = scores.get(symbol)
             if tech is None:
                 continue
@@ -41,6 +47,22 @@ class RiskAgent:
             # Rule 1: Kill Switch
             if getattr(self._limits, "kill_switch_active", False):
                 assessments.append(self._reject(symbol, now, "Kill switch is ACTIVE"))
+                continue
+
+            # ★ Rule 1b: Early Warning — block if risk_level == critical
+            ew = early_warning_results.get(symbol_str)
+            if ew and ew.get("risk_level") in _BLOCKED_RISK_LEVELS:
+                risk_score = ew.get("risk_score", 0)
+                alerts = ew.get("alerts", [])
+                alert_summary = "; ".join(alerts[:3]) if alerts else "Rủi ro tài chính nghiêm trọng"
+                assessments.append(self._reject(
+                    symbol, now,
+                    f"Early Warning CRITICAL (score={risk_score:.0f}/100): {alert_summary}",
+                ))
+                logger.warning(
+                    "Trade blocked by Early Warning: %s score=%.0f level=%s",
+                    symbol_str, risk_score, ew.get("risk_level"),
+                )
                 continue
 
             # Rule 2: VaR Calculation
