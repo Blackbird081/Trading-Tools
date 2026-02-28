@@ -3,6 +3,7 @@
 import { SectorColumn } from "@/components/sector-column";
 import { MarketIndexBar } from "@/components/market-index-bar";
 import { DataLoader } from "@/app/(dashboard)/_components/data-loader";
+import { TradingErrorBoundary } from "@/components/error-boundary";
 
 const SECTORS = [
     {
@@ -37,12 +38,19 @@ export default function MarketBoardPage() {
             <MarketIndexBar />
             <DataLoader />
 
-            {/* Board Layout Container */}
-            <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4 pt-2 px-2 custom-scrollbar">
-                <div className="flex gap-2 h-full min-w-max items-start">
+            {/* ★ Fix: Board Layout Container — thanh cuộn ngang hiển thị đúng */}
+            {/* Dùng overflow-auto thay vì overflow-x-auto + overflow-y-hidden */}
+            {/* min-h-0 để flex child có thể shrink đúng cách */}
+            <div className="flex-1 min-h-0 overflow-auto pb-4 pt-2 px-2">
+                {/* min-w-max đảm bảo container không bị co lại, kích hoạt scroll ngang */}
+                <div className="flex gap-2 min-w-max h-full items-start">
                     {SECTORS.map((sector) => (
-                        <div key={sector.title} className="w-[320px] h-full flex flex-col">
-                            <SectorColumn title={sector.title} symbols={sector.symbols} />
+                        // ★ Fix: bỏ h-full, dùng flex-col + min-h-0 để column scroll đúng
+                        <div key={sector.title} className="w-[300px] flex flex-col min-h-0">
+                            {/* ★ Fix: wrap với Error Boundary để 1 column crash không ảnh hưởng cột khác */}
+                            <TradingErrorBoundary>
+                                <SectorColumn title={sector.title} symbols={sector.symbols} />
+                            </TradingErrorBoundary>
                         </div>
                     ))}
                 </div>
