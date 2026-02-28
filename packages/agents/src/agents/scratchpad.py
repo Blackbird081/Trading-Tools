@@ -29,7 +29,8 @@ logger = logging.getLogger("agents.scratchpad")
 DEFAULT_MAX_CALLS_PER_TOOL = 3
 SIMILARITY_THRESHOLD = 0.7
 
-SCRATCHPAD_DIR = Path(".trading/scratchpad")
+# ★ Configurable via TRADING_SCRATCHPAD_DIR env var
+SCRATCHPAD_DIR = Path(os.getenv("TRADING_SCRATCHPAD_DIR", ".trading/scratchpad"))
 
 
 class AgentScratchpad:

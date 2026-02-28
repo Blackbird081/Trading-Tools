@@ -80,8 +80,8 @@ class ApprovalManager:
         # Create approval request ID
         request_id = f"approval_{tool}_{id(args)}"
 
-        # Create future for response
-        future: asyncio.Future[ApprovalDecision] = asyncio.get_event_loop().create_future()
+        # Create future for response (use get_running_loop() — Python 3.10+ compatible)
+        future: asyncio.Future[ApprovalDecision] = asyncio.get_running_loop().create_future()
         self._pending_approvals[request_id] = future
 
         # Send approval request to frontend
@@ -151,6 +151,42 @@ class ApprovalManager:
     def clear_session_approvals(self) -> None:
         """Clear all session-approved tools (e.g., on session end)."""
         self._session_approved.clear()
+
+    @property
+    def has_pending_approvals(self) -> bool:
+        """Check if there are any pending approval requests."""
+        return bool(self._pending_approvals)
+
+
+# ── Module-level singleton ────────────────────────────────────────────────────
+
+_approval_manager: ApprovalManager | None = None
+
+
+def get_approval_manager() -> ApprovalManager | None:
+    """Get the global ApprovalManager singleton."""
+    return _approval_manager
+
+
+def set_approval_manager(manager: ApprovalManager) -> None:
+    """Set the global ApprovalManager singleton (called at startup)."""
+    global _approval_manager  # noqa: PLW0603
+    _approval_manager = manager
+
+
+def handle_approval_response(request_id: str, decision: str) -> bool:
+    """Handle approval response from WebSocket client.
+
+    ★ Called by WebSocket message handler when frontend sends approval decision.
+    ★ Message format: {"type": "tool_approval_response", "requestId": "...", "decision": "allow-once"}
+
+    Returns True if approval was found and resolved.
+    """
+    manager = get_approval_manager()
+    if manager is None:
+        logger.warning("No ApprovalManager configured — cannot resolve approval")
+        return False
+    return manager.resolve_approval(request_id, decision)
 
     @staticmethod
     def _format_approval_message(tool: str, args: dict[str, Any]) -> str:

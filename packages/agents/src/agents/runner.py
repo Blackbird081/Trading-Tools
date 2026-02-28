@@ -8,17 +8,16 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
-from typing import Any, AsyncIterator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from agents.scratchpad import AgentScratchpad
 from agents.token_counter import TokenCounter
 
 logger = logging.getLogger("agents.runner")
 
-# Context management constants (Dexter-inspired)
-CONTEXT_THRESHOLD_TOKENS = 100_000  # Clear context when estimated tokens exceed this
-KEEP_TOOL_RESULTS = 5               # Keep N most recent tool results after clearing
-MAX_ITERATIONS = 10                 # Max pipeline iterations before giving up
+# Pipeline constants
+MAX_ITERATIONS = 10  # Max pipeline iterations before giving up
 
 
 async def run_trading_pipeline(
@@ -78,7 +77,7 @@ async def run_with_streaming(
     initial_state: dict[str, Any],
     ws_manager: Any = None,
     query: str = "Streaming pipeline run",
-) -> AsyncIterator[dict[str, Any]]:
+) -> AsyncGenerator[dict[str, Any], None]:
     """Execute with real-time streaming for WebSocket updates.
 
     ★ Yields events for each agent node update.

@@ -36,13 +36,26 @@ COST_PER_1M_OUTPUT: dict[str, float] = {
 
 @dataclass
 class TokenUsage:
-    """Token usage for a single LLM call."""
+    """Token usage for a single LLM call.
+
+    ★ total_tokens is auto-calculated as input + output if not provided.
+    """
 
     input_tokens: int = 0
     output_tokens: int = 0
-    total_tokens: int = 0
+    _total_tokens: int = field(default=0, repr=False)
     model: str = "unknown"
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        """Auto-calculate total_tokens if not explicitly set."""
+        if self._total_tokens == 0 and (self.input_tokens > 0 or self.output_tokens > 0):
+            self._total_tokens = self.input_tokens + self.output_tokens
+
+    @property
+    def total_tokens(self) -> int:
+        """Total tokens = input + output."""
+        return self._total_tokens if self._total_tokens > 0 else self.input_tokens + self.output_tokens
 
     @property
     def estimated_cost_usd(self) -> float:
@@ -97,7 +110,7 @@ class TokenCounter:
 
     @property
     def total_tokens(self) -> int:
-        return sum(c.total_tokens for c in self._calls)
+        return sum(c.total_tokens for c in self._calls)  # Uses auto-calculated property
 
     @property
     def total_cost_usd(self) -> float:

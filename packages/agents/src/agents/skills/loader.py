@@ -129,22 +129,41 @@ def _parse_frontmatter(content: str) -> tuple[dict[str, str], str]:
     """Parse YAML frontmatter from Markdown content.
 
     Returns (frontmatter_dict, body_content).
+    ★ Handles multi-line values (folded/literal YAML blocks).
+    ★ Simple parser: only supports key: value pairs (no nested structures).
     """
     if not content.startswith("---"):
         return {}, content
 
-    match = re.match(r"^---\n(.*?)\n---\n(.*)", content, re.DOTALL)
+    match = re.match(r"^---\n(.*?)\n---\n?(.*)", content, re.DOTALL)
     if not match:
         return {}, content
 
     frontmatter_str = match.group(1)
     body = match.group(2)
 
-    # Simple YAML key: value parser (no nested structures)
+    # Parse YAML key: value pairs
+    # Handles: key: value, key: "value", key: 'value'
+    # Also handles multi-line values by joining continuation lines
     frontmatter: dict[str, str] = {}
+    current_key: str | None = None
+    current_value_parts: list[str] = []
+
     for line in frontmatter_str.split("\n"):
-        if ":" in line:
-            key, _, value = line.partition(":")
-            frontmatter[key.strip()] = value.strip().strip('"').strip("'")
+        # Check if this is a new key: value line
+        key_match = re.match(r"^(\w[\w\s-]*)\s*:\s*(.*)", line)
+        if key_match:
+            # Save previous key if any
+            if current_key is not None:
+                frontmatter[current_key] = " ".join(current_value_parts).strip().strip('"').strip("'")
+            current_key = key_match.group(1).strip()
+            current_value_parts = [key_match.group(2).strip()]
+        elif current_key is not None and line.startswith("  "):
+            # Continuation line (indented)
+            current_value_parts.append(line.strip())
+
+    # Save last key
+    if current_key is not None:
+        frontmatter[current_key] = " ".join(current_value_parts).strip().strip('"').strip("'")
 
     return frontmatter, body
