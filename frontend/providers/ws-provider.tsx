@@ -19,7 +19,10 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const attemptRef = useRef<number>(0);  // ★ Track reconnect attempts for backoff
 
   useEffect(() => {
+    const setStatus = useMarketStore.getState().setConnectionStatus;
+
     function connect() {
+      setStatus("connecting");
       try {
         const ws = new WebSocket(WS_URL);
         wsRef.current = ws;
@@ -27,6 +30,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         ws.onopen = () => {
           clearTimeout(reconnectTimer.current);
           attemptRef.current = 0;  // ★ Reset backoff on successful connection
+          setStatus("connected");
           console.debug("[WS] Connected to", WS_URL);
         };
 
@@ -43,6 +47,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         };
 
         ws.onclose = () => {
+          setStatus("disconnected");
           // ★ Exponential backoff: delay = min(base * 2^attempt + jitter, max)
           const attempt = attemptRef.current;
           const backoff = Math.min(
@@ -56,6 +61,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
         ws.onerror = () => ws.close();
       } catch {
+        setStatus("disconnected");
         // ★ Also use backoff for initial connection failures
         const attempt = attemptRef.current;
         const backoff = Math.min(

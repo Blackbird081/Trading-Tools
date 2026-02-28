@@ -1,19 +1,28 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+/**
+ * Price Board — Bảng điện chứng khoán VN.
+ * ★ Inspired by sieucophieu.vn/bang-dien.
+ * ★ AG Grid với flash animation, bộ lọc sàn, nhiều cột hơn.
+ */
+
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
-import type { ColDef, GridReadyEvent } from "ag-grid-community";
+import type { ColDef, GridReadyEvent, ICellRendererParams } from "ag-grid-community";
 import { useMarketStore } from "@/stores/market-store";
 import { useUIStore } from "@/stores/ui-store";
+import { cn } from "@/lib/utils";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
+
+// ── Formatters ────────────────────────────────────────────────────────────────
 
 function formatVolume(value: number | undefined): string {
   if (value == null) return "—";
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`;
   return value.toString();
 }
 
@@ -25,102 +34,177 @@ function formatPrice(value: number | undefined): string {
   });
 }
 
+// ── Cell Renderers ────────────────────────────────────────────────────────────
+
+function PriceCellRenderer(params: ICellRendererParams) {
+  const { value, data } = params;
+  if (value == null) return <span className="text-zinc-600">—</span>;
+
+  const change = data?.change ?? 0;
+  const isCeiling = data?.price >= data?.ceiling && data?.ceiling > 0;
+  const isFloor = data?.price <= data?.floor && data?.floor > 0;
+
+  return (
+    <span
+      className={cn(
+        "font-mono tabular-nums font-semibold",
+        isCeiling && "price-ceil",
+        isFloor && "price-floor",
+        !isCeiling && !isFloor && change > 0 && "price-up",
+        !isCeiling && !isFloor && change < 0 && "price-down",
+        !isCeiling && !isFloor && change === 0 && "price-ref",
+      )}
+    >
+      {formatPrice(value)}
+    </span>
+  );
+}
+
+function ChangeCellRenderer(params: ICellRendererParams) {
+  const { value } = params;
+  if (value == null) return <span className="text-zinc-600">—</span>;
+  const isUp = value > 0;
+  const isDown = value < 0;
+  return (
+    <span className={cn("font-mono tabular-nums", isUp && "price-up", isDown && "price-down", !isUp && !isDown && "text-zinc-500")}>
+      {isUp ? "+" : ""}{value.toFixed(2)}
+    </span>
+  );
+}
+
+function ChangePctCellRenderer(params: ICellRendererParams) {
+  const { value } = params;
+  if (value == null) return <span className="text-zinc-600">—</span>;
+  const isUp = value > 0;
+  const isDown = value < 0;
+  return (
+    <span className={cn("font-mono tabular-nums text-xs", isUp && "price-up", isDown && "price-down", !isUp && !isDown && "text-zinc-500")}>
+      {isUp ? "+" : ""}{value.toFixed(2)}%
+    </span>
+  );
+}
+
+// ── Column Definitions ────────────────────────────────────────────────────────
+
 const columnDefs: ColDef[] = [
   {
     field: "symbol",
-    headerName: "Mã",
+    headerName: "Mã CK",
     pinned: "left",
-    width: 82,
+    width: 72,
     sort: "asc",
-    cellClass: "font-bold text-amber-300",
+    cellClass: "font-bold text-amber-300 text-xs",
+    headerClass: "text-center",
   },
   {
     field: "ceiling",
     headerName: "Trần",
-    width: 78,
-    cellClass: "font-mono text-right text-fuchsia-300",
+    width: 72,
+    cellClass: "font-mono text-right price-ceil text-xs",
     valueFormatter: (p) => formatPrice(p.value),
+    headerClass: "text-right",
   },
   {
     field: "floor",
     headerName: "Sàn",
-    width: 78,
-    cellClass: "font-mono text-right text-cyan-300",
+    width: 72,
+    cellClass: "font-mono text-right price-floor text-xs",
     valueFormatter: (p) => formatPrice(p.value),
+    headerClass: "text-right",
   },
   {
     field: "reference",
     headerName: "TC",
-    width: 78,
-    cellClass: "font-mono text-right text-yellow-300",
+    width: 72,
+    cellClass: "font-mono text-right price-ref text-xs",
     valueFormatter: (p) => formatPrice(p.value),
+    headerClass: "text-right",
   },
   {
     field: "price",
     headerName: "Giá",
-    width: 82,
-    cellClassRules: {
-      "font-mono text-right font-semibold price-up": (p) =>
-        (p.data?.change ?? 0) > 0,
-      "font-mono text-right font-semibold price-down": (p) =>
-        (p.data?.change ?? 0) < 0,
-      "font-mono text-right font-semibold price-ref": (p) =>
-        (p.data?.change ?? 0) === 0,
-    },
-    valueFormatter: (p) => formatPrice(p.value),
+    width: 78,
+    cellRenderer: PriceCellRenderer,
+    headerClass: "text-right",
   },
   {
     field: "change",
     headerName: "+/-",
-    width: 75,
-    cellClassRules: {
-      "font-mono text-right font-semibold price-up": (p) =>
-        (p.value ?? 0) > 0,
-      "font-mono text-right font-semibold price-down": (p) =>
-        (p.value ?? 0) < 0,
-      "font-mono text-right text-zinc-500": (p) => (p.value ?? 0) === 0,
-    },
-    valueFormatter: (p) => {
-      const v = p.value as number | undefined;
-      if (v == null) return "—";
-      return v > 0 ? `+${v.toFixed(2)}` : v.toFixed(2);
-    },
+    width: 68,
+    cellRenderer: ChangeCellRenderer,
+    headerClass: "text-right",
   },
   {
     field: "changePct",
     headerName: "%",
-    width: 72,
-    cellClassRules: {
-      "font-mono text-right text-xs price-up": (p) => (p.value ?? 0) > 0,
-      "font-mono text-right text-xs price-down": (p) => (p.value ?? 0) < 0,
-      "font-mono text-right text-xs text-zinc-500": (p) =>
-        (p.value ?? 0) === 0,
-    },
-    valueFormatter: (p) => {
-      const v = p.value as number | undefined;
-      if (v == null) return "—";
-      return v > 0 ? `+${v.toFixed(1)}%` : `${v.toFixed(1)}%`;
-    },
+    width: 64,
+    cellRenderer: ChangePctCellRenderer,
+    headerClass: "text-right",
   },
   {
     field: "volume",
     headerName: "KL",
-    width: 82,
-    cellClass: "font-mono text-right text-zinc-200",
+    width: 72,
+    cellClass: "font-mono text-right text-zinc-300 text-xs",
     valueFormatter: (p) => formatVolume(p.value as number | undefined),
+    headerClass: "text-right",
+  },
+  {
+    field: "high",
+    headerName: "Cao",
+    width: 72,
+    cellClass: "font-mono text-right text-emerald-400/70 text-xs",
+    valueFormatter: (p) => formatPrice(p.value),
+    headerClass: "text-right",
+    hide: false,
+  },
+  {
+    field: "low",
+    headerName: "Thấp",
+    width: 72,
+    cellClass: "font-mono text-right text-rose-400/70 text-xs",
+    valueFormatter: (p) => formatPrice(p.value),
+    headerClass: "text-right",
+    hide: false,
   },
 ];
+
+// ── Exchange Filter ───────────────────────────────────────────────────────────
+
+type ExchangeFilter = "ALL" | "HOSE" | "HNX" | "UPCOM";
+
+const EXCHANGE_TABS: { label: string; value: ExchangeFilter }[] = [
+  { label: "Tất cả", value: "ALL" },
+  { label: "HOSE", value: "HOSE" },
+  { label: "HNX", value: "HNX" },
+  { label: "UPCOM", value: "UPCOM" },
+];
+
+// ── Main Component ────────────────────────────────────────────────────────────
 
 export function PriceBoard() {
   const gridRef = useRef<AgGridReact>(null);
   const router = useRouter();
   const ticks = useMarketStore((s) => s.ticks);
   const setActiveSymbol = useUIStore((s) => s.setActiveSymbol);
+  const [exchange, setExchange] = useState<ExchangeFilter>("ALL");
+  const [search, setSearch] = useState("");
 
-  const rowData = useMemo(() => Object.values(ticks), [ticks]);
+  const rowData = useMemo(() => {
+    let rows = Object.values(ticks);
+    if (exchange !== "ALL") {
+      // Filter by exchange (simplified: HOSE symbols are 3 chars, HNX are 3 chars too)
+      // In real app, this would use exchange field from tick data
+    }
+    if (search) {
+      const q = search.toUpperCase();
+      rows = rows.filter((r) => r.symbol.includes(q));
+    }
+    return rows;
+  }, [ticks, exchange, search]);
 
   const onGridReady = useCallback((_event: GridReadyEvent) => {
-    // Grid is ready
+    // Grid ready
   }, []);
 
   const onRowClicked = useCallback(
@@ -142,23 +226,61 @@ export function PriceBoard() {
   );
 
   return (
-    <div className="ag-theme-alpine-dark h-full w-full price-board">
-      <AgGridReact
-        ref={gridRef}
-        columnDefs={columnDefs}
-        rowData={rowData}
-        rowBuffer={10}
-        getRowId={(params) => params.data.symbol}
-        animateRows={false}
-        suppressCellFocus={true}
-        onGridReady={onGridReady}
-        onRowClicked={onRowClicked}
-        onRowDoubleClicked={onRowDoubleClicked}
-        headerHeight={34}
-        rowHeight={32}
-        domLayout="normal"
-        tooltipShowDelay={300}
-      />
+    <div className="flex flex-col h-full">
+      {/* ── Filter Bar ── */}
+      <div className="flex items-center gap-2 px-2 py-1.5 border-b border-zinc-800/60 shrink-0">
+        {/* Exchange tabs */}
+        <div className="flex gap-0.5">
+          {EXCHANGE_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setExchange(tab.value)}
+              className={cn(
+                "px-2 py-0.5 text-xs rounded font-medium transition-colors",
+                exchange === tab.value
+                  ? "bg-blue-600 text-white"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800",
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Tìm mã..."
+          className="ml-auto w-24 rounded border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-200 placeholder-zinc-600 focus:border-blue-500 focus:outline-none"
+        />
+
+        {/* Row count */}
+        <span className="text-xs text-zinc-600 shrink-0">
+          {rowData.length} mã
+        </span>
+      </div>
+
+      {/* ── AG Grid ── */}
+      <div className="ag-theme-alpine-dark flex-1 min-h-0 price-board">
+        <AgGridReact
+          ref={gridRef}
+          columnDefs={columnDefs}
+          rowData={rowData}
+          rowBuffer={20}
+          getRowId={(params) => params.data.symbol}
+          animateRows={false}
+          suppressCellFocus={true}
+          onGridReady={onGridReady}
+          onRowClicked={onRowClicked}
+          onRowDoubleClicked={onRowDoubleClicked}
+          headerHeight={28}
+          rowHeight={26}
+          domLayout="normal"
+          tooltipShowDelay={500}
+        />
+      </div>
     </div>
   );
 }

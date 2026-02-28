@@ -29,7 +29,7 @@ export function OrderHistory() {
         <tbody>
           {orders.map((order) => (
             <tr
-              key={order.orderId}
+              key={order.id}
               className="border-b border-zinc-800/50 hover:bg-zinc-800/30"
             >
               <td className="px-4 py-2 font-semibold text-amber-400">
@@ -64,7 +64,7 @@ export function OrderHistory() {
                 </span>
               </td>
               <td className="px-4 py-2 text-right text-zinc-500 text-xs">
-                {new Date(order.timestamp).toLocaleTimeString("vi-VN")}
+                {new Date(order.createdAt).toLocaleTimeString("vi-VN")}
               </td>
             </tr>
           ))}

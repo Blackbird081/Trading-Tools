@@ -23,95 +23,138 @@ body {
   font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
 }
 
-/* AG Grid dark theme overrides */
+/* ── AG Grid dark theme overrides ─────────────────────────────────────────── */
 .ag-theme-alpine-dark {
   --ag-background-color: #0a0a0f;
-  --ag-header-background-color: #141420;
-  --ag-header-foreground-color: #e2e8f0;
-  --ag-odd-row-background-color: #0e0e16;
-  --ag-row-hover-color: #1c1c32;
-  --ag-selected-row-background-color: #1e293b;
+  --ag-header-background-color: #0f0f1a;
+  --ag-header-foreground-color: #cbd5e1;
+  --ag-odd-row-background-color: #0c0c14;
+  --ag-row-hover-color: #1a1a2e;
+  --ag-selected-row-background-color: #1e2a4a;
   --ag-border-color: #1e1e30;
-  --ag-font-size: 13px;
-  --ag-row-border-color: transparent;
-  --ag-cell-horizontal-padding: 8px;
+  --ag-font-size: 12px;
+  --ag-row-border-color: rgba(255,255,255,0.03);
+  --ag-cell-horizontal-padding: 6px;
+  --ag-header-height: 30px;
+  --ag-row-height: 28px;
 }
 
-/* Price board: header titles — sáng, dễ đọc */
+/* ── Price Board ──────────────────────────────────────────────────────────── */
 .price-board .ag-header-cell-label {
-  font-weight: 600;
-  font-size: 11px;
+  font-weight: 700;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #f1f5f9;
-}
-.price-board .ag-header-cell {
-  color: #f1f5f9;
-}
-.price-board .ag-header-icon {
+  letter-spacing: 0.06em;
   color: #94a3b8;
 }
-
-.price-board .ag-row {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  cursor: pointer;
-  transition: background-color 0.15s ease;
+.price-board .ag-header-cell {
+  border-right: 1px solid rgba(255,255,255,0.05) !important;
 }
-
+.price-board .ag-header-icon {
+  color: #64748b;
+}
+.price-board .ag-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
 .price-board .ag-row:hover {
   background-color: #1a1a35 !important;
 }
-
 .price-board .ag-row-selected {
-  background-color: #172554 !important;
+  background-color: #1e2a4a !important;
+  border-left: 2px solid #3b82f6 !important;
+}
+.price-board .ag-cell {
+  border-right: 1px solid rgba(255,255,255,0.03) !important;
+  display: flex;
+  align-items: center;
 }
 
-/* Price color classes */
-.price-up {
-  color: #4ade80;
-}
-.price-down {
-  color: #fb7185;
-}
-.price-ref {
-  color: #fbbf24;
-}
+/* ── Price Color Classes ──────────────────────────────────────────────────── */
+.price-up    { color: #4ade80; }
+.price-down  { color: #fb7185; }
+.price-ref   { color: #fbbf24; }
+.price-ceil  { color: #d946ef; }
+.price-floor { color: #22d3ee; }
 
-/* Flash animations for real-time updates */
+/* ── Flash Animations (real-time price updates) ───────────────────────────── */
 @keyframes flash-green {
-  0% { background-color: rgba(74, 222, 128, 0.2); }
+  0%   { background-color: rgba(74, 222, 128, 0.25); }
+  50%  { background-color: rgba(74, 222, 128, 0.15); }
   100% { background-color: transparent; }
 }
 @keyframes flash-red {
-  0% { background-color: rgba(251, 113, 133, 0.2); }
+  0%   { background-color: rgba(251, 113, 133, 0.25); }
+  50%  { background-color: rgba(251, 113, 133, 0.15); }
+  100% { background-color: transparent; }
+}
+@keyframes flash-yellow {
+  0%   { background-color: rgba(251, 191, 36, 0.20); }
   100% { background-color: transparent; }
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
+.flash-up   { animation: flash-green  0.4s ease-out; }
+.flash-down { animation: flash-red    0.4s ease-out; }
+.flash-ref  { animation: flash-yellow 0.4s ease-out; }
+
+/* ── Market Index Bar ─────────────────────────────────────────────────────── */
+.market-index-bar {
+  background: linear-gradient(180deg, #0f0f1a 0%, #0a0a0f 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.market-index-item {
+  position: relative;
+  padding: 0 16px;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #09090b; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+/* ── Shimmer ──────────────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ── Pulse dot (live indicator) ───────────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.8); }
+}
+.live-dot {
   width: 6px;
   height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  animation: pulse-dot 1.5s ease-in-out infinite;
 }
 
-::-webkit-scrollbar-track {
-  background: #09090b;
+/* ── Volume bar in cells ──────────────────────────────────────────────────── */
+.volume-bar-cell {
+  position: relative;
+  overflow: hidden;
+}
+.volume-bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(59, 130, 246, 0.12);
+  pointer-events: none;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
-}
-
-/* Shimmer animation for progress bars */
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
+/* ── Tooltip ──────────────────────────────────────────────────────────────── */
+.ag-tooltip {
+  background: #1e1e30 !important;
+  border: 1px solid #3f3f5a !important;
+  color: #e2e8f0 !important;
+  font-size: 11px !important;
+  padding: 6px 10px !important;
+  border-radius: 4px !important;
 }
