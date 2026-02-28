@@ -138,10 +138,39 @@ export default function MarketBoardPage() {
 
     return (
         <div className="flex flex-col bg-[#050508] h-full">
+            {/* ★ Market Index Bar — giữ ở trên cùng */}
+            <div className="shrink-0 border-b border-zinc-800/60">
+                <MarketIndexBar />
+            </div>
+
             <DataLoader />
 
-            {/* ★ Desktop: Pagination navigation bar */}
-            <div className="hidden md:flex items-center justify-between px-3 py-1.5 bg-zinc-900/60 border-b border-zinc-800/60 shrink-0">
+            {/* ★ Desktop: 3 columns per page — fill full width */}
+            <div className="hidden md:flex flex-1 min-h-0 gap-2 p-2">
+                {pageSectors.map((sector) => (
+                    <div key={sector.title} className="flex-1 min-w-0 flex flex-col">
+                        <TradingErrorBoundary>
+                            <SectorColumn title={sector.title} symbols={sector.symbols} />
+                        </TradingErrorBoundary>
+                    </div>
+                ))}
+                {/* Fill empty slots if last page has < 3 sectors */}
+                {pageSectors.length < SECTORS_PER_PAGE && Array.from({ length: SECTORS_PER_PAGE - pageSectors.length }).map((_, i) => (
+                    <div key={`empty-${i}`} className="flex-1 min-w-0" />
+                ))}
+            </div>
+
+            {/* ★ Mobile: vertical scroll layout */}
+            <div className="flex md:hidden flex-1 min-h-0 overflow-y-auto flex-col px-2 py-2 gap-3">
+                {SECTORS.map((sector) => (
+                    <TradingErrorBoundary key={sector.title}>
+                        <SectorColumn title={sector.title} symbols={sector.symbols} />
+                    </TradingErrorBoundary>
+                ))}
+            </div>
+
+            {/* ★ Desktop: Pagination navigation bar — đặt ở dưới cùng */}
+            <div className="hidden md:flex items-center justify-between px-3 py-1.5 bg-zinc-900/60 border-t border-zinc-800/60 shrink-0">
                 {/* Page indicator dots */}
                 <div className="flex items-center gap-2">
                     {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
@@ -184,35 +213,6 @@ export default function MarketBoardPage() {
                         <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                 </div>
-            </div>
-
-            {/* ★ Desktop: 3 columns per page — fill full width */}
-            <div className="hidden md:flex flex-1 min-h-0 gap-2 p-2">
-                {pageSectors.map((sector) => (
-                    <div key={sector.title} className="flex-1 min-w-0 flex flex-col">
-                        <TradingErrorBoundary>
-                            <SectorColumn title={sector.title} symbols={sector.symbols} />
-                        </TradingErrorBoundary>
-                    </div>
-                ))}
-                {/* Fill empty slots if last page has < 3 sectors */}
-                {pageSectors.length < SECTORS_PER_PAGE && Array.from({ length: SECTORS_PER_PAGE - pageSectors.length }).map((_, i) => (
-                    <div key={`empty-${i}`} className="flex-1 min-w-0" />
-                ))}
-            </div>
-
-            {/* ★ Mobile: vertical scroll layout */}
-            <div className="flex md:hidden flex-1 min-h-0 overflow-y-auto flex-col px-2 py-2 gap-3">
-                {SECTORS.map((sector) => (
-                    <TradingErrorBoundary key={sector.title}>
-                        <SectorColumn title={sector.title} symbols={sector.symbols} />
-                    </TradingErrorBoundary>
-                ))}
-            </div>
-
-            {/* ★ Market Index Bar — đặt ở dưới cùng như footer */}
-            <div className="shrink-0 border-t border-zinc-800/60">
-                <MarketIndexBar />
             </div>
         </div>
     );

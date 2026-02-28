@@ -12,6 +12,7 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/market"
 const RECONNECT_BASE_MS = 1_000;   // 1s initial delay
 const RECONNECT_MAX_MS = 30_000;   // 30s max delay
 const RECONNECT_JITTER_MS = 500;   // ±500ms jitter to avoid thundering herd
+const IS_DEV = process.env.NODE_ENV !== "production";
 
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -60,8 +61,14 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         };
 
         ws.onerror = (event) => {
-          // ★ FIX: Log error details for production debugging (Sprint 3.5)
-          console.error("[WS] Connection error:", event);
+          // Connection failures are expected when backend WS is offline in local dev.
+          if (IS_DEV) {
+            const reason =
+              event instanceof ErrorEvent && event.message
+                ? event.message
+                : "WebSocket transport error";
+            console.warn(`[WS] ${reason}. Retrying connection...`);
+          }
           ws.close();
         };
       } catch {
