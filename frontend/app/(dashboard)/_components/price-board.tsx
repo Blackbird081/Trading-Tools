@@ -15,6 +15,38 @@ import { useMarketStore } from "@/stores/market-store";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
+// ★ VN Exchange symbol lists (approximate — based on actual listings)
+// HOSE: 3-letter symbols (most common)
+// HNX: 3-letter symbols starting with certain prefixes
+// UPCOM: various
+const HOSE_SYMBOLS = new Set([
+  "FPT","VIC","VHM","GAS","HPG","VPB","MBB","ACB","TCB","SSI","MWG","CTG",
+  "VCB","BID","VNM","SAB","MSN","PLX","POW","REE","PNJ","DGC","VHC","HAG",
+  "HDB","VIB","STB","SHB","LPB","TPB","OCB","EIB","ABB","BVH","VRE","NVL",
+  "PDR","DIG","DXG","KDH","NLG","CEO","SCR","HQC","SJS","VPI","DXS","NRC",
+  "HSG","NKG","SMC","TLH","TVN","POM","VGS","TNA","HPX","TIS","VIS",
+  "PVD","PVS","BSR","OIL","PVC","PVT","PLC","POS","GAS","PVB","PVG",
+]);
+
+const HNX_SYMBOLS = new Set([
+  "SHS","MBS","FTS","BSI","CTS","AGR","VIX","ORS","VND","VCI","HCM",
+  "PVX","PVC","PVA","HUT","HHC","HGM","HNM","HTC","HVN","IDC","IVS",
+  "KSB","L14","LAS","LBM","LCG","LCS","LDG","LEC","LGL","LHC","LIG",
+]);
+
+const UPCOM_SYMBOLS = new Set([
+  "VGI","ELC","ITD","CMG","VTI","FOX","ONE","VTC","VTL","VTX",
+  "ABI","ABT","ACM","ACS","ADC","ADP","ADS","ADT","AEG","AFC",
+]);
+
+function getExchangeForSymbol(symbol: string): string {
+  if (HOSE_SYMBOLS.has(symbol)) return "HOSE";
+  if (HNX_SYMBOLS.has(symbol)) return "HNX";
+  if (UPCOM_SYMBOLS.has(symbol)) return "UPCOM";
+  // Default: assume HOSE for unknown symbols
+  return "HOSE";
+}
+
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -193,8 +225,8 @@ export function PriceBoard() {
   const rowData = useMemo(() => {
     let rows = Object.values(ticks);
     if (exchange !== "ALL") {
-      // Filter by exchange (simplified: HOSE symbols are 3 chars, HNX are 3 chars too)
-      // In real app, this would use exchange field from tick data
+      // ★ Fix: filter by exchange using symbol lookup tables
+      rows = rows.filter((r) => getExchangeForSymbol(r.symbol) === exchange);
     }
     if (search) {
       const q = search.toUpperCase();
