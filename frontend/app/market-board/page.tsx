@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { SectorColumn } from "@/components/sector-column";
 import { MarketIndexBar } from "@/components/market-index-bar";
 import { DataLoader } from "@/app/(dashboard)/_components/data-loader";
 import { TradingErrorBoundary } from "@/components/error-boundary";
 import { useMarketStore } from "@/stores/market-store";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const SECTORS = [
     {
@@ -105,6 +106,7 @@ const MOCK_TICKS: Record<string, { price: number; change: number; changePct: num
 
 export default function MarketBoardPage() {
     const bulkUpdateTicks = useMarketStore((s) => s.bulkUpdateTicks);
+    const scrollRef = useRef<HTMLDivElement>(null);
 
     // ★ Inject mock data khi chưa có real WebSocket data
     useEffect(() => {
@@ -112,7 +114,6 @@ export default function MarketBoardPage() {
         const hasRealData = Object.keys(ticks).length > 0;
 
         if (!hasRealData) {
-            // Convert mock data to TickData format
             const mockTickArray = Object.entries(MOCK_TICKS).map(([symbol, d]) => ({
                 symbol,
                 price: d.price,
@@ -131,16 +132,48 @@ export default function MarketBoardPage() {
         }
     }, [bulkUpdateTicks]);
 
+    // ★ Scroll buttons handlers
+    const scrollLeft = () => scrollRef.current?.scrollBy({ left: -320, behavior: "smooth" });
+    const scrollRight = () => scrollRef.current?.scrollBy({ left: 320, behavior: "smooth" });
+
     return (
-        <div className="flex h-full flex-col bg-[#050508]">
+        // ★ Fix: h-screen - header height để fill viewport đúng cách
+        <div className="flex flex-col bg-[#050508]" style={{ height: "calc(100vh - 48px)" }}>
             <MarketIndexBar />
             <DataLoader />
 
-            {/* Board Layout Container */}
-            <div className="flex-1 min-h-0 overflow-auto pb-4 pt-2 px-2 custom-scrollbar">
-                <div className="flex gap-2 min-w-max h-full items-start">
+            {/* ★ Scroll navigation buttons */}
+            <div className="flex items-center justify-between px-2 py-1 bg-zinc-900/50 border-b border-zinc-800/50 shrink-0">
+                <span className="text-[10px] text-zinc-600 uppercase tracking-wider">
+                    {SECTORS.length} ngành · Cuộn ngang để xem thêm →
+                </span>
+                <div className="flex gap-1">
+                    <button
+                        onClick={scrollLeft}
+                        className="flex items-center justify-center w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+                        title="Cuộn trái"
+                    >
+                        <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={scrollRight}
+                        className="flex items-center justify-center w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+                        title="Cuộn phải"
+                    >
+                        <ChevronRight className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+
+            {/* ★ Board Layout Container — overflow-x-auto với thanh cuộn luôn hiển thị */}
+            <div
+                ref={scrollRef}
+                className="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar"
+                style={{ scrollbarWidth: "thin" }}
+            >
+                <div className="flex gap-2 h-full items-start p-2" style={{ minWidth: "max-content" }}>
                     {SECTORS.map((sector) => (
-                        <div key={sector.title} className="w-[280px] flex flex-col min-h-0">
+                        <div key={sector.title} style={{ width: "280px" }} className="flex flex-col h-full">
                             <TradingErrorBoundary>
                                 <SectorColumn title={sector.title} symbols={sector.symbols} />
                             </TradingErrorBoundary>

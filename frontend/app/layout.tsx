@@ -26,7 +26,8 @@ export default function RootLayout({
             <Sidebar />
             <div className="flex flex-1 flex-col">
               <TopNav />
-              <main className="flex-1 overflow-hidden">{children}</main>
+              {/* ★ overflow-auto allows pages to scroll; pages that need full-height use h-full */}
+              <main className="flex-1 overflow-auto min-h-0">{children}</main>
             </div>
           </div>
           <CommandPalette />
