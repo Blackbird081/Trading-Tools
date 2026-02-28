@@ -34,6 +34,7 @@ def _make_risk(symbol: str) -> RiskAssessment:
         approved=True,
         var_95=Decimal("20000000"),
         position_size_pct=Decimal("0.10"),
+        latest_price=Decimal("100000"),
         stop_loss_price=Decimal("93000"),
         take_profit_price=Decimal("110000"),
         rejection_reason=None,

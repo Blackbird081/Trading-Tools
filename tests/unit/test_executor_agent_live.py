@@ -37,6 +37,7 @@ def _make_state(dry_run: bool = True) -> AgentState:
                 approved=True,
                 var_95=Decimal("0.025"),
                 position_size_pct=Decimal("0.05"),
+                latest_price=Decimal("100000"),
                 stop_loss_price=Decimal("93000"),
                 take_profit_price=Decimal("105000"),
                 rejection_reason=None,

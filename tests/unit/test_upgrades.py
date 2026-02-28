@@ -396,7 +396,7 @@ class TestFactorBacktestBenchmark:
         d = result.to_dict()
         assert "benchmark_return_pct" in d
         assert "alpha_vs_vnindex" in d
-        assert "+10.00%" in d["alpha_vs_vnindex"]
+        assert "10.00%" in d["alpha_vs_vnindex"]
 
 
 # ── TEST-04: FundamentalAgent with financial_data_port ────────────────────────

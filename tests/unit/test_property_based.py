@@ -58,9 +58,9 @@ def make_portfolio(nav: Decimal, purchasing_power: Decimal) -> PortfolioState:
 def test_price_band_ceiling_always_above_floor(ref_price: Decimal) -> None:
     """INVARIANT: ceiling > reference > floor for any valid price."""
     band = calculate_price_band(Symbol("FPT"), Exchange.HOSE, Price(ref_price))
-    assert band.ceiling > band.floor
-    assert band.ceiling > ref_price
-    assert band.floor < ref_price
+    assert band.ceiling_price > band.floor_price
+    assert band.ceiling_price > ref_price
+    assert band.floor_price < ref_price
 
 
 @given(ref_price=valid_price)
@@ -70,8 +70,8 @@ def test_price_band_hose_7_percent(ref_price: Decimal) -> None:
     band = calculate_price_band(Symbol("FPT"), Exchange.HOSE, Price(ref_price))
     expected_ceiling = ref_price * Decimal("1.07")
     expected_floor = ref_price * Decimal("0.93")
-    assert abs(band.ceiling - expected_ceiling) <= Decimal("100")
-    assert abs(band.floor - expected_floor) <= Decimal("100")
+    assert abs(band.ceiling_price - expected_ceiling) <= Decimal("100")
+    assert abs(band.floor_price - expected_floor) <= Decimal("100")
 
 
 # ── Risk Check Properties ─────────────────────────────────────
