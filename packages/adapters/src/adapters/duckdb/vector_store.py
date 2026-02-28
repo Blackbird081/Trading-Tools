@@ -81,20 +81,23 @@ class DuckDBVectorStore:
         if self._conn is None:
             return []
 
-        # Use exact cosine similarity (works without vss extension)
-        where_clause = f"WHERE symbol = '{symbol}'" if symbol else ""
-
-        query = f"""
-            SELECT
-                id, symbol, headline, content, source,
-                list_cosine_similarity(embedding, ?::FLOAT[384]) AS score
-            FROM news_embeddings
-            {where_clause}
-            ORDER BY score DESC
-            LIMIT ?
-        """
+        # ★ Use parameterized queries — NEVER interpolate user input into SQL
         try:
-            rows = self._conn.execute(query, [query_embedding, top_k]).fetchall()
+            if symbol is not None:
+                query = """
+                    SELECT id, symbol, headline, content, source,
+                        list_cosine_similarity(embedding, ?::FLOAT[384]) AS score
+                    FROM news_embeddings WHERE symbol = ?
+                    ORDER BY score DESC LIMIT ?
+                """
+                rows = self._conn.execute(query, [query_embedding, symbol, top_k]).fetchall()
+            else:
+                query = """
+                    SELECT id, symbol, headline, content, source,
+                        list_cosine_similarity(embedding, ?::FLOAT[384]) AS score
+                    FROM news_embeddings ORDER BY score DESC LIMIT ?
+                """
+                rows = self._conn.execute(query, [query_embedding, top_k]).fetchall()
             return [
                 {
                     "id": row[0],

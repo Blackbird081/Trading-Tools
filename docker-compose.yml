@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: algo-trading-api
+    ports:
+      - "8000:8000"
+    environment:
+      SSI_CONSUMER_ID: ${SSI_CONSUMER_ID:-}
+      SSI_CONSUMER_SECRET: ${SSI_CONSUMER_SECRET:-}
+      SSI_PRIVATE_KEY_B64: ${SSI_PRIVATE_KEY_B64:-}
+      SSI_ACCOUNT_NO: ${SSI_ACCOUNT_NO:-}
+      DB_PATH: /app/data/db/trading.duckdb
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DRY_RUN: ${DRY_RUN:-true}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - trading_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  trading_data:
+    driver: local

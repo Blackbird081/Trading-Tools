@@ -31,9 +31,6 @@ def build_trading_graph(
     graph.add_node("executor", executor.run)
     graph.add_node("finalize", _finalize)
 
-    if fundamental is not None:
-        graph.add_node("fundamental", fundamental.run)
-
     # Define Edges
     graph.set_entry_point("inject_context")
     graph.add_edge("inject_context", "screener")
@@ -45,12 +42,22 @@ def build_trading_graph(
         {"has_candidates": "technical", "no_candidates": "finalize"},
     )
 
-    # Technical -> conditional
-    graph.add_conditional_edges(
-        "technical",
-        _route_after_technical,
-        {"has_signals": "risk", "no_signals": "finalize"},
-    )
+    if fundamental is not None:
+        # ★ FIX: Fundamental runs SEQUENTIALLY after technical.
+        # LangGraph cannot have both conditional and unconditional edges from same node.
+        graph.add_node("fundamental", fundamental.run)
+        graph.add_conditional_edges(
+            "technical",
+            _route_after_technical,
+            {"has_signals": "fundamental", "no_signals": "finalize"},
+        )
+        graph.add_edge("fundamental", "risk")
+    else:
+        graph.add_conditional_edges(
+            "technical",
+            _route_after_technical,
+            {"has_signals": "risk", "no_signals": "finalize"},
+        )
 
     # Risk -> conditional
     graph.add_conditional_edges(

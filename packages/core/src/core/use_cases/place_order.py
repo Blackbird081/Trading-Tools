@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -32,21 +32,31 @@ class PlaceOrderResult:
 
 
 class IdempotencyStore:
-    """In-memory idempotency key store with cache."""
+    """In-memory idempotency key store with TTL-based expiry."""
 
     def __init__(self) -> None:
         self._cache: dict[str, PlaceOrderResult] = {}
+        self._timestamps: dict[str, datetime] = {}
 
     def check(self, key: str) -> PlaceOrderResult | None:
         return self._cache.get(key)
 
     def record(self, key: str, result: PlaceOrderResult) -> None:
         self._cache[key] = result
+        self._timestamps[key] = datetime.now(UTC)
 
     def prune_expired(self, max_age_hours: int = 24) -> int:
-        """Remove old keys. Returns count pruned."""
-        # Simplified: in production, check timestamps
-        return 0
+        """Remove keys older than max_age_hours. Returns count pruned."""
+        cutoff = datetime.now(UTC).timestamp() - (max_age_hours * 3600)
+        expired_keys = [k for k, ts in self._timestamps.items() if ts.timestamp() < cutoff]
+        for k in expired_keys:
+            self._cache.pop(k, None)
+            self._timestamps.pop(k, None)
+        return len(expired_keys)
+
+    @property
+    def size(self) -> int:
+        return len(self._cache)
 
 
 async def place_order(
@@ -148,7 +158,7 @@ async def _submit_to_broker(broker: Any, request: PlaceOrderRequest) -> str:
             side=request.side,
             order_type=request.order_type,
             quantity=request.quantity,
-            price=float(request.price),
+            price=request.price,  # ★ Keep as Decimal — no float conversion
         )
         return result
     msg = "Broker does not implement place_order"

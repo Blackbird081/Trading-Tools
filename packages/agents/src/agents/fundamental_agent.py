@@ -4,10 +4,13 @@ import asyncio
 import logging
 from typing import Any
 
+from agents.guardrails import AgentGuardrailPipeline
 from agents.prompt_builder import FinancialPromptBuilder
 from agents.state import AgentState
 
 logger = logging.getLogger("agents.fundamental")
+
+_guardrails = AgentGuardrailPipeline()
 
 
 class FundamentalAgent:
@@ -70,7 +73,8 @@ class FundamentalAgent:
                     limit=5,
                 )
                 if result:
-                    return [n.get("title", "") for n in result]
+                    raw = [n.get("title", "") for n in result]
+                    return _guardrails.sanitize_news_headlines(raw) or None
         except Exception:
             logger.warning("News fetch failed for %s", symbol)
         return None

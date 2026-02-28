@@ -23,7 +23,7 @@ from decimal import Decimal
 
 from core.entities.order import Order, OrderSide
 from core.entities.portfolio import PortfolioState
-from core.entities.risk import RiskLimit
+from core.entities.risk import RiskLimit, RiskMetrics
 from core.use_cases.price_band import PriceBand, validate_order_price
 
 
@@ -43,6 +43,7 @@ def validate_order(
     limits: RiskLimit,
     price_band: PriceBand | None = None,
     pending_sell_qty: int = 0,
+    risk_metrics: RiskMetrics | None = None,
 ) -> RiskCheckResult:
     """Pure function — comprehensive order validation.
 
@@ -120,7 +121,16 @@ def validate_order(
             passed.append(f"SELLABLE_QTY: {order.quantity} <= {available} available")
 
     # ── Check 7: Daily Loss Limit ─────────────────────────
-    # (Would query today's realized PnL from DuckDB — implemented in Phase 2)
+    if risk_metrics is not None:
+        daily_pnl = risk_metrics.daily_pnl
+        max_loss = limits.max_daily_loss
+        if daily_pnl < -max_loss:
+            failed.append(
+                f"DAILY_LOSS: Today's P&L {daily_pnl:,.0f} VND exceeds "
+                f"daily loss limit -{max_loss:,.0f} VND."
+            )
+        else:
+            passed.append(f"DAILY_LOSS: {daily_pnl:,.0f} VND today (limit: -{max_loss:,.0f} VND)")
 
     # ── Final Verdict ─────────────────────────────────────
     if failed:

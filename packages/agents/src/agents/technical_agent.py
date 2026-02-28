@@ -8,6 +8,19 @@ from agents.state import AgentPhase, AgentState, SignalAction, TechnicalScore
 
 logger = logging.getLogger("agents.technical")
 
+# ── Scoring Thresholds ────────────────────────────────────────────────────────
+RSI_OVERSOLD = 30.0
+RSI_NEAR_OVERSOLD = 40.0
+RSI_OVERBOUGHT = 70.0
+RSI_NEAR_OVERBOUGHT = 60.0
+BUY_SCORE_THRESHOLD = 5.0
+SELL_SCORE_THRESHOLD = -5.0
+RSI_SCORE_STRONG = 3.0
+RSI_SCORE_MILD = 1.5
+MACD_SCORE = 3.0
+BB_SCORE = 2.0
+TREND_SCORE = 2.0
+
 
 def compute_indicators(ohlcv_data: list[dict[str, Any]]) -> dict[str, Any]:
     """Compute technical indicators from OHLCV data.

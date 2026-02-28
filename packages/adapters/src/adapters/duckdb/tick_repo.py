@@ -9,6 +9,7 @@ Ref: Doc 02 §2.5
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -26,23 +27,8 @@ class DuckDBTickRepository:
         self._conn = conn
 
     async def insert_batch(self, ticks: list[Tick]) -> int:
-        """Insert a batch of ticks into DuckDB.
-
-        ★ CRITICAL: This is an async interface but DuckDB is blocking.
-        ★ In production, caller MUST wrap with asyncio.to_thread().
-        """
-        if not ticks:
-            return 0
-
-        rows = [(t.symbol, float(t.price), t.volume, t.exchange.value, t.timestamp) for t in ticks]
-        self._conn.executemany(
-            """
-            INSERT INTO ticks (symbol, price, volume, exchange, ts)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            rows,
-        )
-        return len(rows)
+        """Insert a batch of ticks into DuckDB (non-blocking)."""
+        return await asyncio.to_thread(self.insert_batch_sync, ticks)
 
     async def get_ohlcv(
         self,
@@ -50,7 +36,16 @@ class DuckDBTickRepository:
         start: date,
         end: date,
     ) -> list[dict[str, object]]:
-        """Get OHLCV candle data for a symbol in a date range."""
+        """Get OHLCV candle data (non-blocking)."""
+        return await asyncio.to_thread(self._get_ohlcv_sync, symbol, start, end)
+
+    def _get_ohlcv_sync(
+        self,
+        symbol: str,
+        start: date,
+        end: date,
+    ) -> list[dict[str, object]]:
+        """Synchronous OHLCV query."""
         result = self._conn.execute(
             """
             SELECT
@@ -76,11 +71,14 @@ class DuckDBTickRepository:
         self,
         orders: list[Order],
     ) -> list[dict[str, object]]:
-        """ASOF JOIN: find nearest tick price at each order's timestamp.
+        """ASOF JOIN (non-blocking)."""
+        return await asyncio.to_thread(self._asof_join_orders_sync, orders)
 
-        ★ O(N + M) merge-sort complexity — vastly faster than LATERAL JOIN.
-        ★ See Doc 02 §3.1 for detailed explanation.
-        """
+    def _asof_join_orders_sync(
+        self,
+        orders: list[Order],
+    ) -> list[dict[str, object]]:
+        """Synchronous ASOF JOIN."""
         result = self._conn.execute(
             """
             SELECT

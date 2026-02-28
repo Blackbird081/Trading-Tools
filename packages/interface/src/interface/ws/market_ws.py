@@ -21,4 +21,4 @@ async def market_websocket(websocket: WebSocket) -> None:
             data = await websocket.receive_text()
             logger.debug("Received from client: %s", data)
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        await manager.disconnect(websocket)

@@ -18,6 +18,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         const ws = new WebSocket(WS_URL);
         wsRef.current = ws;
 
+        ws.onopen = () => {
+          clearTimeout(reconnectTimer.current);
+          console.debug("[WS] Connected to", WS_URL);
+        };
+
         ws.onmessage = (event: MessageEvent) => {
           try {
             const msg = JSON.parse(event.data as string) as {

@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: CI
 
 on:
   push:
@@ -6,37 +6,91 @@ on:
   pull_request:
     branches: [main, develop]
 
-jobs:
-  quality-gate:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.12"]
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
 
+jobs:
+  python-lint:
+    name: Python Lint & Type Check
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          version: "latest"
-
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
-
+        uses: astral-sh/setup-uv@v3
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
+      - name: Run ruff
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Run mypy
+        run: uv run mypy packages/
 
-      - name: Stage 1 - Lint + Format Check
+  python-test:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Run unit tests with coverage
         run: |
-          uv run ruff check packages/ tests/
-          uv run ruff format --check packages/ tests/
+          uv run pytest tests/unit/ \
+            --cov=packages \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=80 \
+            -v
 
-      - name: Stage 2 - Type Check (mypy --strict)
-        run: uv run mypy packages/ --strict
+  frontend-lint:
+    name: Frontend Lint & Type Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run ESLint
+        run: pnpm lint
+      - name: Run TypeScript check
+        run: pnpm tsc --noEmit
 
-      - name: Stage 3 - Unit Tests
-        run: uv run pytest tests/unit/ -v --tb=short -x
-
-      - name: Stage 4 - Integration Tests + Coverage
-        run: uv run pytest tests/ --cov=packages --cov-report=term-missing --tb=short
+  frontend-test:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run Vitest
+        run: pnpm test --run --coverage

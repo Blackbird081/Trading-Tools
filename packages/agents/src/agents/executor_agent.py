@@ -41,12 +41,14 @@ class ExecutorAgent:
             if action in (SignalAction.HOLD, SignalAction.SKIP):
                 continue
 
-            # Calculate quantity from position size
-            price = risk.stop_loss_price / Decimal("0.93")  # Approx market price
+            # ★ FIX: Use take_profit_price as entry price (not stop_loss/0.93)
+            entry_price = risk.take_profit_price
+            if entry_price <= 0:
+                continue
             quantity = self._calculate_quantity(
                 nav=nav,
                 position_pct=risk.position_size_pct,
-                price=price,
+                price=entry_price,
             )
             if quantity <= 0:
                 continue

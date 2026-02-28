@@ -7,7 +7,7 @@ import type { TickData } from "@/types/market";
 
 export function useMarketStream(gridApi: GridApi | null) {
   const pendingUpdates = useRef<Map<string, TickData>>(new Map());
-  const rafId = useRef<number>(0);
+  const rafId = useRef<number | null>(null);
 
   useEffect(() => {
     if (!gridApi) return;
@@ -35,7 +35,10 @@ export function useMarketStream(gridApi: GridApi | null) {
 
     return () => {
       unsubscribe();
-      cancelAnimationFrame(rafId.current);
+      if (rafId.current !== null) {
+        cancelAnimationFrame(rafId.current);
+        rafId.current = null;
+      }
     };
   }, [gridApi]);
 }

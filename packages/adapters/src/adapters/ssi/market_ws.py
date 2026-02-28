@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any
@@ -148,7 +148,7 @@ class SSIMarketWebSocket:
                 price=Price(Decimal(str(data.get("LastPrice", data.get("price", 0))))),
                 volume=Quantity(int(data.get("LastVol", data.get("volume", 0)))),
                 exchange=exchange,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(UTC),
             )
         except (KeyError, ValueError, TypeError):
             logger.warning("Failed to parse tick message")
