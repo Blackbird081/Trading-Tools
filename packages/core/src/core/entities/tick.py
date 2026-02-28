@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 
 from core.value_objects import Price, Quantity, Symbol
@@ -21,6 +22,15 @@ class Exchange(StrEnum):
     HOSE = "HOSE"  # Ho Chi Minh Stock Exchange
     HNX = "HNX"  # Hanoi Stock Exchange
     UPCOM = "UPCOM"  # Unlisted Public Company Market
+
+
+# ★ VN Exchange-specific price bands (percentage from reference price)
+# HOSE: ±7%, HNX: ±10%, UPCOM: ±15%
+_PRICE_BAND: dict[str, Decimal] = {
+    Exchange.HOSE: Decimal("0.07"),
+    Exchange.HNX: Decimal("0.10"),
+    Exchange.UPCOM: Decimal("0.15"),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,17 +46,26 @@ class Tick:
     exchange: Exchange
     timestamp: datetime
 
-    def is_ceiling(self, ref_price: Price) -> bool:
-        """Check if this tick's price hits the ceiling (giá trần)."""
-        from decimal import Decimal
+    @property
+    def price_band_pct(self) -> Decimal:
+        """Get the price band percentage for this tick's exchange."""
+        return _PRICE_BAND.get(self.exchange, Decimal("0.07"))
 
-        return self.price >= Price(Decimal(str(ref_price)) * Decimal("1.07"))
+    def is_ceiling(self, ref_price: Price) -> bool:
+        """Check if this tick's price hits the ceiling (giá trần).
+
+        ★ Fix: uses exchange-specific band (HOSE=7%, HNX=10%, UPCOM=15%).
+        """
+        band = self.price_band_pct
+        return self.price >= Price(Decimal(str(ref_price)) * (1 + band))
 
     def is_floor(self, ref_price: Price) -> bool:
-        """Check if this tick's price hits the floor (giá sàn)."""
-        from decimal import Decimal
+        """Check if this tick's price hits the floor (giá sàn).
 
-        return self.price <= Price(Decimal(str(ref_price)) * Decimal("0.93"))
+        ★ Fix: uses exchange-specific band (HOSE=7%, HNX=10%, UPCOM=15%).
+        """
+        band = self.price_band_pct
+        return self.price <= Price(Decimal(str(ref_price)) * (1 - band))
 
 
 @dataclass(frozen=True, slots=True)

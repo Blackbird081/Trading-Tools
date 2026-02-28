@@ -55,9 +55,12 @@ class SystemDependencies:
         """Initialize the multi-agent pipeline."""
         try:
             from agents.executor_agent import ExecutorAgent
+            from agents.fundamental_agent import FundamentalAgent
+            from agents.prompt_builder import FinancialPromptBuilder, PromptRegistry
             from agents.risk_agent import RiskAgent
             from agents.screener_agent import ScreenerAgent
             from agents.technical_agent import TechnicalAgent
+            from pathlib import Path
 
             self._components["screener"] = ScreenerAgent(
                 screener_port=self._components.get("screener_port"),
@@ -73,6 +76,28 @@ class SystemDependencies:
             self._components["executor"] = ExecutorAgent(
                 broker_port=self._components.get("broker"),
             )
+
+            # ★ FIX: Initialize FundamentalAgent with financial_data_port
+            ai_engine = self._components.get("ai_engine")
+            if ai_engine is not None:
+                prompts_dir = Path(self._config.get("prompts_dir", "data/prompts"))
+                try:
+                    registry = PromptRegistry(prompts_dir)
+                    prompt_builder = FinancialPromptBuilder(registry)
+                except Exception:
+                    logger.warning("Prompt registry not found — using mock prompt builder")
+                    prompt_builder = None  # type: ignore[assignment]
+
+                if prompt_builder is not None:
+                    self._components["fundamental"] = FundamentalAgent(
+                        engine=ai_engine,
+                        prompt_builder=prompt_builder,
+                        news_port=self._components.get("news_port"),
+                        financial_data_port=self._components.get("financial_data_port"),  # ★ NEW
+                    )
+                    logger.info("FundamentalAgent initialized with financial_data_port=%s",
+                                "yes" if self._components.get("financial_data_port") else "no")
+
             logger.info("Agent pipeline initialized")
         except Exception:
             logger.exception("Failed to initialize agent pipeline")

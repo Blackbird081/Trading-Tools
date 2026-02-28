@@ -402,14 +402,37 @@ class FactorBacktestEngine:
 
     @staticmethod
     def _calculate_ic(scores: dict[str, float], selected: list[str]) -> float:
-        """Calculate Information Coefficient (simplified Spearman rank correlation)."""
+        """Calculate Information Coefficient using Spearman rank correlation.
+
+        ★ Fix: real Spearman rank correlation between factor scores and selection indicator.
+        IC = Spearman(factor_rank, selection_indicator_rank)
+        Range: [-1, +1]. IC > 0.05 is considered meaningful in factor investing.
+        """
         if len(scores) < 3:
             return 0.0
-        # Simplified: positive IC if top-ranked stocks are in selected
-        top_half = set(sorted(scores, key=lambda s: scores[s], reverse=True)[:len(scores) // 2])
+
+        symbols = list(scores.keys())
+        n = len(symbols)
         selected_set = set(selected)
-        overlap = len(top_half & selected_set)
-        expected = len(selected_set) * len(top_half) / len(scores)
-        if expected == 0:
+
+        # Factor ranks (1 = highest score = best)
+        sorted_by_score = sorted(symbols, key=lambda s: scores[s], reverse=True)
+        factor_ranks = {sym: float(rank + 1) for rank, sym in enumerate(sorted_by_score)}
+
+        # Selection indicator ranks (selected=1, not selected=0)
+        # Rank: selected stocks get lower rank numbers (better)
+        sorted_by_selection = sorted(
+            symbols,
+            key=lambda s: (0 if s in selected_set else 1, symbols.index(s)),
+        )
+        selection_ranks = {sym: float(rank + 1) for rank, sym in enumerate(sorted_by_selection)}
+
+        # Spearman rank correlation: 1 - 6*sum(d^2) / (n*(n^2-1))
+        sum_d_sq = sum(
+            (factor_ranks[sym] - selection_ranks[sym]) ** 2
+            for sym in symbols
+        )
+        denominator = n * (n ** 2 - 1)
+        if denominator == 0:
             return 0.0
-        return (overlap - expected) / max(len(selected_set), len(top_half))
+        return 1.0 - (6.0 * sum_d_sq / denominator)
