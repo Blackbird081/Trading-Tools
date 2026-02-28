@@ -141,7 +141,7 @@ export default function MarketBoardPage() {
             <MarketIndexBar />
             <DataLoader />
 
-            {/* ★ Desktop: scroll buttons + horizontal layout */}
+            {/* ★ Scroll navigation bar — desktop only */}
             <div className="hidden md:flex items-center justify-between px-2 py-1 bg-zinc-900/50 border-b border-zinc-800/50 shrink-0">
                 <span className="text-[10px] text-zinc-600 uppercase tracking-wider">
                     {SECTORS.length} ngành · Cuộn ngang để xem thêm →
@@ -164,15 +164,16 @@ export default function MarketBoardPage() {
                 </div>
             </div>
 
-            {/* ★ Desktop: horizontal scroll layout */}
+            {/* ★ Desktop: horizontal scroll — use min-h-0 + overflow-x-auto */}
+            {/* NOTE: hidden md:flex (not md:block) so flex-1 works correctly */}
             <div
                 ref={scrollRef}
-                className="hidden md:block flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar"
+                className="hidden md:flex flex-1 min-h-0 overflow-x-auto overflow-y-hidden custom-scrollbar"
                 style={{ scrollbarWidth: "thin" }}
             >
-                <div className="flex gap-2 h-full items-start p-2" style={{ minWidth: "max-content" }}>
+                <div className="flex gap-2 items-start p-2 h-full" style={{ minWidth: "max-content" }}>
                     {SECTORS.map((sector) => (
-                        <div key={sector.title} style={{ width: "280px" }} className="flex flex-col h-full">
+                        <div key={sector.title} style={{ width: "280px", height: "100%" }} className="flex flex-col">
                             <TradingErrorBoundary>
                                 <SectorColumn title={sector.title} symbols={sector.symbols} />
                             </TradingErrorBoundary>
@@ -182,7 +183,7 @@ export default function MarketBoardPage() {
             </div>
 
             {/* ★ Mobile: vertical scroll layout — 1 column per sector */}
-            <div className="md:hidden flex-1 overflow-y-auto px-2 py-2 space-y-3">
+            <div className="flex md:hidden flex-1 min-h-0 overflow-y-auto flex-col px-2 py-2 gap-3">
                 {SECTORS.map((sector) => (
                     <TradingErrorBoundary key={sector.title}>
                         <SectorColumn title={sector.title} symbols={sector.symbols} />
