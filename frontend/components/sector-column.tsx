@@ -118,7 +118,7 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
             : "from-zinc-900/90 to-zinc-900/90";
 
     return (
-        <div className="flex flex-col rounded overflow-hidden border border-zinc-700/50 shadow-lg max-h-[calc(100vh-130px)]">
+        <div className="flex flex-col rounded overflow-hidden border border-zinc-700/50 shadow-lg md:max-h-[calc(100vh-130px)]">
             {/* ── Sector Header ── */}
             <div className={cn(
                 "flex items-center justify-between px-3 py-2 bg-gradient-to-r flex-shrink-0",

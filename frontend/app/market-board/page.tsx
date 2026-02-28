@@ -137,13 +137,12 @@ export default function MarketBoardPage() {
     const scrollRight = () => scrollRef.current?.scrollBy({ left: 320, behavior: "smooth" });
 
     return (
-        // ★ Fix: h-screen - header height để fill viewport đúng cách
-        <div className="flex flex-col bg-[#050508]" style={{ height: "calc(100vh - 48px)" }}>
+        <div className="flex flex-col bg-[#050508] h-full">
             <MarketIndexBar />
             <DataLoader />
 
-            {/* ★ Scroll navigation buttons */}
-            <div className="flex items-center justify-between px-2 py-1 bg-zinc-900/50 border-b border-zinc-800/50 shrink-0">
+            {/* ★ Desktop: scroll buttons + horizontal layout */}
+            <div className="hidden md:flex items-center justify-between px-2 py-1 bg-zinc-900/50 border-b border-zinc-800/50 shrink-0">
                 <span className="text-[10px] text-zinc-600 uppercase tracking-wider">
                     {SECTORS.length} ngành · Cuộn ngang để xem thêm →
                 </span>
@@ -165,10 +164,10 @@ export default function MarketBoardPage() {
                 </div>
             </div>
 
-            {/* ★ Board Layout Container — overflow-x-auto với thanh cuộn luôn hiển thị */}
+            {/* ★ Desktop: horizontal scroll layout */}
             <div
                 ref={scrollRef}
-                className="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar"
+                className="hidden md:block flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar"
                 style={{ scrollbarWidth: "thin" }}
             >
                 <div className="flex gap-2 h-full items-start p-2" style={{ minWidth: "max-content" }}>
@@ -180,6 +179,15 @@ export default function MarketBoardPage() {
                         </div>
                     ))}
                 </div>
+            </div>
+
+            {/* ★ Mobile: vertical scroll layout — 1 column per sector */}
+            <div className="md:hidden flex-1 overflow-y-auto px-2 py-2 space-y-3">
+                {SECTORS.map((sector) => (
+                    <TradingErrorBoundary key={sector.title}>
+                        <SectorColumn title={sector.title} symbols={sector.symbols} />
+                    </TradingErrorBoundary>
+                ))}
             </div>
         </div>
     );
