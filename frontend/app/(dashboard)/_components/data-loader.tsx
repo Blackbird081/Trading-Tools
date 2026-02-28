@@ -249,22 +249,20 @@ export function DataLoader() {
                 <button
                   onClick={() => setPreset("VN30")}
                   disabled={isLoading}
-                  className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    preset === "VN30"
+                  className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-colors ${preset === "VN30"
                       ? "bg-emerald-600 text-white"
                       : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-                  }`}
+                    }`}
                 >
                   VN30
                 </button>
                 <button
                   onClick={() => setPreset("TOP100")}
                   disabled={isLoading}
-                  className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    preset === "TOP100"
+                  className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-colors ${preset === "TOP100"
                       ? "bg-amber-600 text-white"
                       : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-                  }`}
+                    }`}
                 >
                   Top 100
                 </button>
@@ -295,13 +293,12 @@ export function DataLoader() {
             {/* Load / Refresh button */}
             <button
               onClick={handleLoad}
-              className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-semibold transition-all ${
-                isLoading
+              className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-semibold transition-all ${isLoading
                   ? "bg-red-600/80 hover:bg-red-600 text-white"
                   : isDone
                     ? "bg-zinc-700 hover:bg-zinc-600 text-zinc-200"
                     : "bg-emerald-600 hover:bg-emerald-500 text-white"
-              }`}
+                }`}
             >
               {isLoading ? (
                 <>

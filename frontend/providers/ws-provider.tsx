@@ -6,7 +6,7 @@ import { useSignalStore } from "@/stores/signal-store";
 import { usePortfolioStore } from "@/stores/portfolio-store";
 import type { TickData, CandleData, AgentSignal, Position } from "@/types/market";
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000/ws/market";
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/market";
 
 // ★ Exponential backoff constants
 const RECONNECT_BASE_MS = 1_000;   // 1s initial delay
