@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import { Sidebar } from "@/components/sidebar";
 import { TopNav } from "@/components/top-nav";
 import { CommandPalette } from "@/components/command-palette";
 import { WebSocketProvider } from "@/providers/ws-provider";
 import "./globals.css";
+
+const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
 export const metadata: Metadata = {
   title: "Algo Trading Terminal",
@@ -17,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi" className="dark">
-      <body className="bg-zinc-950 text-zinc-100 antialiased">
+      <body className={`bg-zinc-950 text-zinc-100 antialiased text-[15px] ${inter.className}`}>
         <WebSocketProvider>
           <div className="flex h-screen overflow-hidden">
             <Sidebar />

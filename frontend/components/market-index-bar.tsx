@@ -6,6 +6,7 @@
  * ★ Real-time updates via Zustand market store.
  */
 
+import { useState, useEffect } from "react";
 import { useMarketStore } from "@/stores/market-store";
 import { cn } from "@/lib/utils";
 
@@ -69,6 +70,15 @@ function IndexItem({ index }: { index: IndexData }) {
 
 export function MarketIndexBar() {
   const connectionStatus = useMarketStore((s) => s.connectionStatus);
+  const [time, setTime] = useState<string>("");
+
+  useEffect(() => {
+    setTime(new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    const interval = setInterval(() => {
+      setTime(new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="market-index-bar flex items-center justify-between px-2 h-10 shrink-0">
@@ -93,7 +103,7 @@ export function MarketIndexBar() {
           </span>
         </div>
         <span className="text-xs text-zinc-600 font-mono">
-          {new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+          {time}
         </span>
       </div>
     </div>

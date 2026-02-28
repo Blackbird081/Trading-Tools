@@ -78,7 +78,7 @@ function ChangePctCellRenderer(params: ICellRendererParams) {
   const isUp = value > 0;
   const isDown = value < 0;
   return (
-    <span className={cn("font-mono tabular-nums text-xs", isUp && "price-up", isDown && "price-down", !isUp && !isDown && "text-zinc-500")}>
+    <span className={cn("font-mono tabular-nums", isUp && "price-up", isDown && "price-down", !isUp && !isDown && "text-zinc-500")}>
       {isUp ? "+" : ""}{value.toFixed(2)}%
     </span>
   );
@@ -93,14 +93,14 @@ const columnDefs: ColDef[] = [
     pinned: "left",
     width: 72,
     sort: "asc",
-    cellClass: "font-bold text-amber-300 text-xs",
+    cellClass: "font-bold text-amber-300 text-sm",
     headerClass: "text-center",
   },
   {
     field: "ceiling",
     headerName: "Trần",
     width: 72,
-    cellClass: "font-mono text-right price-ceil text-xs",
+    cellClass: "font-mono text-right price-ceil",
     valueFormatter: (p) => formatPrice(p.value),
     headerClass: "text-right",
   },
@@ -108,7 +108,7 @@ const columnDefs: ColDef[] = [
     field: "floor",
     headerName: "Sàn",
     width: 72,
-    cellClass: "font-mono text-right price-floor text-xs",
+    cellClass: "font-mono text-right price-floor",
     valueFormatter: (p) => formatPrice(p.value),
     headerClass: "text-right",
   },
@@ -116,7 +116,7 @@ const columnDefs: ColDef[] = [
     field: "reference",
     headerName: "TC",
     width: 72,
-    cellClass: "font-mono text-right price-ref text-xs",
+    cellClass: "font-mono text-right price-ref",
     valueFormatter: (p) => formatPrice(p.value),
     headerClass: "text-right",
   },
@@ -145,7 +145,7 @@ const columnDefs: ColDef[] = [
     field: "volume",
     headerName: "KL",
     width: 72,
-    cellClass: "font-mono text-right text-zinc-300 text-xs",
+    cellClass: "font-mono text-right text-zinc-300",
     valueFormatter: (p) => formatVolume(p.value as number | undefined),
     headerClass: "text-right",
   },
@@ -153,7 +153,7 @@ const columnDefs: ColDef[] = [
     field: "high",
     headerName: "Cao",
     width: 72,
-    cellClass: "font-mono text-right text-emerald-400/70 text-xs",
+    cellClass: "font-mono text-right text-emerald-400/70",
     valueFormatter: (p) => formatPrice(p.value),
     headerClass: "text-right",
     hide: false,
@@ -162,7 +162,7 @@ const columnDefs: ColDef[] = [
     field: "low",
     headerName: "Thấp",
     width: 72,
-    cellClass: "font-mono text-right text-rose-400/70 text-xs",
+    cellClass: "font-mono text-right text-rose-400/70",
     valueFormatter: (p) => formatPrice(p.value),
     headerClass: "text-right",
     hide: false,
@@ -257,7 +257,7 @@ export function PriceBoard() {
         />
 
         {/* Row count */}
-        <span className="text-xs text-zinc-600 shrink-0">
+        <span className="text-sm text-zinc-600 shrink-0">
           {rowData.length} mã
         </span>
       </div>
