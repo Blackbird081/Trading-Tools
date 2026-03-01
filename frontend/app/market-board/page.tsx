@@ -106,6 +106,9 @@ export default function MarketBoardPage() {
     const [currentPage, setCurrentPage] = useState(0);  // 0-indexed
     const [mobileSectorIndex, setMobileSectorIndex] = useState(0);
     const mobileListRef = useRef<HTMLDivElement>(null);
+    const touchStartXRef = useRef<number | null>(null);
+    const touchStartYRef = useRef<number | null>(null);
+    const showMobileStepControls = false; // Temporary disabled on mobile to reduce UI noise.
 
     // ★ Inject mock data khi chưa có real WebSocket data
     useEffect(() => {
@@ -141,8 +144,29 @@ export default function MarketBoardPage() {
     const goToMobilePrev = () => setMobileSectorIndex((p) => Math.max(0, p - 1));
     const goToMobileNext = () => setMobileSectorIndex((p) => Math.min(SECTORS.length - 1, p + 1));
 
-    const scrollMobileMore = () => {
-        mobileListRef.current?.scrollBy({ top: 320, behavior: "smooth" });
+    const handleMobileTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+        const touch = e.touches[0];
+        if (!touch) return;
+        touchStartXRef.current = touch.clientX;
+        touchStartYRef.current = touch.clientY;
+    };
+
+    const handleMobileTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+        const startX = touchStartXRef.current;
+        const startY = touchStartYRef.current;
+        const touch = e.changedTouches[0];
+        if (!touch || startX == null || startY == null) return;
+
+        const deltaX = touch.clientX - startX;
+        const deltaY = touch.clientY - startY;
+        const absX = Math.abs(deltaX);
+        const absY = Math.abs(deltaY);
+
+        // Horizontal swipe gesture: ignore mostly vertical movement.
+        if (absX >= 50 && absY <= 40 && absX > absY) {
+            if (deltaX < 0) goToMobileNext();
+            if (deltaX > 0) goToMobilePrev();
+        }
     };
 
     return (
@@ -190,45 +214,44 @@ export default function MarketBoardPage() {
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-zinc-500">
-                            Mục {mobileSectorIndex + 1}/{SECTORS.length}
-                        </span>
-                        <div className="flex items-center gap-1">
-                        <button
-                            onClick={goToMobilePrev}
-                            disabled={mobileSectorIndex === 0}
-                            className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-                        >
-                            <ChevronLeft className="h-3.5 w-3.5" />
-                            Trước
-                        </button>
-                        <button
-                            onClick={goToMobileNext}
-                            disabled={mobileSectorIndex === SECTORS.length - 1}
-                            className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-                        >
-                            Tiếp
-                            <ChevronRight className="h-3.5 w-3.5" />
-                        </button>
+                    {showMobileStepControls && (
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-zinc-500">
+                                Mục {mobileSectorIndex + 1}/{SECTORS.length}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={goToMobilePrev}
+                                    disabled={mobileSectorIndex === 0}
+                                    className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+                                >
+                                    <ChevronLeft className="h-3.5 w-3.5" />
+                                    Trước
+                                </button>
+                                <button
+                                    onClick={goToMobileNext}
+                                    disabled={mobileSectorIndex === SECTORS.length - 1}
+                                    className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+                                >
+                                    Tiếp
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
 
-            <div ref={mobileListRef} className="flex md:hidden flex-1 min-h-0 flex-col gap-2 overflow-y-auto px-2 pb-2">
+            <div
+                ref={mobileListRef}
+                onTouchStart={handleMobileTouchStart}
+                onTouchEnd={handleMobileTouchEnd}
+                className="flex md:hidden flex-1 min-h-0 flex-col gap-2 overflow-y-auto px-2 pb-2"
+            >
                 {mobileSector && (
                     <TradingErrorBoundary key={mobileSector.title}>
                         <SectorColumn title={mobileSector.title} symbols={mobileSector.symbols} />
                     </TradingErrorBoundary>
-                )}
-                {mobileSector && mobileSector.symbols.length > 10 && (
-                    <button
-                        onClick={scrollMobileMore}
-                        className="mx-auto rounded border border-zinc-700 bg-zinc-900/70 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
-                    >
-                        Cuộn thêm để xem hết mã
-                    </button>
                 )}
             </div>
 
