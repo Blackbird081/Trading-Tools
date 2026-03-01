@@ -26,18 +26,19 @@ const MOCK_INDICES: IndexData[] = [
   { name: "VN30", value: 1312.80, change: +9.10, changePct: +0.70 },
 ];
 
-function IndexItem({ index }: { index: IndexData }) {
+function IndexItem({ index, compact = false }: { index: IndexData; compact?: boolean }) {
   const isUp = index.change > 0;
   const isDown = index.change < 0;
 
   return (
-    <div className="market-index-item flex items-center gap-3 py-2">
-      <span className="text-xs font-semibold text-zinc-300 min-w-[80px]">
+    <div className={cn("market-index-item flex items-center py-2", compact ? "gap-2" : "gap-3")}>
+      <span className={cn("text-xs font-semibold text-zinc-300", compact ? "min-w-[68px]" : "min-w-[80px]")}>
         {index.name}
       </span>
       <span
         className={cn(
-          "font-mono text-sm font-bold tabular-nums",
+          "font-mono font-bold tabular-nums",
+          compact ? "text-[13px]" : "text-sm",
           isUp && "text-emerald-400",
           isDown && "text-rose-400",
           !isUp && !isDown && "text-amber-400",
@@ -47,7 +48,8 @@ function IndexItem({ index }: { index: IndexData }) {
       </span>
       <span
         className={cn(
-          "font-mono text-xs tabular-nums",
+          "font-mono tabular-nums",
+          compact ? "text-[11px]" : "text-xs",
           isUp && "text-emerald-400",
           isDown && "text-rose-400",
           !isUp && !isDown && "text-zinc-500",
@@ -81,16 +83,18 @@ export function MarketIndexBar() {
   }, []);
 
   return (
-    <div className="market-index-bar flex items-center justify-between px-2 h-10 shrink-0">
+    <div className="market-index-bar flex h-10 shrink-0 items-center justify-between px-1.5 sm:px-2">
       {/* Left: Market indices */}
       <div className="flex items-center overflow-x-auto">
-        {MOCK_INDICES.map((index) => (
-          <IndexItem key={index.name} index={index} />
+        {MOCK_INDICES.map((index, idx) => (
+          <div key={index.name} className={cn(idx > 0 && "hidden md:block")}>
+            <IndexItem index={index} compact={idx === 0} />
+          </div>
         ))}
       </div>
 
       {/* Right: Connection status + time */}
-      <div className="flex items-center gap-3 px-4 shrink-0">
+      <div className="flex shrink-0 items-center gap-2 px-2 sm:gap-3 sm:px-4">
         <div className="flex items-center gap-1.5">
           <div
             className={cn(
@@ -102,7 +106,7 @@ export function MarketIndexBar() {
             {connectionStatus === "connected" ? "LIVE" : "OFFLINE"}
           </span>
         </div>
-        <span className="text-xs text-zinc-600 font-mono">
+        <span className="hidden font-mono text-xs text-zinc-600 sm:block">
           {time}
         </span>
       </div>

@@ -6,7 +6,7 @@
  * ★ AG Grid với flash animation, bộ lọc sàn, nhiều cột hơn.
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import type { ColDef, GridReadyEvent, ICellRendererParams } from "ag-grid-community";
@@ -220,6 +220,27 @@ export function PriceBoard() {
   const openSymbolPopup = useUIStore((s) => s.openSymbolPopup);
   const [exchange, setExchange] = useState<ExchangeFilter>("ALL");
   const [search, setSearch] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const applyMatch = () => setIsMobile(mediaQuery.matches);
+    applyMatch();
+    mediaQuery.addEventListener("change", applyMatch);
+    return () => mediaQuery.removeEventListener("change", applyMatch);
+  }, []);
+
+  const responsiveColumnDefs = useMemo(
+    () =>
+      columnDefs.map((col) => {
+        if (col.field === "high" || col.field === "low") {
+          return { ...col, hide: isMobile };
+        }
+        return col;
+      }),
+    [isMobile]
+  );
 
   const rowData = useMemo(() => {
     let rows = Object.values(ticks);
@@ -251,15 +272,15 @@ export function PriceBoard() {
   return (
     <div className="flex flex-col h-full">
       {/* ── Filter Bar ── */}
-      <div className="flex items-center gap-2 px-2 py-1.5 border-b border-zinc-800/60 shrink-0">
+      <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800/60 px-2 py-1.5 shrink-0">
         {/* Exchange tabs */}
-        <div className="flex gap-0.5">
+        <div className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto pb-0.5 sm:flex-none sm:overflow-visible sm:pb-0">
           {EXCHANGE_TABS.map((tab) => (
             <button
               key={tab.value}
               onClick={() => setExchange(tab.value)}
               className={cn(
-                "px-2 py-0.5 text-xs rounded font-medium transition-colors",
+                "shrink-0 rounded px-2 py-0.5 text-xs font-medium transition-colors",
                 exchange === tab.value
                   ? "bg-blue-600 text-white"
                   : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800",
@@ -276,11 +297,11 @@ export function PriceBoard() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Tìm mã..."
-          className="ml-auto w-24 rounded border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-200 placeholder-zinc-600 focus:border-blue-500 focus:outline-none"
+          className="h-7 w-24 rounded border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-200 placeholder-zinc-600 focus:border-blue-500 focus:outline-none sm:ml-auto"
         />
 
         {/* Row count */}
-        <span className="text-sm text-zinc-600 shrink-0">
+        <span className="text-xs text-zinc-600 shrink-0">
           {rowData.length} mã
         </span>
       </div>
@@ -289,7 +310,7 @@ export function PriceBoard() {
       <div className="ag-theme-alpine-dark flex-1 min-h-0 price-board">
         <AgGridReact
           ref={gridRef}
-          columnDefs={columnDefs}
+          columnDefs={responsiveColumnDefs}
           rowData={rowData}
           rowBuffer={20}
           getRowId={(params) => params.data.symbol}
@@ -297,8 +318,8 @@ export function PriceBoard() {
           suppressCellFocus={true}
           onGridReady={onGridReady}
           onRowClicked={onRowClicked}
-          headerHeight={28}
-          rowHeight={26}
+          headerHeight={isMobile ? 26 : 28}
+          rowHeight={isMobile ? 24 : 26}
           domLayout="normal"
           tooltipShowDelay={300}
           rowClass="cursor-pointer"

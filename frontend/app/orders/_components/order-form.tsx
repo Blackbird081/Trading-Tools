@@ -50,10 +50,8 @@ export function OrderForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-900 p-6"
+      className="space-y-3"
     >
-      <h3 className="text-sm font-medium text-zinc-400">Đặt lệnh</h3>
-
       <div className="flex gap-2">
         <button
           type="button"

@@ -69,7 +69,11 @@ describe("WebSocket Exponential Backoff Logic", () => {
   it("delay increases monotonically up to cap", () => {
     const delays = [0, 1, 2, 3, 4, 5].map((a) => expectedBackoffRange(a)[0]);
     for (let i = 1; i < delays.length; i++) {
-      expect(delays[i]).toBeGreaterThanOrEqual(delays[i - 1]);
+      const currentDelay = delays[i];
+      const previousDelay = delays[i - 1];
+      expect(currentDelay).toBeDefined();
+      expect(previousDelay).toBeDefined();
+      expect(currentDelay!).toBeGreaterThanOrEqual(previousDelay!);
     }
   });
 

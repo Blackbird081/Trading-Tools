@@ -206,13 +206,13 @@ export function DataLoader() {
   const isDone = state.status === "complete" || state.status === "cached";
 
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
+    <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
       {/* Header — always visible */}
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="flex w-full items-center justify-between px-4 py-2.5 hover:bg-zinc-800/50 transition-colors"
+        className="flex w-full items-center justify-between px-3 py-2.5 transition-colors hover:bg-zinc-800/50 sm:px-4"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <Database className="h-4 w-4 text-emerald-400" />
           <span className="text-xs font-medium uppercase tracking-wider text-zinc-400">
             Market Data
@@ -224,7 +224,7 @@ export function DataLoader() {
             </span>
           )}
           {state.lastUpdated && (
-            <span className="flex items-center gap-1 text-[10px] text-zinc-600 ml-2">
+            <span className="ml-1 hidden items-center gap-1 text-[10px] text-zinc-600 sm:flex">
               <Clock className="h-3 w-3" />
               Cập nhật: {state.lastUpdated}
             </span>
@@ -237,11 +237,11 @@ export function DataLoader() {
 
       {/* Expandable body */}
       {expanded && (
-        <div className="border-t border-zinc-800 px-4 pb-4 pt-3 space-y-3">
+        <div className="space-y-3 border-t border-zinc-800 px-3 pb-4 pt-3 sm:px-4">
           {/* Row: Preset + Years */}
-          <div className="flex items-end gap-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
             {/* Preset selector */}
-            <div className="flex-1">
+            <div className="w-full lg:flex-1">
               <label className="mb-1 block text-[11px] font-medium text-zinc-500 uppercase">
                 Danh sách
               </label>
@@ -270,7 +270,7 @@ export function DataLoader() {
             </div>
 
             {/* Years slider */}
-            <div className="flex-1">
+            <div className="w-full lg:flex-1">
               <label className="mb-1 block text-[11px] font-medium text-zinc-500 uppercase">
                 Dữ liệu: {years} năm
               </label>
@@ -293,12 +293,13 @@ export function DataLoader() {
             {/* Load / Refresh button */}
             <button
               onClick={handleLoad}
-              className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-semibold transition-all ${isLoading
-                ? "bg-red-600/80 hover:bg-red-600 text-white"
-                : isDone
-                  ? "bg-zinc-700 hover:bg-zinc-600 text-zinc-200"
-                  : "bg-emerald-600 hover:bg-emerald-500 text-white"
-                }`}
+              className={`flex w-full items-center justify-center gap-1.5 rounded-md px-4 py-2 text-xs font-semibold transition-all lg:w-auto lg:py-1.5 ${
+                isLoading
+                  ? "bg-red-600/80 text-white hover:bg-red-600"
+                  : isDone
+                    ? "bg-zinc-700 text-zinc-200 hover:bg-zinc-600"
+                    : "bg-emerald-600 text-white hover:bg-emerald-500"
+              }`}
             >
               {isLoading ? (
                 <>
@@ -330,7 +331,7 @@ export function DataLoader() {
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-[shimmer_1.5s_infinite]" />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-zinc-500">
+                <span className="pr-2 text-[11px] text-zinc-500">
                   {state.currentSymbol && (
                     <span className="text-emerald-400 font-mono">
                       {state.currentSymbol}

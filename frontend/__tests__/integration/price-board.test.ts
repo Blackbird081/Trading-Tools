@@ -10,7 +10,7 @@ describe("PriceBoard integration", () => {
       { field: "volume", headerName: "KL" },
     ];
     expect(columns).toHaveLength(5);
-    expect(columns[0].field).toBe("symbol");
+    expect(columns[0]?.field).toBe("symbol");
   });
 
   it("should format tick data for grid rows", () => {

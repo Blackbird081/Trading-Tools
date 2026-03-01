@@ -45,9 +45,9 @@ function fmtVol(v: number | undefined): string {
 
 function IndicatorRow({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="flex items-center justify-between py-1 border-b border-zinc-800/40 last:border-0">
-      <span className="text-[11px] text-zinc-500">{label}</span>
-      <span className={cn("text-[11px] font-mono font-semibold", color ?? "text-zinc-200")}>{value}</span>
+    <div className="flex items-center justify-between border-b border-zinc-800/40 py-1 last:border-0">
+      <span className="text-xs text-zinc-500 sm:text-[11px]">{label}</span>
+      <span className={cn("text-xs font-mono font-semibold sm:text-[11px]", color ?? "text-zinc-200")}>{value}</span>
     </div>
   );
 }
@@ -175,22 +175,22 @@ export function SymbolPopup() {
       />
 
       {/* Modal */}
-      <div className="fixed inset-x-4 top-[5vh] bottom-[5vh] z-50 mx-auto max-w-5xl flex flex-col rounded-xl border border-zinc-700 bg-zinc-950 shadow-2xl overflow-hidden">
+      <div className="fixed inset-0 z-50 flex flex-col overflow-hidden border-zinc-700 bg-zinc-950 shadow-2xl sm:inset-x-4 sm:bottom-[5vh] sm:top-[5vh] sm:mx-auto sm:max-w-5xl sm:rounded-xl sm:border">
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800 shrink-0">
-          <div className="flex items-center gap-4">
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-zinc-800 px-3 py-3 sm:px-5">
+          <div className="min-w-0 flex-1">
             {/* Symbol + name */}
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-amber-300">{symbol}</h2>
+                <h2 className="text-lg font-bold text-amber-300 sm:text-xl">{symbol}</h2>
                 <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">HOSE</span>
               </div>
             </div>
 
             {/* Price info */}
             {tick && (
-              <div className="flex items-center gap-3 ml-4">
-                <span className={cn("text-2xl font-mono font-bold tabular-nums", priceColor)}>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 sm:mt-0 sm:ml-4 sm:flex-nowrap">
+                <span className={cn("text-xl font-mono font-bold tabular-nums sm:text-2xl", priceColor)}>
                   {fmt(tick.price)}
                 </span>
                 <div className="flex flex-col">
@@ -216,10 +216,11 @@ export function SymbolPopup() {
               href={`/company/${symbol}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-xs transition-colors"
+              className="flex items-center gap-1 rounded-lg bg-zinc-800 px-2.5 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200 sm:px-3"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Xem đầy đủ
+              <span className="hidden sm:inline">Xem đầy đủ</span>
+              <span className="sm:hidden">Xem</span>
             </a>
             <button
               onClick={closeSymbolPopup}
@@ -231,18 +232,18 @@ export function SymbolPopup() {
         </div>
 
         {/* ── Body: Chart + Indicators ── */}
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-1 min-h-0 flex-col sm:flex-row">
           {/* Chart — takes most space */}
-          <div className="flex-1 min-w-0 bg-zinc-950">
+          <div className="min-h-[42vh] min-w-0 flex-1 bg-zinc-950 sm:min-h-0">
             <PopupChart symbol={symbol} />
           </div>
 
           {/* Right panel: Technical indicators */}
-          <div className="w-56 shrink-0 border-l border-zinc-800 overflow-y-auto bg-zinc-900/50">
+          <div className="w-full shrink-0 overflow-y-auto border-t border-zinc-800 bg-zinc-900/50 sm:w-56 sm:border-l sm:border-t-0">
             {/* Price levels */}
             {tick && (
               <div className="px-3 py-2 border-b border-zinc-800">
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Giá hôm nay</p>
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500">Giá hôm nay</p>
                 <IndicatorRow label="Mở cửa" value={fmt(tick.open)} />
                 <IndicatorRow label="Cao nhất" value={fmt(tick.high)} color="text-emerald-400" />
                 <IndicatorRow label="Thấp nhất" value={fmt(tick.low)} color="text-rose-400" />
@@ -252,9 +253,9 @@ export function SymbolPopup() {
 
             {/* Technical indicators */}
             <div className="px-3 py-2 border-b border-zinc-800">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <Activity className="h-3 w-3 text-emerald-400" />
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Chỉ báo kỹ thuật</p>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Activity className="h-3 w-3 text-emerald-400" />
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Chỉ báo kỹ thuật</p>
               </div>
               {t ? (
                 <>
@@ -307,18 +308,18 @@ export function SymbolPopup() {
                   <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Hỗ trợ / Kháng cự</p>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-zinc-800/50 px-2 py-1.5 mb-1">
-                  <div className="flex items-center gap-1 text-[11px]">
+                  <div className="flex items-center gap-1 text-xs sm:text-[11px]">
                     <TrendingDown className="h-3 w-3 text-rose-400" />
                     <span className="text-zinc-500">Hỗ trợ</span>
                   </div>
-                  <span className="font-mono text-[11px] font-semibold text-rose-400">{fmt(t.support)}</span>
+                  <span className="font-mono text-xs font-semibold text-rose-400 sm:text-[11px]">{fmt(t.support)}</span>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-zinc-800/50 px-2 py-1.5">
-                  <div className="flex items-center gap-1 text-[11px]">
+                  <div className="flex items-center gap-1 text-xs sm:text-[11px]">
                     <TrendingUp className="h-3 w-3 text-emerald-400" />
                     <span className="text-zinc-500">Kháng cự</span>
                   </div>
-                  <span className="font-mono text-[11px] font-semibold text-emerald-400">{fmt(t.resistance)}</span>
+                  <span className="font-mono text-xs font-semibold text-emerald-400 sm:text-[11px]">{fmt(t.resistance)}</span>
                 </div>
               </div>
             )}

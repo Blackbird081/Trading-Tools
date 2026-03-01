@@ -7,14 +7,14 @@ export function PnlChart() {
   const cash = usePortfolioStore((s) => s.cash);
 
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 sm:p-6">
       <h3 className="mb-4 text-sm font-medium text-zinc-400">
         Tổng quan tài sản
       </h3>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <p className="text-xs text-zinc-500">NAV</p>
-          <p className="text-xl font-bold text-white">
+          <p className="text-lg font-bold text-white sm:text-xl">
             {nav.toLocaleString(undefined, {
               maximumFractionDigits: 0,
             })}
@@ -22,7 +22,7 @@ export function PnlChart() {
         </div>
         <div>
           <p className="text-xs text-zinc-500">Tiền mặt</p>
-          <p className="text-xl font-bold text-emerald-400">
+          <p className="text-lg font-bold text-emerald-400 sm:text-xl">
             {cash.toLocaleString(undefined, {
               maximumFractionDigits: 0,
             })}

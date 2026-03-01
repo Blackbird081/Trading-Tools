@@ -5,24 +5,24 @@ import { PnlChart } from "./_components/pnl-chart";
 export default function PortfolioPage() {
   return (
     <TradingErrorBoundary>
-      <div className="p-4">
-        <h1 className="text-lg font-semibold mb-4">Portfolio</h1>
-        <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="p-3 sm:p-4">
+        <h1 className="mb-4 text-xl font-semibold sm:text-2xl">Portfolio</h1>
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
             <p className="text-xs text-zinc-500 uppercase">NAV</p>
-            <p className="text-xl font-mono font-semibold text-zinc-100">0 ₫</p>
+            <p className="text-lg font-mono font-semibold text-zinc-100 sm:text-xl">0 ₫</p>
           </div>
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
             <p className="text-xs text-zinc-500 uppercase">Cash</p>
-            <p className="text-xl font-mono font-semibold text-zinc-100">0 ₫</p>
+            <p className="text-lg font-mono font-semibold text-zinc-100 sm:text-xl">0 ₫</p>
           </div>
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
             <p className="text-xs text-zinc-500 uppercase">PnL</p>
-            <p className="text-xl font-mono font-semibold text-emerald-400">+0 ₫</p>
+            <p className="text-lg font-mono font-semibold text-emerald-400 sm:text-xl">+0 ₫</p>
           </div>
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
             <p className="text-xs text-zinc-500 uppercase">Purchasing Power</p>
-            <p className="text-xl font-mono font-semibold text-zinc-100">0 ₫</p>
+            <p className="text-lg font-mono font-semibold text-zinc-100 sm:text-xl">0 ₫</p>
           </div>
         </div>
         <TradingErrorBoundary>

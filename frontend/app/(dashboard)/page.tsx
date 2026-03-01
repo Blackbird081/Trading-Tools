@@ -24,9 +24,9 @@ export default function DashboardPage() {
       <DataLoader />
 
       {/* ── Main content: Price Board chiếm toàn bộ không gian ── */}
-      <div className="flex flex-1 min-h-0 gap-0.5 p-0.5">
+      <div className="flex flex-1 min-h-0 flex-col gap-2 p-2 lg:flex-row lg:gap-0.5 lg:p-0.5">
         {/* Price Board — full width */}
-        <div className="flex-1 border border-zinc-800/50 rounded-sm overflow-hidden">
+        <div className="min-h-[360px] flex-1 overflow-hidden rounded-sm border border-zinc-800/50 lg:min-h-0">
           <TradingErrorBoundary>
             <Suspense fallback={<LoadingSkeleton />}>
               <PriceBoard />
@@ -34,9 +34,9 @@ export default function DashboardPage() {
           </TradingErrorBoundary>
         </div>
 
-        {/* Agent Signals panel — sidebar nhỏ bên phải */}
+        {/* Agent Signals panel — desktop sidebar */}
         <TradingErrorBoundary>
-          <div className="w-72 shrink-0 bg-zinc-900/80 border border-zinc-800/50 rounded-sm p-3 overflow-auto flex flex-col gap-3">
+          <div className="hidden w-72 shrink-0 flex-col gap-3 overflow-auto rounded-sm border border-zinc-800/50 bg-zinc-900/80 p-3 lg:flex">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
@@ -55,6 +55,13 @@ export default function DashboardPage() {
             </div>
           </div>
         </TradingErrorBoundary>
+
+        {/* Mobile helper card */}
+        <div className="rounded-sm border border-zinc-800/50 bg-zinc-900/60 p-2 lg:hidden">
+          <p className="text-xs leading-relaxed text-zinc-500">
+            Nhấn vào mã cổ phiếu để mở biểu đồ kỹ thuật và tín hiệu AI chi tiết.
+          </p>
+        </div>
       </div>
     </div>
   );
