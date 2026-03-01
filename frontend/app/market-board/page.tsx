@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SectorColumn } from "@/components/sector-column";
 import { MarketIndexBar } from "@/components/market-index-bar";
 import { DataLoader } from "@/app/(dashboard)/_components/data-loader";
@@ -104,6 +104,8 @@ const TOTAL_PAGES = Math.ceil(SECTORS.length / SECTORS_PER_PAGE);
 export default function MarketBoardPage() {
     const bulkUpdateTicks = useMarketStore((s) => s.bulkUpdateTicks);
     const [currentPage, setCurrentPage] = useState(0);  // 0-indexed
+    const [mobileSectorIndex, setMobileSectorIndex] = useState(0);
+    const mobileListRef = useRef<HTMLDivElement>(null);
 
     // ★ Inject mock data khi chưa có real WebSocket data
     useEffect(() => {
@@ -132,9 +134,16 @@ export default function MarketBoardPage() {
     // Current page sectors
     const startIdx = currentPage * SECTORS_PER_PAGE;
     const pageSectors = SECTORS.slice(startIdx, startIdx + SECTORS_PER_PAGE);
+    const mobileSector = SECTORS[mobileSectorIndex];
 
     const goToPrev = () => setCurrentPage((p) => Math.max(0, p - 1));
     const goToNext = () => setCurrentPage((p) => Math.min(TOTAL_PAGES - 1, p + 1));
+    const goToMobilePrev = () => setMobileSectorIndex((p) => Math.max(0, p - 1));
+    const goToMobileNext = () => setMobileSectorIndex((p) => Math.min(SECTORS.length - 1, p + 1));
+
+    const scrollMobileMore = () => {
+        mobileListRef.current?.scrollBy({ top: 320, behavior: "smooth" });
+    };
 
     return (
         <div className="flex flex-col bg-[#050508] h-full">
@@ -160,52 +169,67 @@ export default function MarketBoardPage() {
                 ))}
             </div>
 
-            {/* ★ Mobile: one page at a time (3 sectors/page) */}
+            {/* ★ Mobile: one sector per screen */}
             <div className="md:hidden shrink-0 px-2 pt-2 pb-1">
-                <div className="flex items-center justify-between rounded border border-zinc-800/60 bg-zinc-900/50 px-2 py-1.5">
-                    <div className="flex items-center gap-1">
-                        {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
+                <div className="flex flex-col gap-2 rounded border border-zinc-800/60 bg-zinc-900/50 px-2 py-1.5">
+                    <div className="flex items-center justify-between gap-1">
+                        <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                            {SECTORS.map((sector, idx) => (
                             <button
-                                key={`mobile-page-${i}`}
-                                onClick={() => setCurrentPage(i)}
+                                key={`mobile-sector-${sector.title}`}
+                                onClick={() => setMobileSectorIndex(idx)}
                                 className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                                    i === currentPage
+                                    idx === mobileSectorIndex
                                         ? "bg-emerald-600 text-white"
                                         : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
                                 }`}
                             >
-                                Trang {i + 1}
+                                {sector.title}
                             </button>
-                        ))}
+                            ))}
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-zinc-500">
+                            Mục {mobileSectorIndex + 1}/{SECTORS.length}
+                        </span>
+                        <div className="flex items-center gap-1">
                         <button
-                            onClick={goToPrev}
-                            disabled={currentPage === 0}
+                            onClick={goToMobilePrev}
+                            disabled={mobileSectorIndex === 0}
                             className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
                         >
                             <ChevronLeft className="h-3.5 w-3.5" />
                             Trước
                         </button>
                         <button
-                            onClick={goToNext}
-                            disabled={currentPage === TOTAL_PAGES - 1}
+                            onClick={goToMobileNext}
+                            disabled={mobileSectorIndex === SECTORS.length - 1}
                             className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
                         >
                             Tiếp
                             <ChevronRight className="h-3.5 w-3.5" />
                         </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div className="flex md:hidden flex-1 min-h-0 flex-col gap-3 overflow-y-auto px-2 pb-2">
-                {pageSectors.map((sector) => (
-                    <TradingErrorBoundary key={sector.title}>
-                        <SectorColumn title={sector.title} symbols={sector.symbols} />
+            <div ref={mobileListRef} className="flex md:hidden flex-1 min-h-0 flex-col gap-2 overflow-y-auto px-2 pb-2">
+                {mobileSector && (
+                    <TradingErrorBoundary key={mobileSector.title}>
+                        <SectorColumn title={mobileSector.title} symbols={mobileSector.symbols} />
                     </TradingErrorBoundary>
-                ))}
+                )}
+                {mobileSector && mobileSector.symbols.length > 10 && (
+                    <button
+                        onClick={scrollMobileMore}
+                        className="mx-auto rounded border border-zinc-700 bg-zinc-900/70 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                    >
+                        Cuộn thêm để xem hết mã
+                    </button>
+                )}
             </div>
 
             {/* ★ Desktop: Pagination navigation bar — đặt ở dưới cùng */}
