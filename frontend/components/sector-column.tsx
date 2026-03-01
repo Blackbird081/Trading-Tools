@@ -10,6 +10,7 @@
 import { useMarketStore } from "@/stores/market-store";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
+import { useRef } from "react";
 
 interface SectorColumnProps {
     title: string;
@@ -138,6 +139,8 @@ function getHeaderGradient(changePct: number) {
 export function SectorColumn({ title, symbols }: SectorColumnProps) {
     const ticks = useMarketStore((s) => s.ticks);
     const openSymbolPopup = useUIStore((s) => s.openSymbolPopup);
+    const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+    const movedRef = useRef(false);
 
     // Calculate sector average change
     let totalChangePct = 0;
@@ -158,6 +161,32 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
 
     // Header gradient based on sector performance
     const headerGradient = getHeaderGradient(avgChangePct);
+
+    const handleRowsTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+        const touch = e.touches[0];
+        if (!touch) return;
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+        movedRef.current = false;
+    };
+
+    const handleRowsTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+        const touch = e.touches[0];
+        const start = touchStartRef.current;
+        if (!touch || !start) return;
+        if (Math.abs(touch.clientX - start.x) > 8 || Math.abs(touch.clientY - start.y) > 8) {
+            movedRef.current = true;
+        }
+    };
+
+    const handleRowsTouchEnd = () => {
+        touchStartRef.current = null;
+    };
+
+    const handleRowClick = (symbol: string) => {
+        // Prevent accidental popup open while user is swiping/scrolling the list.
+        if (movedRef.current) return;
+        openSymbolPopup(symbol);
+    };
 
     return (
         <div className="flex flex-col overflow-hidden rounded border border-zinc-700/50 shadow-lg md:max-h-[calc(100vh-130px)]">
@@ -193,14 +222,19 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
             </div>
 
             {/* ── Stock Rows ── */}
-            <div className="bg-zinc-950 md:flex-1 md:overflow-y-auto">
+            <div
+                className="max-h-[calc(100dvh-260px)] overflow-y-auto overscroll-contain touch-pan-y bg-zinc-950 [-webkit-overflow-scrolling:touch] md:max-h-none md:flex-1 md:overflow-y-auto"
+                onTouchStart={handleRowsTouchStart}
+                onTouchMove={handleRowsTouchMove}
+                onTouchEnd={handleRowsTouchEnd}
+            >
                 {rowData.map(({ symbol, data }) => {
                     const colors = getRowColors(data?.changePct, !!data);
 
                     return (
                         <div
                             key={symbol}
-                            onClick={() => openSymbolPopup(symbol)}
+                            onClick={() => handleRowClick(symbol)}
                             className={cn(
                                 "grid grid-cols-[2.5fr_2.5fr_2.5fr_2fr] px-2.5 py-2 md:px-2 md:py-[5px]",
                                 "border-b border-zinc-800/40 cursor-pointer transition-colors",

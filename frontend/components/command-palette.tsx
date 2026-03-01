@@ -146,7 +146,7 @@ export function CommandPalette() {
               className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-300 cursor-pointer aria-selected:bg-zinc-800"
             >
               <FileText className="h-4 w-4 text-zinc-500" />
-              Orders
+              Order
             </Command.Item>
             <Command.Item
               value="/settings"

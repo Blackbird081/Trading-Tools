@@ -19,10 +19,10 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/market-board", label: "Bảng điện", icon: BarChart3 },
+  { href: "/market-board", label: "Market Board", icon: BarChart3 },
   { href: "/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/screener", label: "Screener", icon: TrendingUp },
-  { href: "/orders", label: "Lệnh", icon: FileText },
+  { href: "/orders", label: "Order", icon: FileText },
 ];
 
 export function BottomNav() {
@@ -44,7 +44,7 @@ export function BottomNav() {
             )}
           >
             <item.icon className={cn("h-5 w-5", isActive && "text-emerald-400")} />
-            <span className="text-[10px] font-medium">{item.label}</span>
+            <span className="text-[9px] font-medium leading-tight text-center">{item.label}</span>
           </Link>
         );
       })}

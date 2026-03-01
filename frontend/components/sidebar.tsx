@@ -18,7 +18,7 @@ const navItems = [
   { href: "/market-board", label: "Market Board", icon: BarChart3 },
   { href: "/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/screener", label: "Screener", icon: TrendingUp },
-  { href: "/orders", label: "Orders", icon: FileText },
+  { href: "/orders", label: "Order", icon: FileText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
