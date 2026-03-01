@@ -1,39 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SectorColumn } from "@/components/sector-column";
 import { MarketIndexBar } from "@/components/market-index-bar";
-import { DataLoader } from "@/app/(dashboard)/_components/data-loader";
 import { TradingErrorBoundary } from "@/components/error-boundary";
 import { useMarketStore } from "@/stores/market-store";
+import { useUIStore } from "@/stores/ui-store";
+import { buildMarketSectors } from "@/lib/market-sectors";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-
-const SECTORS = [
-    {
-        title: "VN30",
-        symbols: ["FPT", "VIC", "VHM", "GAS", "HPG", "VPB", "MBB", "ACB", "TCB", "SSI", "MWG", "CTG"],
-    },
-    {
-        title: "Bất động sản",
-        symbols: ["VHM", "VIC", "NVL", "PDR", "DIG", "DXG", "KDH", "NLG", "CEO", "SCR", "HQC", "SJS"],
-    },
-    {
-        title: "Chứng khoán",
-        symbols: ["SSI", "VND", "VCI", "HCM", "SHS", "MBS", "FTS", "BSI", "CTS", "AGR", "VIX", "ORS"],
-    },
-    {
-        title: "Ngân hàng",
-        symbols: ["VCB", "BID", "CTG", "TCB", "MBB", "VPB", "ACB", "STB", "SHB", "HDB", "VIB", "LPB", "TPB"],
-    },
-    {
-        title: "Thép",
-        symbols: ["HPG", "HSG", "NKG", "SMC", "TLH", "TVN", "POM", "VGS", "TNA"],
-    },
-    {
-        title: "Dầu khí",
-        symbols: ["GAS", "PVD", "PVS", "BSR", "PLX", "OIL", "PVC", "PVT", "PLC", "POS"],
-    },
-];
 
 // ★ Mock data để test giao diện khi chưa có real data từ WebSocket
 const MOCK_TICKS: Record<string, { price: number; change: number; changePct: number; volume: number }> = {
@@ -99,20 +73,23 @@ const MOCK_TICKS: Record<string, { price: number; change: number; changePct: num
 
 // ★ Pagination: 3 sectors per page on desktop
 const SECTORS_PER_PAGE = 3;
-const TOTAL_PAGES = Math.ceil(SECTORS.length / SECTORS_PER_PAGE);
 
 export default function MarketBoardPage() {
+    const preset = useUIStore((s) => s.preset);
     const bulkUpdateTicks = useMarketStore((s) => s.bulkUpdateTicks);
+    const ticks = useMarketStore((s) => s.ticks);
     const [currentPage, setCurrentPage] = useState(0);  // 0-indexed
     const [mobileSectorIndex, setMobileSectorIndex] = useState(0);
     const touchStartXRef = useRef<number | null>(null);
     const touchStartYRef = useRef<number | null>(null);
     const showMobileStepControls = false; // Temporary disabled on mobile to reduce UI noise.
+    const sectors = useMemo(() => buildMarketSectors(preset, ticks), [preset, ticks]);
+    const totalPages = Math.max(1, Math.ceil(sectors.length / SECTORS_PER_PAGE));
 
     // ★ Inject mock data khi chưa có real WebSocket data
     useEffect(() => {
-        const ticks = useMarketStore.getState().ticks;
-        const hasRealData = Object.keys(ticks).length > 0;
+        const marketTicks = useMarketStore.getState().ticks;
+        const hasRealData = Object.keys(marketTicks).length > 0;
 
         if (!hasRealData) {
             const mockTickArray = Object.entries(MOCK_TICKS).map(([symbol, d]) => ({
@@ -135,13 +112,21 @@ export default function MarketBoardPage() {
 
     // Current page sectors
     const startIdx = currentPage * SECTORS_PER_PAGE;
-    const pageSectors = SECTORS.slice(startIdx, startIdx + SECTORS_PER_PAGE);
-    const mobileSector = SECTORS[mobileSectorIndex];
+    const pageSectors = sectors.slice(startIdx, startIdx + SECTORS_PER_PAGE);
+    const mobileSector = sectors[mobileSectorIndex];
 
     const goToPrev = () => setCurrentPage((p) => Math.max(0, p - 1));
-    const goToNext = () => setCurrentPage((p) => Math.min(TOTAL_PAGES - 1, p + 1));
+    const goToNext = () => setCurrentPage((p) => Math.min(totalPages - 1, p + 1));
     const goToMobilePrev = () => setMobileSectorIndex((p) => Math.max(0, p - 1));
-    const goToMobileNext = () => setMobileSectorIndex((p) => Math.min(SECTORS.length - 1, p + 1));
+    const goToMobileNext = () => setMobileSectorIndex((p) => Math.min(sectors.length - 1, p + 1));
+
+    useEffect(() => {
+        setCurrentPage((p) => Math.min(p, totalPages - 1));
+    }, [totalPages]);
+
+    useEffect(() => {
+        setMobileSectorIndex((p) => Math.min(p, Math.max(sectors.length - 1, 0)));
+    }, [sectors.length]);
 
     const handleMobileSwipeStart = (e: React.TouchEvent<HTMLDivElement>) => {
         const touch = e.touches[0];
@@ -161,8 +146,8 @@ export default function MarketBoardPage() {
         const absX = Math.abs(deltaX);
         const absY = Math.abs(deltaY);
 
-        // Horizontal swipe gesture: ignore mostly vertical movement.
-        if (absX >= 50 && absX > absY * 1.5) {
+        // Horizontal swipe gesture tuned for iPhone finger movement.
+        if (absX >= 32 && absX > absY * 1.15) {
             if (deltaX < 0) goToMobileNext();
             if (deltaX > 0) goToMobilePrev();
         }
@@ -174,8 +159,6 @@ export default function MarketBoardPage() {
             <div className="shrink-0 border-b border-zinc-800/60">
                 <MarketIndexBar />
             </div>
-
-            <DataLoader />
 
             {/* ★ Desktop: 3 columns per page — fill full width */}
             <div className="hidden md:flex flex-1 min-h-0 gap-2 p-2">
@@ -201,7 +184,7 @@ export default function MarketBoardPage() {
                 <div className="flex flex-col gap-2 rounded border border-zinc-800/60 bg-zinc-900/50 px-2 py-1.5">
                     <div className="flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
-                            {SECTORS.map((sector, idx) => (
+                            {sectors.map((sector, idx) => (
                             <button
                                 key={`mobile-sector-${sector.title}`}
                                 onClick={() => setMobileSectorIndex(idx)}
@@ -220,7 +203,7 @@ export default function MarketBoardPage() {
                     {showMobileStepControls && (
                         <div className="flex items-center justify-between">
                             <span className="text-[11px] text-zinc-500">
-                                Mục {mobileSectorIndex + 1}/{SECTORS.length}
+                                Mục {mobileSectorIndex + 1}/{sectors.length}
                             </span>
                             <div className="flex items-center gap-1">
                                 <button
@@ -233,7 +216,7 @@ export default function MarketBoardPage() {
                                 </button>
                                 <button
                                     onClick={goToMobileNext}
-                                    disabled={mobileSectorIndex === SECTORS.length - 1}
+                                    disabled={mobileSectorIndex === sectors.length - 1}
                                     className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
                                 >
                                     Tiếp
@@ -257,7 +240,7 @@ export default function MarketBoardPage() {
             <div className="hidden md:flex items-center justify-between px-3 py-1.5 bg-zinc-900/60 border-t border-zinc-800/60 shrink-0">
                 {/* Page indicator dots */}
                 <div className="flex items-center gap-2">
-                    {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
+                    {Array.from({ length: totalPages }).map((_, i) => (
                         <button
                             key={i}
                             onClick={() => setCurrentPage(i)}
@@ -269,7 +252,7 @@ export default function MarketBoardPage() {
                         >
                             Trang {i + 1}
                             <span className="text-[10px] opacity-70">
-                                ({SECTORS.slice(i * SECTORS_PER_PAGE, (i + 1) * SECTORS_PER_PAGE).map(s => s.title).join(", ")})
+                                ({sectors.slice(i * SECTORS_PER_PAGE, (i + 1) * SECTORS_PER_PAGE).map((s) => s.title).join(", ")})
                             </span>
                         </button>
                     ))}
@@ -286,11 +269,11 @@ export default function MarketBoardPage() {
                         Trước
                     </button>
                     <span className="text-xs text-zinc-600 px-1">
-                        {currentPage + 1} / {TOTAL_PAGES}
+                        {currentPage + 1} / {totalPages}
                     </span>
                     <button
                         onClick={goToNext}
-                        disabled={currentPage === TOTAL_PAGES - 1}
+                        disabled={currentPage === totalPages - 1}
                         className="flex items-center gap-1 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs"
                     >
                         Tiếp

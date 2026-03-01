@@ -238,62 +238,72 @@ export function DataLoader() {
       {/* Expandable body */}
       {expanded && (
         <div className="space-y-3 border-t border-zinc-800 px-3 pb-4 pt-3 sm:px-4">
-          {/* Row: Preset + Years */}
+          {/* Row 1: Preset + Load on mobile, full controls on desktop */}
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-            {/* Preset selector */}
+            {/* Preset selector + mobile load button */}
             <div className="w-full lg:flex-1">
               <label className="mb-1 block text-[11px] font-medium text-zinc-500 uppercase">
                 Danh sách
               </label>
-              <div className="flex rounded-md overflow-hidden border border-zinc-700">
+              <div className="flex gap-2">
+                <div className="flex flex-1 rounded-md overflow-hidden border border-zinc-700">
+                  <button
+                    onClick={() => setPreset("VN30")}
+                    disabled={isLoading}
+                    className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-colors ${preset === "VN30"
+                      ? "bg-emerald-600 text-white"
+                      : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                      }`}
+                  >
+                    VN30
+                  </button>
+                  <button
+                    onClick={() => setPreset("TOP100")}
+                    disabled={isLoading}
+                    className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-colors ${preset === "TOP100"
+                      ? "bg-amber-600 text-white"
+                      : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                      }`}
+                  >
+                    Top 100
+                  </button>
+                </div>
+
+                {/* Mobile: Load button in same row with preset */}
                 <button
-                  onClick={() => setPreset("VN30")}
-                  disabled={isLoading}
-                  className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-colors ${preset === "VN30"
-                    ? "bg-emerald-600 text-white"
-                    : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-                    }`}
+                  onClick={handleLoad}
+                  className={`lg:hidden flex items-center justify-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-semibold transition-all ${
+                    isLoading
+                      ? "bg-red-600/80 text-white hover:bg-red-600"
+                      : isDone
+                        ? "bg-zinc-700 text-zinc-200 hover:bg-zinc-600"
+                        : "bg-emerald-600 text-white hover:bg-emerald-500"
+                  }`}
                 >
-                  VN30
-                </button>
-                <button
-                  onClick={() => setPreset("TOP100")}
-                  disabled={isLoading}
-                  className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-colors ${preset === "TOP100"
-                    ? "bg-amber-600 text-white"
-                    : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-                    }`}
-                >
-                  Top 100
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Stop
+                    </>
+                  ) : isDone ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Update
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-3.5 w-3.5" />
+                      Load
+                    </>
+                  )}
                 </button>
               </div>
             </div>
 
-            {/* Years slider */}
-            <div className="w-full lg:flex-1">
-              <label className="mb-1 block text-[11px] font-medium text-zinc-500 uppercase">
-                Dữ liệu: {years} năm
-              </label>
-              <input
-                type="range"
-                min={1}
-                max={10}
-                value={years}
-                onChange={(e) => setYears(Number(e.target.value))}
-                disabled={isLoading}
-                className="w-full h-1.5 appearance-none rounded-full bg-zinc-700 accent-emerald-500 cursor-pointer disabled:opacity-50"
-              />
-              <div className="flex justify-between mt-0.5">
-                <span className="text-[10px] text-zinc-600">1Y</span>
-                <span className="text-[10px] text-zinc-600">5Y</span>
-                <span className="text-[10px] text-zinc-600">10Y</span>
-              </div>
-            </div>
-
-            {/* Load / Refresh button */}
+            {/* Desktop-only Load / Refresh button */}
             <button
               onClick={handleLoad}
-              className={`flex w-full items-center justify-center gap-1.5 rounded-md px-4 py-2 text-xs font-semibold transition-all lg:w-auto lg:py-1.5 ${
+              className={`hidden lg:flex items-center justify-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-semibold transition-all ${
                 isLoading
                   ? "bg-red-600/80 text-white hover:bg-red-600"
                   : isDone
@@ -318,6 +328,29 @@ export function DataLoader() {
                 </>
               )}
             </button>
+          </div>
+
+          {/* Row 2: Years slider */}
+          <div className="w-full">
+            <div className="w-full lg:max-w-[540px]">
+              <label className="mb-1 block text-[11px] font-medium text-zinc-500 uppercase">
+                Dữ liệu: {years} năm
+              </label>
+              <input
+                type="range"
+                min={1}
+                max={10}
+                value={years}
+                onChange={(e) => setYears(Number(e.target.value))}
+                disabled={isLoading}
+                className="w-full h-1.5 appearance-none rounded-full bg-zinc-700 accent-emerald-500 cursor-pointer disabled:opacity-50"
+              />
+              <div className="flex justify-between mt-0.5">
+                <span className="text-[10px] text-zinc-600">1Y</span>
+                <span className="text-[10px] text-zinc-600">5Y</span>
+                <span className="text-[10px] text-zinc-600">10Y</span>
+              </div>
+            </div>
           </div>
 
           {/* Progress bar */}

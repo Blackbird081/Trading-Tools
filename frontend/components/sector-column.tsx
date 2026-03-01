@@ -59,18 +59,54 @@ function getRowColors(changePct?: number, hasData?: boolean) {
             changeText: "text-amber-400",
         };
     }
+    if (changePct > 3) {
+        return {
+            rowBg: "bg-emerald-900/35 hover:bg-emerald-900/45",
+            symbolBg: "bg-emerald-400/45",
+            symbolText: "text-emerald-100",
+            priceText: "text-emerald-200",
+            changeText: "text-emerald-200",
+        };
+    }
+    if (changePct > 1) {
+        return {
+            rowBg: "bg-emerald-900/25 hover:bg-emerald-900/35",
+            symbolBg: "bg-emerald-400/35",
+            symbolText: "text-emerald-200",
+            priceText: "text-emerald-300",
+            changeText: "text-emerald-300",
+        };
+    }
     if (changePct > 0) {
         return {
-            rowBg: "bg-emerald-950/20 hover:bg-emerald-950/40",
+            rowBg: "bg-emerald-950/15 hover:bg-emerald-950/28",
             symbolBg: "bg-emerald-500/25",
             symbolText: "text-emerald-300",
             priceText: "text-emerald-400",
             changeText: "text-emerald-400",
         };
     }
+    if (changePct < -3) {
+        return {
+            rowBg: "bg-rose-900/35 hover:bg-rose-900/45",
+            symbolBg: "bg-rose-400/45",
+            symbolText: "text-rose-100",
+            priceText: "text-rose-200",
+            changeText: "text-rose-200",
+        };
+    }
+    if (changePct < -1) {
+        return {
+            rowBg: "bg-rose-900/25 hover:bg-rose-900/35",
+            symbolBg: "bg-rose-400/35",
+            symbolText: "text-rose-200",
+            priceText: "text-rose-300",
+            changeText: "text-rose-300",
+        };
+    }
     if (changePct < 0) {
         return {
-            rowBg: "bg-rose-950/20 hover:bg-rose-950/40",
+            rowBg: "bg-rose-950/15 hover:bg-rose-950/28",
             symbolBg: "bg-rose-500/25",
             symbolText: "text-rose-300",
             priceText: "text-rose-400",
@@ -79,12 +115,22 @@ function getRowColors(changePct?: number, hasData?: boolean) {
     }
     // Reference price (changePct === 0)
     return {
-        rowBg: "bg-amber-950/10 hover:bg-amber-950/25",
+        rowBg: "bg-amber-950/14 hover:bg-amber-950/26",
         symbolBg: "bg-amber-500/20",
-        symbolText: "text-amber-300",
+        symbolText: "text-amber-200",
         priceText: "text-amber-300",
-        changeText: "text-amber-400",
+        changeText: "text-amber-300",
     };
+}
+
+function getHeaderGradient(changePct: number) {
+    if (changePct > 2) return "from-emerald-900/80 to-zinc-900/90";
+    if (changePct > 0.5) return "from-emerald-950/80 to-zinc-900/90";
+    if (changePct > 0) return "from-emerald-950/55 to-zinc-900/90";
+    if (changePct < -2) return "from-rose-900/80 to-zinc-900/90";
+    if (changePct < -0.5) return "from-rose-950/80 to-zinc-900/90";
+    if (changePct < 0) return "from-rose-950/55 to-zinc-900/90";
+    return "from-zinc-900/90 to-zinc-900/90";
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -111,11 +157,7 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
     const isSectorDown = avgChangePct < -0.001;
 
     // Header gradient based on sector performance
-    const headerGradient = isSectorUp
-        ? "from-emerald-950/80 to-zinc-900/90"
-        : isSectorDown
-            ? "from-rose-950/80 to-zinc-900/90"
-            : "from-zinc-900/90 to-zinc-900/90";
+    const headerGradient = getHeaderGradient(avgChangePct);
 
     return (
         <div className="flex flex-col overflow-hidden rounded border border-zinc-700/50 shadow-lg md:max-h-[calc(100vh-130px)]">
@@ -151,7 +193,7 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
             </div>
 
             {/* ── Stock Rows ── */}
-            <div className="max-h-[62vh] overflow-y-auto bg-zinc-950 md:max-h-none md:flex-1 md:overflow-y-auto">
+            <div className="bg-zinc-950 md:flex-1 md:overflow-y-auto">
                 {rowData.map(({ symbol, data }) => {
                     const colors = getRowColors(data?.changePct, !!data);
 
