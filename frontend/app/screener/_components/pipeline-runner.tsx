@@ -107,6 +107,17 @@ interface PipelineState {
   error: string;
 }
 
+const INITIAL_PIPELINE_STATE: PipelineState = {
+  status: "idle",
+  percent: 0,
+  totalSteps: 0,
+  device: "CPU",
+  steps: [],
+  results: [],
+  summary: null,
+  error: "",
+};
+
 type SortField = "symbol" | "score" | "action" | "rsi" | "risk" | "entry_price" | "quantity";
 type SortDir = "asc" | "desc";
 type ActionFilter = "ALL" | "BUY" | "SELL" | "HOLD";
@@ -302,17 +313,7 @@ function MetricCard({
 
 /* ── Main Component ─────────────────────────────────────────── */
 export function PipelineRunner() {
-  const initialState: PipelineState = {
-    status: "idle",
-    percent: 0,
-    totalSteps: 0,
-    device: "CPU",
-    steps: [],
-    results: [],
-    summary: null,
-    error: "",
-  };
-  const [state, setState] = useState<PipelineState>(initialState);
+  const [state, setState] = useState<PipelineState>(INITIAL_PIPELINE_STATE);
   const abortRef = useRef<AbortController | null>(null);
 
   // Table state
@@ -394,70 +395,6 @@ export function PipelineRunner() {
   // ── SSE handling ──────────────────────────────────────────
   const preset = useUIStore((s) => s.preset);
 
-  const handleRun = useCallback(async () => {
-    if (state.status === "running") {
-      abortRef.current?.abort();
-      setState((s) => ({ ...s, status: "idle" }));
-      return;
-    }
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setExpandedSymbol(null);
-    setSearchQuery("");
-    setCurrentPage(1);
-    setActionFilter("ALL");
-    setShowAgentSteps(true);
-
-    setState({
-      ...initialState,
-      status: "running",
-    });
-
-    try {
-      const res = await fetch(`${API_BASE}/run-screener?preset=${preset}`, {
-        signal: controller.signal,
-      });
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        let eventType = "";
-        for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            eventType = line.slice(7).trim();
-          } else if (line.startsWith("data: ") && eventType) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              handleEvent(eventType, data);
-            } catch {
-              // skip
-            }
-            eventType = "";
-          }
-        }
-      }
-    } catch (e) {
-      if ((e as Error).name !== "AbortError") {
-        setState((s) => ({
-          ...s,
-          status: "error",
-          error: (e as Error).message,
-        }));
-      }
-    }
-  }, [state.status, preset]);
-
   const handleEvent = useCallback(
     (event: string, data: Record<string, unknown>) => {
       switch (event) {
@@ -538,6 +475,70 @@ export function PipelineRunner() {
     },
     []
   );
+
+  const handleRun = useCallback(async () => {
+    if (state.status === "running") {
+      abortRef.current?.abort();
+      setState((s) => ({ ...s, status: "idle" }));
+      return;
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setExpandedSymbol(null);
+    setSearchQuery("");
+    setCurrentPage(1);
+    setActionFilter("ALL");
+    setShowAgentSteps(true);
+
+    setState({
+      ...INITIAL_PIPELINE_STATE,
+      status: "running",
+    });
+
+    try {
+      const res = await fetch(`${API_BASE}/run-screener?preset=${preset}`, {
+        signal: controller.signal,
+      });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        let eventType = "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith("data: ") && eventType) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              handleEvent(eventType, data);
+            } catch {
+              // skip
+            }
+            eventType = "";
+          }
+        }
+      }
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") {
+        setState((s) => ({
+          ...s,
+          status: "error",
+          error: (e as Error).message,
+        }));
+      }
+    }
+  }, [state.status, preset, handleEvent]);
 
   const isRunning = state.status === "running";
   const isDone = state.status === "complete";

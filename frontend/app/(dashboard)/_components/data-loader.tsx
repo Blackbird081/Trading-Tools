@@ -79,6 +79,62 @@ export function DataLoader() {
     })();
   }, [preset, bulkUpdateTicks]);
 
+  const handleEvent = useCallback(
+    (event: string, data: Record<string, unknown>) => {
+      switch (event) {
+        case "start":
+          setState((s) => ({
+            ...s,
+            total: data.total as number,
+            message: `Loading ${data.total} symbols x ${data.years} years...`,
+          }));
+          break;
+
+        case "progress":
+          setState((s) => ({
+            ...s,
+            loaded: data.loaded as number,
+            percent: data.percent as number,
+            currentSymbol: data.symbol as string,
+            message: data.status as string,
+          }));
+          break;
+
+        case "tick": {
+          const tick: TickData = {
+            symbol: data.symbol as string,
+            price: data.price as number,
+            change: data.change as number,
+            changePct: data.changePct as number,
+            volume: data.volume as number,
+            high: data.high as number,
+            low: data.low as number,
+            open: data.open as number,
+            ceiling: data.ceiling as number,
+            floor: data.floor as number,
+            reference: data.reference as number,
+            timestamp: data.timestamp as number,
+          };
+          updateTick(tick);
+          break;
+        }
+
+        case "complete":
+          setState({
+            status: "complete",
+            percent: 100,
+            loaded: data.loaded as number,
+            total: data.total as number,
+            currentSymbol: "",
+            message: data.message as string,
+            lastUpdated: (data.last_updated as string) ?? null,
+          });
+          break;
+      }
+    },
+    [updateTick]
+  );
+
   // ── Stream-load from API ──────────────────────────────────
   const handleLoad = useCallback(async () => {
     if (state.status === "loading") {
@@ -144,63 +200,7 @@ export function DataLoader() {
         }));
       }
     }
-  }, [preset, years, state.status, state.lastUpdated, updateTick]);
-
-  const handleEvent = useCallback(
-    (event: string, data: Record<string, unknown>) => {
-      switch (event) {
-        case "start":
-          setState((s) => ({
-            ...s,
-            total: data.total as number,
-            message: `Loading ${data.total} symbols x ${data.years} years...`,
-          }));
-          break;
-
-        case "progress":
-          setState((s) => ({
-            ...s,
-            loaded: data.loaded as number,
-            percent: data.percent as number,
-            currentSymbol: data.symbol as string,
-            message: data.status as string,
-          }));
-          break;
-
-        case "tick": {
-          const tick: TickData = {
-            symbol: data.symbol as string,
-            price: data.price as number,
-            change: data.change as number,
-            changePct: data.changePct as number,
-            volume: data.volume as number,
-            high: data.high as number,
-            low: data.low as number,
-            open: data.open as number,
-            ceiling: data.ceiling as number,
-            floor: data.floor as number,
-            reference: data.reference as number,
-            timestamp: data.timestamp as number,
-          };
-          updateTick(tick);
-          break;
-        }
-
-        case "complete":
-          setState({
-            status: "complete",
-            percent: 100,
-            loaded: data.loaded as number,
-            total: data.total as number,
-            currentSymbol: "",
-            message: data.message as string,
-            lastUpdated: (data.last_updated as string) ?? null,
-          });
-          break;
-      }
-    },
-    [updateTick]
-  );
+  }, [preset, years, state.status, state.lastUpdated, handleEvent]);
 
   const isLoading = state.status === "loading";
   const isDone = state.status === "complete" || state.status === "cached";

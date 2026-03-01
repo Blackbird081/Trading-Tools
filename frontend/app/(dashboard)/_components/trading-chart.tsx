@@ -68,40 +68,6 @@ export function TradingChart() {
     };
   }, []);
 
-  // Fetch candles from backend for a symbol
-  const loadCandles = useCallback(async (symbol: string) => {
-    const series = seriesRef.current;
-    if (!series) return;
-
-    try {
-      const res = await fetch(`${API_BASE}/candles/${symbol}?limit=500`);
-      if (!res.ok) {
-        // Fallback to generated data if backend doesn't have candles
-        generateFallbackData(symbol, series);
-        return;
-      }
-
-      const data = await res.json();
-      if (data.candles && data.candles.length > 0) {
-        const formatted: CandlestickData<Time>[] = data.candles.map(
-          (c: { time: number; open: number; high: number; low: number; close: number }) => ({
-            time: c.time as Time,
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-          })
-        );
-        series.setData(formatted);
-        chartRef.current?.timeScale().fitContent();
-      } else {
-        generateFallbackData(symbol, series);
-      }
-    } catch {
-      generateFallbackData(symbol, series);
-    }
-  }, []);
-
   // Fallback: generate sample candles client-side
   const generateFallbackData = useCallback(
     (symbol: string, series: ISeriesApi<"Candlestick">) => {
@@ -141,6 +107,40 @@ export function TradingChart() {
     },
     []
   );
+
+  // Fetch candles from backend for a symbol
+  const loadCandles = useCallback(async (symbol: string) => {
+    const series = seriesRef.current;
+    if (!series) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/candles/${symbol}?limit=500`);
+      if (!res.ok) {
+        // Fallback to generated data if backend doesn't have candles
+        generateFallbackData(symbol, series);
+        return;
+      }
+
+      const data = await res.json();
+      if (data.candles && data.candles.length > 0) {
+        const formatted: CandlestickData<Time>[] = data.candles.map(
+          (c: { time: number; open: number; high: number; low: number; close: number }) => ({
+            time: c.time as Time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+          })
+        );
+        series.setData(formatted);
+        chartRef.current?.timeScale().fitContent();
+      } else {
+        generateFallbackData(symbol, series);
+      }
+    } catch {
+      generateFallbackData(symbol, series);
+    }
+  }, [generateFallbackData]);
 
   // Load candles when symbol changes
   useEffect(() => {
