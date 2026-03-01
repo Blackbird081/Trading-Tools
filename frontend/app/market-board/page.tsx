@@ -160,9 +160,48 @@ export default function MarketBoardPage() {
                 ))}
             </div>
 
-            {/* ★ Mobile: vertical scroll layout */}
-            <div className="flex md:hidden flex-1 min-h-0 overflow-y-auto flex-col px-2 py-2 gap-3">
-                {SECTORS.map((sector) => (
+            {/* ★ Mobile: one page at a time (3 sectors/page) */}
+            <div className="md:hidden shrink-0 px-2 pt-2 pb-1">
+                <div className="flex items-center justify-between rounded border border-zinc-800/60 bg-zinc-900/50 px-2 py-1.5">
+                    <div className="flex items-center gap-1">
+                        {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
+                            <button
+                                key={`mobile-page-${i}`}
+                                onClick={() => setCurrentPage(i)}
+                                className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+                                    i === currentPage
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
+                                }`}
+                            >
+                                Trang {i + 1}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={goToPrev}
+                            disabled={currentPage === 0}
+                            className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                            <ChevronLeft className="h-3.5 w-3.5" />
+                            Trước
+                        </button>
+                        <button
+                            onClick={goToNext}
+                            disabled={currentPage === TOTAL_PAGES - 1}
+                            className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                            Tiếp
+                            <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex md:hidden flex-1 min-h-0 flex-col gap-3 overflow-y-auto px-2 pb-2">
+                {pageSectors.map((sector) => (
                     <TradingErrorBoundary key={sector.title}>
                         <SectorColumn title={sector.title} symbols={sector.symbols} />
                     </TradingErrorBoundary>

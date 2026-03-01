@@ -118,20 +118,20 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
             : "from-zinc-900/90 to-zinc-900/90";
 
     return (
-        <div className="flex flex-col rounded overflow-hidden border border-zinc-700/50 shadow-lg md:max-h-[calc(100vh-130px)]">
+        <div className="flex flex-col overflow-hidden rounded border border-zinc-700/50 shadow-lg md:max-h-[calc(100vh-130px)]">
             {/* ── Sector Header ── */}
             <div className={cn(
-                "flex items-center justify-between px-3 py-2 bg-gradient-to-r flex-shrink-0",
+                "flex shrink-0 items-center justify-between bg-gradient-to-r px-3 py-2.5 md:py-2",
                 headerGradient,
                 "border-b border-zinc-700/60"
             )}>
-                <span className="text-xs font-bold text-zinc-100 uppercase tracking-wide">
+                <span className="text-sm font-bold uppercase tracking-wide text-zinc-100 md:text-xs">
                     {title}
                 </span>
                 <div className="flex items-center gap-1.5">
                     {/* Sector trend indicator */}
                     <span className={cn(
-                        "text-xs font-mono font-semibold",
+                        "font-mono text-sm font-semibold md:text-xs",
                         isSectorUp && "text-emerald-400",
                         isSectorDown && "text-rose-400",
                         !isSectorUp && !isSectorDown && "text-amber-400",
@@ -143,15 +143,15 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
             </div>
 
             {/* ── Column Headers ── */}
-            <div className="grid grid-cols-[2.5fr_2.5fr_2.5fr_2fr] px-2 py-1 bg-zinc-900 border-b border-zinc-700/60 flex-shrink-0">
-                <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Mã</span>
-                <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest text-right">Giá</span>
-                <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest text-right">%</span>
-                <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest text-right">KL</span>
+            <div className="grid shrink-0 grid-cols-[2.5fr_2.5fr_2.5fr_2fr] border-b border-zinc-700/60 bg-zinc-900 px-2.5 py-1.5 md:px-2 md:py-1">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-zinc-500 md:text-[9px]">Mã</span>
+                <span className="text-right text-[11px] font-bold uppercase tracking-widest text-zinc-500 md:text-[9px]">Giá</span>
+                <span className="text-right text-[11px] font-bold uppercase tracking-widest text-zinc-500 md:text-[9px]">%</span>
+                <span className="text-right text-[11px] font-bold uppercase tracking-widest text-zinc-500 md:text-[9px]">KL</span>
             </div>
 
             {/* ── Stock Rows ── */}
-            <div className="flex flex-col overflow-y-auto flex-1 bg-zinc-950">
+            <div className="bg-zinc-950 md:flex-1 md:overflow-y-auto">
                 {rowData.map(({ symbol, data }) => {
                     const colors = getRowColors(data?.changePct, !!data);
 
@@ -160,7 +160,7 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
                             key={symbol}
                             onClick={() => openSymbolPopup(symbol)}
                             className={cn(
-                                "grid grid-cols-[2.5fr_2.5fr_2.5fr_2fr] px-2 py-[5px]",
+                                "grid grid-cols-[2.5fr_2.5fr_2.5fr_2fr] px-2.5 py-2 md:px-2 md:py-[5px]",
                                 "border-b border-zinc-800/40 cursor-pointer transition-colors",
                                 colors.rowBg,
                             )}
@@ -168,7 +168,7 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
                             {/* Mã CK */}
                             <div className="flex items-center">
                                 <span className={cn(
-                                    "text-[11px] font-bold px-1 py-0.5 rounded-sm",
+                                    "rounded-sm px-1.5 py-0.5 text-xs font-bold md:px-1 md:text-[11px]",
                                     colors.symbolBg,
                                     colors.symbolText,
                                 )}>
@@ -178,7 +178,7 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
 
                             {/* Giá */}
                             <div className={cn(
-                                "text-right font-mono text-[11px] tabular-nums font-semibold self-center",
+                                "self-center text-right font-mono text-sm font-semibold tabular-nums md:text-[11px]",
                                 colors.priceText,
                             )}>
                                 {formatPrice(data?.price)}
@@ -186,14 +186,14 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
 
                             {/* % thay đổi */}
                             <div className={cn(
-                                "text-right font-mono text-[10px] tabular-nums self-center",
+                                "self-center text-right font-mono text-xs tabular-nums md:text-[10px]",
                                 colors.changeText,
                             )}>
                                 {formatChangePct(data?.changePct)}
                             </div>
 
                             {/* Khối lượng */}
-                            <div className="text-right font-mono text-[10px] text-zinc-500 tabular-nums self-center">
+                            <div className="self-center text-right font-mono text-xs text-zinc-500 tabular-nums md:text-[10px]">
                                 {formatVolume(data?.volume)}
                             </div>
                         </div>
