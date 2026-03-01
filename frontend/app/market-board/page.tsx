@@ -105,7 +105,6 @@ export default function MarketBoardPage() {
     const bulkUpdateTicks = useMarketStore((s) => s.bulkUpdateTicks);
     const [currentPage, setCurrentPage] = useState(0);  // 0-indexed
     const [mobileSectorIndex, setMobileSectorIndex] = useState(0);
-    const mobileListRef = useRef<HTMLDivElement>(null);
     const touchStartXRef = useRef<number | null>(null);
     const touchStartYRef = useRef<number | null>(null);
     const showMobileStepControls = false; // Temporary disabled on mobile to reduce UI noise.
@@ -144,14 +143,14 @@ export default function MarketBoardPage() {
     const goToMobilePrev = () => setMobileSectorIndex((p) => Math.max(0, p - 1));
     const goToMobileNext = () => setMobileSectorIndex((p) => Math.min(SECTORS.length - 1, p + 1));
 
-    const handleMobileTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    const handleMobileSwipeStart = (e: React.TouchEvent<HTMLDivElement>) => {
         const touch = e.touches[0];
         if (!touch) return;
         touchStartXRef.current = touch.clientX;
         touchStartYRef.current = touch.clientY;
     };
 
-    const handleMobileTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    const handleMobileSwipeEnd = (e: React.TouchEvent<HTMLDivElement>) => {
         const startX = touchStartXRef.current;
         const startY = touchStartYRef.current;
         const touch = e.changedTouches[0];
@@ -163,7 +162,7 @@ export default function MarketBoardPage() {
         const absY = Math.abs(deltaY);
 
         // Horizontal swipe gesture: ignore mostly vertical movement.
-        if (absX >= 50 && absY <= 40 && absX > absY) {
+        if (absX >= 50 && absX > absY * 1.5) {
             if (deltaX < 0) goToMobileNext();
             if (deltaX > 0) goToMobilePrev();
         }
@@ -194,7 +193,11 @@ export default function MarketBoardPage() {
             </div>
 
             {/* ★ Mobile: one sector per screen */}
-            <div className="md:hidden shrink-0 px-2 pt-2 pb-1">
+            <div
+                className="md:hidden shrink-0 px-2 pt-2 pb-1"
+                onTouchStart={handleMobileSwipeStart}
+                onTouchEnd={handleMobileSwipeEnd}
+            >
                 <div className="flex flex-col gap-2 rounded border border-zinc-800/60 bg-zinc-900/50 px-2 py-1.5">
                     <div className="flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
@@ -242,12 +245,7 @@ export default function MarketBoardPage() {
                 </div>
             </div>
 
-            <div
-                ref={mobileListRef}
-                onTouchStart={handleMobileTouchStart}
-                onTouchEnd={handleMobileTouchEnd}
-                className="flex md:hidden flex-1 min-h-0 flex-col gap-2 overflow-y-auto px-2 pb-2"
-            >
+            <div className="flex md:hidden flex-1 min-h-0 flex-col gap-2 overflow-y-auto px-2 pb-2">
                 {mobileSector && (
                     <TradingErrorBoundary key={mobileSector.title}>
                         <SectorColumn title={mobileSector.title} symbols={mobileSector.symbols} />

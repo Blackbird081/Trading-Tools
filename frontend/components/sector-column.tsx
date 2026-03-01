@@ -151,7 +151,7 @@ export function SectorColumn({ title, symbols }: SectorColumnProps) {
             </div>
 
             {/* ── Stock Rows ── */}
-            <div className="bg-zinc-950 md:flex-1 md:overflow-y-auto">
+            <div className="max-h-[62vh] overflow-y-auto bg-zinc-950 md:max-h-none md:flex-1 md:overflow-y-auto">
                 {rowData.map(({ symbol, data }) => {
                     const colors = getRowColors(data?.changePct, !!data);
 
