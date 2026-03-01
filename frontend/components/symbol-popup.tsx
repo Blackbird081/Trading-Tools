@@ -175,7 +175,7 @@ export function SymbolPopup() {
       />
 
       {/* Modal */}
-      <div className="fixed inset-0 z-50 flex flex-col overflow-hidden border-zinc-700 bg-zinc-950 shadow-2xl sm:inset-x-4 sm:bottom-[5vh] sm:top-[5vh] sm:mx-auto sm:max-w-5xl sm:rounded-xl sm:border">
+      <div className="fixed inset-0 z-50 flex flex-col overflow-hidden border-zinc-700 bg-zinc-950 pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] shadow-2xl sm:inset-x-4 sm:bottom-[5vh] sm:top-[5vh] sm:mx-auto sm:max-w-5xl sm:rounded-xl sm:border sm:pb-0 sm:pt-0">
         {/* ── Header ── */}
         <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-zinc-800 px-3 py-3 sm:px-5">
           <div className="min-w-0 flex-1">
@@ -253,9 +253,9 @@ export function SymbolPopup() {
 
             {/* Technical indicators */}
             <div className="px-3 py-2 border-b border-zinc-800">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <Activity className="h-3 w-3 text-emerald-400" />
-                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Chỉ báo kỹ thuật</p>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Activity className="h-3 w-3 text-emerald-400" />
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Chỉ báo kỹ thuật</p>
               </div>
               {t ? (
                 <>

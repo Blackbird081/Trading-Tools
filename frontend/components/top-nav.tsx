@@ -13,7 +13,7 @@ export function TopNav() {
   const connectionStatus = useMarketStore((s) => s.connectionStatus);
 
   return (
-    <header className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-3 md:px-4 shrink-0">
+    <header className="shrink-0 flex h-[calc(48px+env(safe-area-inset-top,0px))] items-center justify-between border-b border-zinc-800 bg-zinc-950 px-3 pt-[env(safe-area-inset-top,0px)] md:h-12 md:px-4 md:pt-0">
       <div className="flex items-center gap-2 md:gap-3">
         {/* Sidebar toggle — desktop only */}
         <button

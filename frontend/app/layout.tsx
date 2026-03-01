@@ -18,8 +18,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default function RootLayout({
@@ -41,9 +41,11 @@ export default function RootLayout({
           </div>
 
           {/* Mobile layout: top nav + main + bottom nav */}
-          <div className="flex md:hidden flex-col h-screen overflow-hidden">
+          <div className="flex h-dvh min-h-dvh flex-col overflow-hidden md:hidden">
             <TopNav />
-            <main className="flex-1 overflow-auto min-h-0 pb-16">{children}</main>
+            <main className="min-h-0 flex-1 overflow-auto pb-[calc(64px+env(safe-area-inset-bottom,0px))]">
+              {children}
+            </main>
             <BottomNav />
           </div>
 
