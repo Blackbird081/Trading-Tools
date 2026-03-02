@@ -12,6 +12,8 @@ interface MarketState {
 
   updateTick: (tick: TickData) => void;
   updateCandle: (symbol: string, candle: CandleData) => void;
+  replaceTicks: (ticks: TickData[]) => void;
+  clearTicks: () => void;
   bulkUpdateTicks: (ticks: TickData[]) => void;
   setConnectionStatus: (status: ConnectionStatus) => void;  // ★ NEW
 }
@@ -33,6 +35,20 @@ export const useMarketStore = create<MarketState>()(
       set((state) => ({
         candles: { ...state.candles, [symbol]: candle },
       })),
+
+    replaceTicks: (ticks) =>
+      set(() => {
+        const next: Record<string, TickData> = {};
+        for (const tick of ticks) {
+          next[tick.symbol] = tick;
+        }
+        return {
+          ticks: next,
+          latestTick: ticks[ticks.length - 1] ?? null,
+        };
+      }),
+
+    clearTicks: () => set({ ticks: {}, latestTick: null }),
 
     bulkUpdateTicks: (ticks) =>
       set((state) => {

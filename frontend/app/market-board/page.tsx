@@ -75,10 +75,11 @@ const MOCK_TICKS: Record<string, { price: number; change: number; changePct: num
 // ★ Pagination: 3 sectors per page on desktop
 const SECTORS_PER_PAGE = 3;
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const ENABLE_MOCK_FALLBACK = process.env.NODE_ENV !== "production";
 
 export default function MarketBoardPage() {
     const preset = useUIStore((s) => s.preset);
-    const bulkUpdateTicks = useMarketStore((s) => s.bulkUpdateTicks);
+    const replaceTicks = useMarketStore((s) => s.replaceTicks);
     const ticks = useMarketStore((s) => s.ticks);
     const [currentPage, setCurrentPage] = useState(0);  // 0-indexed
     const [mobileSectorIndex, setMobileSectorIndex] = useState(0);
@@ -98,7 +99,7 @@ export default function MarketBoardPage() {
                 if (res.ok) {
                     const data = await res.json() as { ticks?: TickData[] };
                     if (!cancelled && Array.isArray(data.ticks) && data.ticks.length > 0) {
-                        bulkUpdateTicks(data.ticks);
+                        replaceTicks(data.ticks);
                         return;
                     }
                 }
@@ -107,6 +108,7 @@ export default function MarketBoardPage() {
             }
 
             if (cancelled) return;
+            if (!ENABLE_MOCK_FALLBACK) return;
 
             const marketTicks = useMarketStore.getState().ticks;
             const hasRealData = Object.keys(marketTicks).length > 0;
@@ -126,13 +128,13 @@ export default function MarketBoardPage() {
                 reference: d.price - d.change,
                 timestamp: Date.now(),
             }));
-            bulkUpdateTicks(mockTickArray);
+            replaceTicks(mockTickArray);
         })();
 
         return () => {
             cancelled = true;
         };
-    }, [preset, bulkUpdateTicks]);
+    }, [preset, replaceTicks]);
 
     // Current page sectors
     const startIdx = currentPage * SECTORS_PER_PAGE;

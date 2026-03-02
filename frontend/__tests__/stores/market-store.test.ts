@@ -122,4 +122,66 @@ describe("MarketStore", () => {
 
     expect(useMarketStore.getState().candles["FPT"]).toEqual(candle);
   });
+
+  it("replaceTicks replaces whole snapshot instead of merging", () => {
+    useMarketStore.getState().updateTick({
+      symbol: "OLD",
+      price: 10,
+      change: 0,
+      changePct: 0,
+      volume: 1000,
+      high: 10,
+      low: 10,
+      open: 10,
+      ceiling: 10.7,
+      floor: 9.3,
+      reference: 10,
+      timestamp: 1,
+    });
+
+    useMarketStore.getState().replaceTicks([
+      {
+        symbol: "NEW",
+        price: 20,
+        change: 1,
+        changePct: 5,
+        volume: 2000,
+        high: 21,
+        low: 19,
+        open: 19.5,
+        ceiling: 21.4,
+        floor: 18.6,
+        reference: 19,
+        timestamp: 2,
+      },
+    ]);
+
+    const state = useMarketStore.getState();
+    expect(Object.keys(state.ticks)).toEqual(["NEW"]);
+    expect(state.ticks["OLD"]).toBeUndefined();
+    expect(state.ticks["NEW"]?.price).toBe(20);
+  });
+
+  it("clearTicks removes all tick rows", () => {
+    useMarketStore.getState().updateTick({
+      symbol: "FPT",
+      price: 98.5,
+      change: 1.2,
+      changePct: 1.23,
+      volume: 50000,
+      high: 99.0,
+      low: 97.0,
+      open: 97.3,
+      ceiling: 104.0,
+      floor: 91.0,
+      reference: 97.3,
+      timestamp: Date.now(),
+    });
+
+    useMarketStore.getState().clearTicks();
+
+    const state = useMarketStore.getState();
+    expect(state.ticks).toEqual({});
+    expect(state.latestTick).toBeNull();
+  });
 });

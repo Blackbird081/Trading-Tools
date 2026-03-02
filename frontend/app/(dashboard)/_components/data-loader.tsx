@@ -42,8 +42,9 @@ export function DataLoader() {
     lastUpdated: null,
   });
   const abortRef = useRef<AbortController | null>(null);
+  const replaceTicks = useMarketStore((s) => s.replaceTicks);
+  const clearTicks = useMarketStore((s) => s.clearTicks);
   const updateTick = useMarketStore((s) => s.updateTick);
-  const bulkUpdateTicks = useMarketStore((s) => s.bulkUpdateTicks);
 
   // ── Auto-load from DB cache when preset changes ───────────
   useEffect(() => {
@@ -57,7 +58,7 @@ export function DataLoader() {
         if (cancelled) return;
 
         if (data.ticks && data.ticks.length > 0) {
-          bulkUpdateTicks(data.ticks as TickData[]);
+          replaceTicks(data.ticks as TickData[]);
           setState({
             status: "cached",
             percent: 100,
@@ -69,10 +70,12 @@ export function DataLoader() {
           });
           setExpanded(false);
         } else {
+          clearTicks();
           setExpanded(true);
         }
       } catch {
         if (cancelled) return;
+        clearTicks();
         // Backend not ready — show loader expanded
         setExpanded(true);
       }
@@ -81,7 +84,7 @@ export function DataLoader() {
     return () => {
       cancelled = true;
     };
-  }, [preset, bulkUpdateTicks]);
+  }, [preset, replaceTicks, clearTicks]);
 
   const handleEvent = useCallback(
     (event: string, data: Record<string, unknown>) => {
@@ -159,6 +162,7 @@ export function DataLoader() {
       message: "Connecting...",
       lastUpdated: state.lastUpdated,
     });
+    clearTicks();
 
     try {
       const url = `${API_BASE}/load-data?preset=${preset}&years=${years}`;
@@ -204,7 +208,7 @@ export function DataLoader() {
         }));
       }
     }
-  }, [preset, years, state.status, state.lastUpdated, handleEvent]);
+  }, [preset, years, state.status, state.lastUpdated, handleEvent, clearTicks]);
 
   const isLoading = state.status === "loading";
   const isDone = state.status === "complete" || state.status === "cached";
