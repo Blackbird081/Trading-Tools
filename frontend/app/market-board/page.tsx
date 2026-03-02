@@ -7,6 +7,7 @@ import { TradingErrorBoundary } from "@/components/error-boundary";
 import { useMarketStore } from "@/stores/market-store";
 import { useUIStore } from "@/stores/ui-store";
 import { buildMarketSectors } from "@/lib/market-sectors";
+import type { TickData } from "@/types/market";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 // ★ Mock data để test giao diện khi chưa có real data từ WebSocket
@@ -73,6 +74,7 @@ const MOCK_TICKS: Record<string, { price: number; change: number; changePct: num
 
 // ★ Pagination: 3 sectors per page on desktop
 const SECTORS_PER_PAGE = 3;
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 export default function MarketBoardPage() {
     const preset = useUIStore((s) => s.preset);
@@ -86,13 +88,31 @@ export default function MarketBoardPage() {
     const sectors = useMemo(() => buildMarketSectors(preset, ticks), [preset, ticks]);
     const totalPages = Math.max(1, Math.ceil(sectors.length / SECTORS_PER_PAGE));
 
-    // ★ Inject mock data khi chưa có real WebSocket data
+    // Prefer persisted backend cache; only use mock data as last-resort fallback.
     useEffect(() => {
-        const marketTicks = useMarketStore.getState().ticks;
-        const hasRealData = Object.keys(marketTicks).length > 0;
+        let cancelled = false;
 
-        if (!hasRealData) {
-            const mockTickArray = Object.entries(MOCK_TICKS).map(([symbol, d]) => ({
+        (async () => {
+            try {
+                const res = await fetch(`${API_BASE}/cached-data?preset=${preset}`);
+                if (res.ok) {
+                    const data = await res.json() as { ticks?: TickData[] };
+                    if (!cancelled && Array.isArray(data.ticks) && data.ticks.length > 0) {
+                        bulkUpdateTicks(data.ticks);
+                        return;
+                    }
+                }
+            } catch {
+                // Fall back to mock data below when cache API is unavailable.
+            }
+
+            if (cancelled) return;
+
+            const marketTicks = useMarketStore.getState().ticks;
+            const hasRealData = Object.keys(marketTicks).length > 0;
+            if (hasRealData) return;
+
+            const mockTickArray: TickData[] = Object.entries(MOCK_TICKS).map(([symbol, d]) => ({
                 symbol,
                 price: d.price,
                 change: d.change,
@@ -107,8 +127,12 @@ export default function MarketBoardPage() {
                 timestamp: Date.now(),
             }));
             bulkUpdateTicks(mockTickArray);
-        }
-    }, [bulkUpdateTicks]);
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [preset, bulkUpdateTicks]);
 
     // Current page sectors
     const startIdx = currentPage * SECTORS_PER_PAGE;

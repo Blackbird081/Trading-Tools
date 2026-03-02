@@ -44,18 +44,17 @@ export function DataLoader() {
   const abortRef = useRef<AbortController | null>(null);
   const updateTick = useMarketStore((s) => s.updateTick);
   const bulkUpdateTicks = useMarketStore((s) => s.bulkUpdateTicks);
-  const initDone = useRef(false);
 
-  // ── Auto-load from DB cache on mount ──────────────────────
+  // ── Auto-load from DB cache when preset changes ───────────
   useEffect(() => {
-    if (initDone.current) return;
-    initDone.current = true;
+    let cancelled = false;
 
     (async () => {
       try {
         const res = await fetch(`${API_BASE}/cached-data?preset=${preset}`);
         if (!res.ok) return;
         const data = await res.json();
+        if (cancelled) return;
 
         if (data.ticks && data.ticks.length > 0) {
           bulkUpdateTicks(data.ticks as TickData[]);
@@ -73,10 +72,15 @@ export function DataLoader() {
           setExpanded(true);
         }
       } catch {
+        if (cancelled) return;
         // Backend not ready — show loader expanded
         setExpanded(true);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [preset, bulkUpdateTicks]);
 
   const handleEvent = useCallback(
