@@ -119,6 +119,34 @@ These two items are locked as immediate priority and must be completed before ad
   - F5 restores cached data consistently,
   - incremental update path is distinct from full load path.
 
+### 0.7 Production Incident Log (Railway) - 2026-03-02
+
+#### Incident ID: `INC-RW-20260302-DUCKDB-PERMISSION`
+
+- Environment: Railway `production` (`Trading-Tools`)
+- Time (UTC+7): around `2026-03-02 13:40`
+- Symptom:
+  - Dashboard status switched to `ERROR`.
+  - Loader progress stalled near start (`0/x`), then stream interrupted.
+  - UI message: `Data stream interrupted. Please retry Load/Update.`
+- Railway log evidence (stack trace excerpt):
+  - `RuntimeError: Unable to initialize data loader DB: [Errno 13] Permission denied: 'data/db'`
+  - Trace path: `packages/interface/src/interface/rest/data_loader.py` (`_get_conn`, `_save_tick_to_db`, `_generate_progress`).
+- Impact:
+  - `Load`/`Update` flow aborted in production.
+  - No fresh symbols written to cache for that run.
+- Confirmed root cause:
+  - Runtime attempted a relative fallback path (`data/db`) that is not writable under current Railway container/volume permissions.
+  - Environment `DUCKDB_PATH` had been switched during troubleshooting, exposing permission mismatch between configured path and fallback path.
+- Immediate containment:
+  - Keep volume mount at `/app/data`.
+  - Keep a single writable canonical DB file path (`/app/data/trading.duckdb`) for Railway runtime.
+  - Block deploy until manual smoke check passes: `Load` (full) and `Update` (incremental).
+- Required follow-up before next production release:
+  - Harden DB path fallback to writable locations only.
+  - Ensure SSE stream emits terminal `error` event instead of abrupt disconnect when DB init fails.
+  - Re-verify acceptance in Section `0.6` (P0/P1) after redeploy.
+
 ---
 
 ## PHASE 1: FOUNDATION & CORE DOMAIN

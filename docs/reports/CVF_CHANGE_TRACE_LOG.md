@@ -101,3 +101,18 @@ Notes:
 - Plan Mapping: Section 0.6 P0/P1 priority roadmap
 - Owner: Codex + project owner
 - Notes: Recommended Railway variable `DUCKDB_PATH=/app/data/trading.duckdb` for volume-root write compatibility.
+
+### CVF-TT-20260302-006
+- Date-Time (UTC+7): 2026-03-02 13:40
+- Type: ops
+- Scope: Add production Railway incident evidence for DuckDB permission failure into implementation governance.
+- Impact: Established auditable root-cause record for loader interruption and production `ERROR` state.
+- Root Cause: Runtime attempted non-writable fallback path `data/db`, causing `[Errno 13] Permission denied` during DB initialization in data loader stream.
+- Files Changed: `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence: Matched Railway production log stack trace (`RuntimeError: Unable to initialize data loader DB: [Errno 13] Permission denied: 'data/db'`) with UI failure state and loader interruption behavior.
+- Deployment Target: documentation governance (CVF trace artifacts)
+- Deployment Status: completed (local update)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: Section 0.7 `INC-RW-20260302-DUCKDB-PERMISSION` + Section 0.6 P1 persistence policy
+- Owner: Codex + project owner
+- Notes: This is a trace-evidence update; code fix and redeploy validation remain required before closing incident.
