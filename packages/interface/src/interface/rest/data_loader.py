@@ -32,11 +32,28 @@ _conn: duckdb.DuckDBPyConnection | None = None
 def _get_conn() -> duckdb.DuckDBPyConnection:
     global _conn
     if _conn is None:
-        db_path = Path(os.getenv("DUCKDB_PATH", "data/db/trading.duckdb"))
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        _conn = duckdb.connect(str(db_path))
-        _conn.execute(_CACHE_DDL)
-        logger.info("Data loader cache DB initialized at %s", db_path)
+        env_path = Path(os.getenv("DUCKDB_PATH", "/app/data/trading.duckdb"))
+        candidates = [
+            env_path,
+            Path("/app/data/trading.duckdb"),
+            Path("data/db/trading.duckdb"),
+        ]
+
+        last_error: Exception | None = None
+        for db_path in candidates:
+            try:
+                db_path.parent.mkdir(parents=True, exist_ok=True)
+                _conn = duckdb.connect(str(db_path))
+                _conn.execute(_CACHE_DDL)
+                logger.info("Data loader cache DB initialized at %s", db_path)
+                break
+            except Exception as exc:  # pragma: no cover - environment-specific fallback
+                last_error = exc
+                logger.warning("Failed to initialize data loader DB at %s: %s", db_path, exc)
+                _conn = None
+
+        if _conn is None:
+            raise RuntimeError(f"Unable to initialize data loader DB: {last_error}")
     return _conn
 
 

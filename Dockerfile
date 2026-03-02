@@ -17,7 +17,7 @@ RUN mkdir -p /app/data/db /app/data/models && chown -R appuser:appuser /app/data
 USER appuser
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/packages/core/src:/app/packages/adapters/src:/app/packages/agents/src:/app/packages/interface/src"
-ENV DUCKDB_PATH="/app/data/db/trading.duckdb"
+ENV DUCKDB_PATH="/app/data/trading.duckdb"
 # ★ Increased start-period to 60s for Railway cold start
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
     CMD curl -f http://localhost:${PORT:-8000}/api/health/live || exit 1

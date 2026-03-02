@@ -86,3 +86,18 @@ Notes:
 - Plan Mapping: Section 0.6 P1 — Data Persistence & Update Policy
 - Owner: Codex + project owner
 - Notes: Runtime attach can be executed immediately after setting `RAILWAY_TOKEN` or running interactive `railway login` on this machine.
+
+### CVF-TT-20260302-005
+- Date-Time (UTC+7): 2026-03-02
+- Type: hotfix
+- Scope: Fix "Loading stuck at 0/100" by hardening DuckDB path fallback and stream interruption handling.
+- Impact: Data loader no longer hangs silently when backend stream stops unexpectedly; Railway volume path works with fallback when `/app/data/db` cannot be created.
+- Root Cause: Backend stream terminated at first symbol due DB path/mount write-path mismatch; frontend remained in loading state because no terminal SSE event was received.
+- Files Changed: `packages/interface/src/interface/rest/data_loader.py`, `packages/interface/src/interface/app.py`, `frontend/app/(dashboard)/_components/data-loader.tsx`, `Dockerfile`, `README.md`
+- Validation Evidence: `python -m py_compile packages/interface/src/interface/rest/data_loader.py packages/interface/src/interface/app.py` pass; `pnpm -C frontend exec tsc --noEmit` pass; `pnpm -C frontend exec vitest run __tests__/integration/ws-provider.test.ts __tests__/stores/market-store.test.ts __tests__/stores/signal-store.test.ts` pass (12/12).
+- Deployment Target: frontend + backend (Railway)
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: Section 0.6 P0/P1 priority roadmap
+- Owner: Codex + project owner
+- Notes: Recommended Railway variable `DUCKDB_PATH=/app/data/trading.duckdb` for volume-root write compatibility.

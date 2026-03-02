@@ -113,7 +113,7 @@ Copy `.env.example` thành `.env`:
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token |
 | `TELEGRAM_CHAT_ID` | Telegram chat ID |
 | `AUTH_ENABLED` | `false` cho dev, `true` cho production |
-| `DUCKDB_PATH` | Đường dẫn file DuckDB (mặc định: `data/db/trading.duckdb`) |
+| `DUCKDB_PATH` | Đường dẫn file DuckDB (mặc định: `/app/data/trading.duckdb` trên Railway, local fallback `data/db/trading.duckdb`) |
 | `DUCKDB_MAX_CONNECTIONS` | Số kết nối tối đa (mặc định: 5) |
 | `CORS_ORIGINS` | Danh sách origins cho CORS (phân cách bằng dấu phẩy) |
 | `TRADING_AUDIT_LOG_DIR` | Thư mục audit log (mặc định: `.trading/audit`) |

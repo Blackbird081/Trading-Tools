@@ -161,6 +161,7 @@ export function DataLoader() {
         const decoder = new TextDecoder();
         let buffer = "";
         let eventType = "";
+        let sawTerminalEvent = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -176,9 +177,20 @@ export function DataLoader() {
             } else if (line.startsWith("data: ") && eventType) {
               const parsed = JSON.parse(line.slice(6)) as Record<string, unknown>;
               handleEvent(eventType, parsed, mode);
+              if (eventType === "complete" || eventType === "error") {
+                sawTerminalEvent = true;
+              }
               eventType = "";
             }
           }
+        }
+
+        if (!sawTerminalEvent) {
+          setState((s) => ({
+            ...s,
+            status: "error",
+            message: "Data stream interrupted. Please retry Load/Update.",
+          }));
         }
       } catch (e) {
         if ((e as Error).name === "AbortError") {
