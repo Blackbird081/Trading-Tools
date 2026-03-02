@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import random
+import tempfile
 from collections.abc import AsyncGenerator
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -29,18 +30,36 @@ router = APIRouter()
 _conn: duckdb.DuckDBPyConnection | None = None
 
 
+def _db_path_candidates() -> list[Path]:
+    """Resolve writable DuckDB path candidates in priority order."""
+    env_raw = os.getenv("DUCKDB_PATH", "").strip()
+    candidates: list[Path] = []
+    if env_raw:
+        candidates.append(Path(env_raw).expanduser())
+    candidates.extend(
+        [
+            Path("/app/data/trading.duckdb"),
+            Path(tempfile.gettempdir()) / "trading.duckdb",
+        ]
+    )
+
+    # De-duplicate while preserving order.
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for path in candidates:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(path)
+    return unique
+
+
 def _get_conn() -> duckdb.DuckDBPyConnection:
     global _conn
     if _conn is None:
-        env_path = Path(os.getenv("DUCKDB_PATH", "/app/data/trading.duckdb"))
-        candidates = [
-            env_path,
-            Path("/app/data/trading.duckdb"),
-            Path("data/db/trading.duckdb"),
-        ]
-
         last_error: Exception | None = None
-        for db_path in candidates:
+        for db_path in _db_path_candidates():
             try:
                 db_path.parent.mkdir(parents=True, exist_ok=True)
                 _conn = duckdb.connect(str(db_path))
@@ -53,7 +72,9 @@ def _get_conn() -> duckdb.DuckDBPyConnection:
                 _conn = None
 
         if _conn is None:
-            raise RuntimeError(f"Unable to initialize data loader DB: {last_error}")
+            raise RuntimeError(
+                f"Unable to initialize data loader DB at candidates={_db_path_candidates()}: {last_error}"
+            )
     return _conn
 
 
@@ -689,6 +710,27 @@ def _sse(event: str, data: dict[str, object]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
+async def _safe_sse_stream(
+    mode: str,
+    stream: AsyncGenerator[str, None],
+) -> AsyncGenerator[str, None]:
+    """Ensure stream always terminates with an explicit error event on failure."""
+    try:
+        async for chunk in stream:
+            yield chunk
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        logger.exception("%s stream failed: %s", mode, exc)
+        yield _sse(
+            "error",
+            {
+                "mode": mode,
+                "message": f"{mode.title()} failed: {exc}",
+            },
+        )
+
+
 # ── REST endpoints ──────────────────────────────────────────────
 @router.get("/load-data")
 async def load_data(
@@ -698,7 +740,7 @@ async def load_data(
     """Load historical data for symbols with streaming progress."""
     symbols = VN30_SYMBOLS if preset == "VN30" else TOP100_SYMBOLS[:100]
     return StreamingResponse(
-        _generate_progress(symbols, years, preset),
+        _safe_sse_stream("load", _generate_progress(symbols, years, preset)),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -715,7 +757,7 @@ async def update_data(
     """Incremental update for existing cached symbol universe."""
     symbols = VN30_SYMBOLS if preset == "VN30" else TOP100_SYMBOLS[:100]
     return StreamingResponse(
-        _generate_incremental_progress(symbols, preset),
+        _safe_sse_stream("update", _generate_incremental_progress(symbols, preset)),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -734,65 +776,75 @@ async def get_cached_data(
     Returns ticks + metadata (last_updated, count).
     Called on page load / F5 to avoid re-fetching.
     """
-    conn = _get_conn()
+    try:
+        conn = _get_conn()
 
-    # Get metadata
-    meta_rows = conn.execute(
-        "SELECT last_updated, symbol_count, years FROM load_metadata WHERE preset = ?",
-        [preset],
-    ).fetchall()
+        # Get metadata
+        meta_rows = conn.execute(
+            "SELECT last_updated, symbol_count, years FROM load_metadata WHERE preset = ?",
+            [preset],
+        ).fetchall()
 
-    if not meta_rows:
+        if not meta_rows:
+            return {
+                "ticks": [],
+                "last_updated": None,
+                "symbol_count": 0,
+                "years": 0,
+            }
+
+        last_updated, symbol_count, years = meta_rows[0]
+
+        # Get cached ticks
+        rows = conn.execute(
+            """SELECT symbol, price, change_val, change_pct, volume,
+                      high, low, open_price, ceiling, floor, reference,
+                      updated_at
+               FROM market_cache
+               WHERE preset = ?
+               ORDER BY symbol""",
+            [preset],
+        ).fetchall()
+
+        ticks = []
+        for r in rows:
+            ticks.append(
+                {
+                    "symbol": r[0],
+                    "price": r[1],
+                    "change": r[2],
+                    "changePct": r[3],
+                    "volume": r[4],
+                    "high": r[5],
+                    "low": r[6],
+                    "open": r[7],
+                    "ceiling": r[8],
+                    "floor": r[9],
+                    "reference": r[10],
+                    "timestamp": int(r[11].timestamp() * 1000) if r[11] else 0,
+                }
+            )
+
+        fmt = "%d/%m/%Y %H:%M"
+        updated_str = (
+            last_updated.strftime(fmt) if hasattr(last_updated, "strftime") else str(last_updated)
+        )
+
+        return {
+            "ticks": ticks,
+            "last_updated": updated_str,
+            "symbol_count": symbol_count,
+            "years": years,
+        }
+    except Exception as exc:
+        logger.exception("Failed to read cached data for preset=%s: %s", preset, exc)
         return {
             "ticks": [],
             "last_updated": None,
             "symbol_count": 0,
             "years": 0,
+            "error": str(exc),
         }
-
-    last_updated, symbol_count, years = meta_rows[0]
-
-    # Get cached ticks
-    rows = conn.execute(
-        """SELECT symbol, price, change_val, change_pct, volume,
-                  high, low, open_price, ceiling, floor, reference,
-                  updated_at
-           FROM market_cache
-           WHERE preset = ?
-           ORDER BY symbol""",
-        [preset],
-    ).fetchall()
-
-    ticks = []
-    for r in rows:
-        ticks.append(
-            {
-                "symbol": r[0],
-                "price": r[1],
-                "change": r[2],
-                "changePct": r[3],
-                "volume": r[4],
-                "high": r[5],
-                "low": r[6],
-                "open": r[7],
-                "ceiling": r[8],
-                "floor": r[9],
-                "reference": r[10],
-                "timestamp": int(r[11].timestamp() * 1000) if r[11] else 0,
-            }
-        )
-
-    fmt = "%d/%m/%Y %H:%M"
-    updated_str = (
-        last_updated.strftime(fmt) if hasattr(last_updated, "strftime") else str(last_updated)
-    )
-
-    return {
-        "ticks": ticks,
-        "last_updated": updated_str,
-        "symbol_count": symbol_count,
-        "years": years,
-    }
 
 
 @router.get("/candles/{symbol}")
@@ -801,36 +853,44 @@ async def get_candles(
     limit: int = Query(500, ge=50, le=2000),
 ) -> dict[str, object]:
     """Get OHLCV candle data for a symbol from cache."""
-    conn = _get_conn()
     symbol = symbol.upper()
+    try:
+        conn = _get_conn()
+        rows = conn.execute(
+            """SELECT ts, open_price, high, low, close_price, volume
+               FROM market_candles
+               WHERE symbol = ?
+               ORDER BY ts DESC
+               LIMIT ?""",
+            [symbol, limit],
+        ).fetchall()
 
-    rows = conn.execute(
-        """SELECT ts, open_price, high, low, close_price, volume
-           FROM market_candles
-           WHERE symbol = ?
-           ORDER BY ts DESC
-           LIMIT ?""",
-        [symbol, limit],
-    ).fetchall()
+        candles = []
+        for r in reversed(rows):  # reverse to chronological order
+            candles.append(
+                {
+                    "time": r[0],
+                    "open": r[1],
+                    "high": r[2],
+                    "low": r[3],
+                    "close": r[4],
+                    "volume": r[5],
+                }
+            )
 
-    candles = []
-    for r in reversed(rows):  # reverse to chronological order
-        candles.append(
-            {
-                "time": r[0],
-                "open": r[1],
-                "high": r[2],
-                "low": r[3],
-                "close": r[4],
-                "volume": r[5],
-            }
-        )
-
-    return {
-        "symbol": symbol,
-        "candles": candles,
-        "count": len(candles),
-    }
+        return {
+            "symbol": symbol,
+            "candles": candles,
+            "count": len(candles),
+        }
+    except Exception as exc:
+        logger.exception("Failed to read candles for %s: %s", symbol, exc)
+        return {
+            "symbol": symbol,
+            "candles": [],
+            "count": 0,
+            "error": str(exc),
+        }
 
 
 @router.get("/check-updates")
@@ -838,38 +898,47 @@ async def check_updates(
     preset: str = Query("VN30"),
 ) -> dict[str, object]:
     """Check if data needs updating (>24h old or missing)."""
-    conn = _get_conn()
-    meta_rows = conn.execute(
-        "SELECT last_updated, symbol_count, years FROM load_metadata WHERE preset = ?",
-        [preset],
-    ).fetchall()
+    try:
+        conn = _get_conn()
+        meta_rows = conn.execute(
+            "SELECT last_updated, symbol_count, years FROM load_metadata WHERE preset = ?",
+            [preset],
+        ).fetchall()
 
-    if not meta_rows:
+        if not meta_rows:
+            return {
+                "needs_update": True,
+                "reason": "no_data",
+                "last_updated": None,
+            }
+
+        last_updated = meta_rows[0][0]
+        now = datetime.now(tz=UTC)
+
+        # If last_updated is naive, assume UTC
+        if hasattr(last_updated, "tzinfo") and last_updated.tzinfo is None:
+            last_updated = last_updated.replace(tzinfo=UTC)
+
+        age_hours = (now - last_updated).total_seconds() / 3600
+        needs_update = age_hours > 24
+
+        fmt = "%d/%m/%Y %H:%M"
+        return {
+            "needs_update": needs_update,
+            "reason": "stale" if needs_update else "fresh",
+            "last_updated": last_updated.strftime(fmt),
+            "age_hours": round(age_hours, 1),
+            "symbol_count": meta_rows[0][1],
+            "years": meta_rows[0][2],
+        }
+    except Exception as exc:
+        logger.exception("Failed to check updates for preset=%s: %s", preset, exc)
         return {
             "needs_update": True,
-            "reason": "no_data",
+            "reason": "db_error",
             "last_updated": None,
+            "error": str(exc),
         }
-
-    last_updated = meta_rows[0][0]
-    now = datetime.now(tz=UTC)
-
-    # If last_updated is naive, assume UTC
-    if hasattr(last_updated, "tzinfo") and last_updated.tzinfo is None:
-        last_updated = last_updated.replace(tzinfo=UTC)
-
-    age_hours = (now - last_updated).total_seconds() / 3600
-    needs_update = age_hours > 24
-
-    fmt = "%d/%m/%Y %H:%M"
-    return {
-        "needs_update": needs_update,
-        "reason": "stale" if needs_update else "fresh",
-        "last_updated": last_updated.strftime(fmt),
-        "age_hours": round(age_hours, 1),
-        "symbol_count": meta_rows[0][1],
-        "years": meta_rows[0][2],
-    }
 
 
 @router.get("/run-screener")

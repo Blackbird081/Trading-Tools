@@ -14,7 +14,7 @@ COPY --from=builder /app/.venv /app/.venv
 COPY packages/ packages/
 COPY pyproject.toml ./
 RUN mkdir -p /app/data/db /app/data/models && chown -R appuser:appuser /app/data
-USER appuser
+USER root
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/packages/core/src:/app/packages/adapters/src:/app/packages/agents/src:/app/packages/interface/src"
 ENV DUCKDB_PATH="/app/data/trading.duckdb"

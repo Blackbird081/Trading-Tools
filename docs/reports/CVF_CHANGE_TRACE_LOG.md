@@ -116,3 +116,18 @@ Notes:
 - Plan Mapping: Section 0.7 `INC-RW-20260302-DUCKDB-PERMISSION` + Section 0.6 P1 persistence policy
 - Owner: Codex + project owner
 - Notes: This is a trace-evidence update; code fix and redeploy validation remain required before closing incident.
+
+### CVF-TT-20260302-007
+- Date-Time (UTC+7): 2026-03-02 14:00
+- Type: hotfix
+- Scope: Resolve persistent Dashboard `ERROR` by hardening data-loader DB path strategy and SSE failure handling for Railway runtime.
+- Impact: Cache read endpoint no longer hard-fails UI on DB init error; load/update streams now emit explicit `error` event; runtime can write DB using root user and fallback `/tmp` path.
+- Root Cause: Production runtime hit permission-denied path during DuckDB initialization, causing uncaught exceptions and interrupted streams.
+- Files Changed: `packages/interface/src/interface/rest/data_loader.py`, `Dockerfile`
+- Validation Evidence: `python -m py_compile packages/interface/src/interface/rest/data_loader.py packages/interface/src/interface/app.py` pass; `pnpm -C frontend exec tsc --noEmit` pass; `pnpm -C frontend exec vitest run __tests__/integration/ws-provider.test.ts __tests__/stores/market-store.test.ts __tests__/stores/signal-store.test.ts` pass (12/12).
+- Deployment Target: backend + frontend on Railway
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: Section 0.6 P0/P1 + Section 0.7 `INC-RW-20260302-DUCKDB-PERMISSION`
+- Owner: Codex + project owner
+- Notes: Canonical Railway env remains `DUCKDB_PATH=/app/data/trading.duckdb`; `/tmp/trading.duckdb` is emergency fallback to keep app operational.
