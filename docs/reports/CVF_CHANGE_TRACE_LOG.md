@@ -146,3 +146,18 @@ Notes:
 - Plan Mapping: Phase 4 (Frontend & Real-time UI) — mobile usability polish
 - Owner: Codex + project owner
 - Notes: Implemented fixed-size horizontal grid tabs (`auto-cols-[92px]`, `h-14`) with centered wrapped label text.
+
+### CVF-TT-20260302-009
+- Date-Time (UTC+7): 2026-03-02 16:36
+- Type: test
+- Scope: Add phase-gate test coverage for Data Loader to enforce P0 acceptance before moving to next roadmap phase.
+- Impact: Prevents regression where app auto-loads on mount; ensures load stream only starts by explicit user action.
+- Root Cause: P0 acceptance criteria previously relied mainly on manual verification, with no direct automated test for auto-load behavior.
+- Files Changed: `frontend/__tests__/integration/data-loader.test.tsx`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence: `pnpm -C frontend exec tsc --noEmit` pass; `pnpm -C frontend exec vitest run __tests__/integration/data-loader.test.tsx` pass (2/2); `pnpm -C frontend exec vitest run __tests__/integration/data-loader.test.tsx __tests__/integration/ws-provider.test.ts __tests__/stores/market-store.test.ts __tests__/stores/signal-store.test.ts __tests__/lib/market-sectors.test.ts` pass (19/19).
+- Deployment Target: frontend + CVF governance docs
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: Section 0.6 P0 + Section 0.8 Phase Execution Status
+- Owner: Codex + project owner
+- Notes: P0 marked gated-complete; P1 remains in-progress pending Railway production smoke validation.

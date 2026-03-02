@@ -147,6 +147,32 @@ These two items are locked as immediate priority and must be completed before ad
   - Ensure SSE stream emits terminal `error` event instead of abrupt disconnect when DB init fails.
   - Re-verify acceptance in Section `0.6` (P0/P1) after redeploy.
 
+### 0.8 Phase Execution Status (Gate-Driven)
+
+Execution policy: each phase must pass its gate tests before moving to the next phase.
+
+#### Phase P0 - Loader UX Hotfix
+
+- Status: `DONE (gated)`
+- Scope:
+  - No auto-load on app open.
+  - Manual `Load` / `Update` flow only.
+  - Clear status states in UI.
+- Gate evidence:
+  - `pnpm -C frontend exec tsc --noEmit` (pass)
+  - `pnpm -C frontend exec vitest run __tests__/integration/data-loader.test.tsx` (pass)
+  - `pnpm -C frontend exec vitest run __tests__/integration/data-loader.test.tsx __tests__/integration/ws-provider.test.ts __tests__/stores/market-store.test.ts __tests__/stores/signal-store.test.ts __tests__/lib/market-sectors.test.ts` (19/19 pass)
+
+#### Phase P1 - Persistence & Update Policy
+
+- Status: `IN PROGRESS (awaiting production smoke validation)`
+- Completed technical items:
+  - Data loader path fallback hardened (`/app/data/...` + `/tmp/...` fallback).
+  - Cache endpoints avoid hard-fail behavior on DB init errors.
+  - SSE stream emits explicit terminal `error` event on failures.
+- Remaining gate:
+  - Railway production smoke: `Load` full + `Update` incremental + F5 restore consistency check on deployed app.
+
 ---
 
 ## PHASE 1: FOUNDATION & CORE DOMAIN
