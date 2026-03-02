@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup: initialize DuckDB pool
     try:
         from adapters.duckdb.connection import get_default_pool
-        db_path = os.getenv("DUCKDB_PATH", "data/trading.duckdb")
+        db_path = os.getenv("DUCKDB_PATH", "data/db/trading.duckdb")
         max_conn = int(os.getenv("DUCKDB_MAX_CONNECTIONS", "5"))
         pool = get_default_pool(db_path=db_path, max_connections=max_conn)
         app.state.db_pool = pool

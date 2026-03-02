@@ -38,6 +38,89 @@ Phase 1 ──► Phase 2 ──► Phase 3 ──┐
 
 ---
 
+## 0. CVF CHANGE TRACEABILITY & GOVERNANCE (MANDATORY)
+
+**Policy Effective Date:** 2026-03-02 (UTC+7)  
+**Scope:** Applies to ALL changes after this date: feature, bug fix, hotfix, test update, refactor, docs, deployment config.
+
+### 0.1 Objective
+
+From now on, project traceability is not allowed to rely on Git commit history alone. Every change must be logged in CVF trace artifacts so any issue can be audited end-to-end (why changed, what changed, how verified, where deployed).
+
+### 0.2 Mandatory Trace Artifacts
+
+| Artifact | Required Location | Requirement |
+|:---|:---|:---|
+| Change Trace Ledger | `docs/reports/CVF_CHANGE_TRACE_LOG.md` | One entry per completed change set |
+| Plan Linkage | `docs/plans/IMPLEMENTATION_PLAN.md` | Each change must map to a Phase/Task or an explicit Hotfix item |
+| Test Evidence | Same trace entry (`Validation Evidence`) + related test files | Must list executed checks and outcome |
+| Production Incident Notes (if applicable) | Same trace entry (`Root Cause` + `Impact`) | Mandatory for bugs/hotfixes |
+
+### 0.3 Trace Entry Schema (Minimum Fields)
+
+Each entry in `CVF_CHANGE_TRACE_LOG.md` must include:
+
+1. `CVF-Trace-ID` (format: `CVF-TT-YYYYMMDD-XXX`)
+2. `Date-Time` (UTC+7)
+3. `Type` (`feature`, `bugfix`, `hotfix`, `test`, `refactor`, `docs`, `ops`)
+4. `Scope`
+5. `Root Cause` (required for bugfix/hotfix)
+6. `Files Changed`
+7. `Validation Evidence` (commands/tests/manual checks + result)
+8. `Deployment Target` (local/staging/railway/production)
+9. `Commit SHA` (or `N/A` if documentation-only)
+10. `Plan Mapping` (Phase/Task reference)
+11. `Owner`
+
+### 0.4 Execution Workflow (Required)
+
+1. Before implementation: identify plan mapping (`Phase/Task` or `Hotfix`).
+2. During implementation: keep scope bounded to mapped item.
+3. Before push/deploy: complete trace entry with validation evidence.
+4. After deploy: append actual deployment status/outcome to the same entry.
+
+### 0.5 Quality Gate (Hard Rule)
+
+No change is considered complete unless all are true:
+
+```
+□ Code or config change exists
+□ CVF trace entry exists and is complete
+□ Validation evidence recorded
+□ Plan mapping recorded
+□ Deployment status recorded (if deployed)
+```
+
+If any box is missing, the work is **incomplete** under CVF governance.
+
+### 0.6 Current Priority Execution Roadmap (P0/P1 First)
+
+These two items are locked as immediate priority and must be completed before additional desktop redesign work.
+
+#### P0 — Hotfix UX Data Loader (same day)
+
+- Disable auto-load completely.
+- Explicit status model: `No cache`, `Loading data`, `Loaded`, `Updating`, `Error`, `Cancelled`.
+- Replace ambiguous text (`Connecting...`) with business-progress messaging.
+- If cache exists: restore only; do not trigger background load.
+- Acceptance:
+  - app open does not auto-run load,
+  - user must click `Load`/`Update` to start data operation.
+
+#### P1 — Data Persistence & Update Policy (1 day)
+
+- Railway must use persistent volume mounted to `/app/data`.
+- Standardize environment path: `DUCKDB_PATH=/app/data/db/trading.duckdb`.
+- Split actions:
+  - `Load`: full data load by `preset + years`.
+  - `Update`: incremental cache refresh (no full redownload).
+- Acceptance:
+  - data survives redeploy with volume enabled,
+  - F5 restores cached data consistently,
+  - incremental update path is distinct from full load path.
+
+---
+
 ## PHASE 1: FOUNDATION & CORE DOMAIN
 
 **Duration:** Weeks 1-3
@@ -1123,4 +1206,4 @@ NON-FUNCTIONAL
 
 ---
 
-*This plan is a living document. Update it as implementation reveals new constraints or opportunities. The blueprints (01-06) remain the authoritative source for technical details — this plan tells you WHEN and IN WHAT ORDER to build them.*
+*This plan is a living document. Update it as implementation reveals new constraints or opportunities. The blueprints (01-06) remain the authoritative source for technical details — this plan tells you WHEN and IN WHAT ORDER to build them. All executed changes must be trace-logged in `docs/reports/CVF_CHANGE_TRACE_LOG.md` under the governance rules in Section 0.*

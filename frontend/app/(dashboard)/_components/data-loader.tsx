@@ -1,21 +1,16 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useMarketStore } from "@/stores/market-store";
 import { useUIStore } from "@/stores/ui-store";
 import type { TickData } from "@/types/market";
-import {
-  Database,
-  Download,
-  CheckCircle2,
-  Loader2,
-  ChevronDown,
-  RefreshCw,
-  Clock,
-} from "lucide-react";
+import { Database, Download, CheckCircle2, Loader2, ChevronDown, RefreshCw, Clock, Square } from "lucide-react";
+
+type LoaderStatus = "no_cache" | "loading" | "loaded" | "updating" | "error" | "cancelled";
+type LoaderMode = "load" | "update";
 
 interface LoadState {
-  status: "idle" | "loading" | "complete" | "error" | "cached";
+  status: LoaderStatus;
   percent: number;
   loaded: number;
   total: number;
@@ -26,162 +21,203 @@ interface LoadState {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
+const STATUS_LABEL: Record<LoaderStatus, string> = {
+  no_cache: "No cache",
+  loading: "Loading data",
+  loaded: "Loaded",
+  updating: "Updating",
+  error: "Error",
+  cancelled: "Cancelled",
+};
+
 export function DataLoader() {
   const preset = useUIStore((s) => s.preset);
   const setPreset = useUIStore((s) => s.setPreset);
   const years = useUIStore((s) => s.years);
   const setYears = useUIStore((s) => s.setYears);
+
+  const replaceTicks = useMarketStore((s) => s.replaceTicks);
+  const clearTicks = useMarketStore((s) => s.clearTicks);
+  const updateTick = useMarketStore((s) => s.updateTick);
+  const ticks = useMarketStore((s) => s.ticks);
+
   const [expanded, setExpanded] = useState(false);
   const [state, setState] = useState<LoadState>({
-    status: "idle",
+    status: "no_cache",
     percent: 0,
     loaded: 0,
     total: 0,
     currentSymbol: "",
-    message: "",
+    message: "No cache. Bấm Load để nạp dữ liệu.",
     lastUpdated: null,
   });
   const abortRef = useRef<AbortController | null>(null);
-  const autoLoadTriggeredRef = useRef<Record<string, boolean>>({});
-  const replaceTicks = useMarketStore((s) => s.replaceTicks);
-  const clearTicks = useMarketStore((s) => s.clearTicks);
-  const updateTick = useMarketStore((s) => s.updateTick);
+
+  const tickCount = useMemo(() => Object.keys(ticks).length, [ticks]);
+  const isBusy = state.status === "loading" || state.status === "updating";
+  const canUpdate = tickCount > 0 && !isBusy;
 
   const handleEvent = useCallback(
-    (event: string, data: Record<string, unknown>) => {
+    (event: string, data: Record<string, unknown>, mode: LoaderMode) => {
       switch (event) {
         case "start":
           setState((s) => ({
             ...s,
-            total: data.total as number,
-            message: `Loading ${data.total} symbols x ${data.years} years...`,
+            status: mode === "load" ? "loading" : "updating",
+            total: Number(data.total ?? 0),
+            message:
+              mode === "load"
+                ? `Loading ${data.total ?? 0} symbols x ${data.years ?? years} years...`
+                : `Updating ${data.total ?? 0} cached symbols...`,
           }));
           break;
 
         case "progress":
           setState((s) => ({
             ...s,
-            loaded: data.loaded as number,
-            percent: data.percent as number,
-            currentSymbol: data.symbol as string,
-            message: data.status as string,
+            loaded: Number(data.loaded ?? 0),
+            percent: Number(data.percent ?? 0),
+            currentSymbol: String(data.symbol ?? ""),
+            message: String(data.status ?? (mode === "load" ? "Loading data..." : "Updating data...")),
           }));
           break;
 
         case "tick": {
           const tick: TickData = {
-            symbol: data.symbol as string,
-            price: data.price as number,
-            change: data.change as number,
-            changePct: data.changePct as number,
-            volume: data.volume as number,
-            high: data.high as number,
-            low: data.low as number,
-            open: data.open as number,
-            ceiling: data.ceiling as number,
-            floor: data.floor as number,
-            reference: data.reference as number,
-            timestamp: data.timestamp as number,
+            symbol: String(data.symbol ?? ""),
+            price: Number(data.price ?? 0),
+            change: Number(data.change ?? 0),
+            changePct: Number(data.changePct ?? 0),
+            volume: Number(data.volume ?? 0),
+            high: Number(data.high ?? 0),
+            low: Number(data.low ?? 0),
+            open: Number(data.open ?? 0),
+            ceiling: Number(data.ceiling ?? 0),
+            floor: Number(data.floor ?? 0),
+            reference: Number(data.reference ?? 0),
+            timestamp: Number(data.timestamp ?? Date.now()),
           };
           updateTick(tick);
           break;
         }
 
+        case "error":
+          setState((s) => ({
+            ...s,
+            status: "error",
+            message: String(data.message ?? "Operation failed"),
+          }));
+          break;
+
         case "complete":
           setState({
-            status: "complete",
+            status: "loaded",
             percent: 100,
-            loaded: data.loaded as number,
-            total: data.total as number,
+            loaded: Number(data.loaded ?? 0),
+            total: Number(data.total ?? 0),
             currentSymbol: "",
-            message: data.message as string,
+            message: String(data.message ?? "Loaded"),
             lastUpdated: (data.last_updated as string) ?? null,
           });
           break;
       }
     },
-    [updateTick]
+    [updateTick, years]
   );
 
-  const startLoad = useCallback(async () => {
-    if (abortRef.current) return;
+  const runStream = useCallback(
+    async (mode: LoaderMode) => {
+      if (abortRef.current) return;
 
-    const controller = new AbortController();
-    abortRef.current = controller;
+      const controller = new AbortController();
+      abortRef.current = controller;
 
-    setState((prev) => ({
-      status: "loading",
-      percent: 0,
-      loaded: 0,
-      total: 0,
-      currentSymbol: "",
-      message: "Connecting...",
-      lastUpdated: prev.lastUpdated,
-    }));
-    clearTicks();
+      setState((prev) => ({
+        ...prev,
+        status: mode === "load" ? "loading" : "updating",
+        percent: 0,
+        loaded: 0,
+        total: 0,
+        currentSymbol: "",
+        message: mode === "load" ? "Loading data..." : "Updating cached data...",
+      }));
 
-    try {
-      const url = `${API_BASE}/load-data?preset=${preset}&years=${years}`;
-      const res = await fetch(url, { signal: controller.signal });
-
-      if (!res.ok || !res.body) {
-        throw new Error(`HTTP ${res.status}`);
+      if (mode === "load") {
+        clearTicks();
       }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+      try {
+        const url =
+          mode === "load"
+            ? `${API_BASE}/load-data?preset=${preset}&years=${years}`
+            : `${API_BASE}/update-data?preset=${preset}`;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok || !res.body) {
+          throw new Error(`HTTP ${res.status}`);
+        }
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
         let eventType = "";
-        for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            eventType = line.slice(7).trim();
-          } else if (line.startsWith("data: ") && eventType) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              handleEvent(eventType, data);
-            } catch {
-              // skip parse errors
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith("data: ") && eventType) {
+              const parsed = JSON.parse(line.slice(6)) as Record<string, unknown>;
+              handleEvent(eventType, parsed, mode);
+              eventType = "";
             }
-            eventType = "";
           }
         }
+      } catch (e) {
+        if ((e as Error).name === "AbortError") {
+          setState((s) => ({
+            ...s,
+            status: "cancelled",
+            message: "Cancelled by user.",
+          }));
+        } else {
+          setState((s) => ({
+            ...s,
+            status: "error",
+            message: `Error: ${(e as Error).message}`,
+          }));
+        }
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+        }
       }
-    } catch (e) {
-      if ((e as Error).name !== "AbortError") {
-        setState((s) => ({
-          ...s,
-          status: "error",
-          message: `Error: ${(e as Error).message}`,
-        }));
-      }
-    } finally {
-      if (abortRef.current === controller) {
-        abortRef.current = null;
-      }
-    }
-  }, [preset, years, handleEvent, clearTicks]);
+    },
+    [preset, years, handleEvent, clearTicks]
+  );
 
-  // ── Stream-load from API ──────────────────────────────────
   const handleLoad = useCallback(() => {
-    if (state.status === "loading") {
-      abortRef.current?.abort();
-      setState((s) => ({ ...s, status: "idle", message: "Cancelled" }));
-      return;
-    }
+    if (isBusy) return;
+    void runStream("load");
+  }, [isBusy, runStream]);
 
-    void startLoad();
-  }, [state.status, startLoad]);
+  const handleUpdate = useCallback(() => {
+    if (!canUpdate) return;
+    void runStream("update");
+  }, [canUpdate, runStream]);
 
-  // ── Auto-load from DB cache when preset changes ───────────
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
+  // Restore from cache only. Never auto-load.
   useEffect(() => {
     let cancelled = false;
 
@@ -189,80 +225,74 @@ export function DataLoader() {
       try {
         const res = await fetch(`${API_BASE}/cached-data?preset=${preset}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
         const data = await res.json();
         if (cancelled) return;
 
         if (Array.isArray(data.ticks) && data.ticks.length > 0) {
           replaceTicks(data.ticks as TickData[]);
           setState({
-            status: "cached",
+            status: "loaded",
             percent: 100,
-            loaded: data.symbol_count,
-            total: data.symbol_count,
+            loaded: Number(data.symbol_count ?? 0),
+            total: Number(data.symbol_count ?? 0),
             currentSymbol: "",
-            message: `Loaded ${data.symbol_count} symbols from cache`,
-            lastUpdated: data.last_updated,
+            message: `Loaded ${data.symbol_count ?? 0} symbols from cache`,
+            lastUpdated: (data.last_updated as string) ?? null,
           });
           setExpanded(false);
-          autoLoadTriggeredRef.current[preset] = false;
-          return;
-        }
-
-        clearTicks();
-        setExpanded(true);
-        setState((prev) => ({
-          ...prev,
-          status: "idle",
-          percent: 0,
-          loaded: 0,
-          total: 0,
-          currentSymbol: "",
-          message: "No cache found. Auto loading now...",
-        }));
-
-        if (!autoLoadTriggeredRef.current[preset]) {
-          autoLoadTriggeredRef.current[preset] = true;
-          void startLoad();
+        } else {
+          clearTicks();
+          setState({
+            status: "no_cache",
+            percent: 0,
+            loaded: 0,
+            total: 0,
+            currentSymbol: "",
+            message: "No cache. Bấm Load để nạp dữ liệu.",
+            lastUpdated: null,
+          });
+          setExpanded(true);
         }
       } catch {
         if (cancelled) return;
         clearTicks();
-        setExpanded(true);
-        setState((prev) => ({
-          ...prev,
+        setState({
           status: "error",
-          message: "Cannot read cache. Please load data.",
-        }));
+          percent: 0,
+          loaded: 0,
+          total: 0,
+          currentSymbol: "",
+          message: "Error reading cache. Please retry.",
+          lastUpdated: null,
+        });
+        setExpanded(true);
       }
     })();
 
     return () => {
       cancelled = true;
+      abortRef.current?.abort();
     };
-  }, [preset, replaceTicks, clearTicks, startLoad]);
-
-  const isLoading = state.status === "loading";
-  const isDone = state.status === "complete" || state.status === "cached";
+  }, [preset, replaceTicks, clearTicks]);
 
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
-      {/* Header — always visible */}
       <button
         onClick={() => setExpanded((e) => !e)}
         className="flex w-full items-center justify-between px-3 py-2.5 transition-colors hover:bg-zinc-800/50 sm:px-4"
       >
         <div className="flex min-w-0 items-center gap-2">
           <Database className="h-4 w-4 text-emerald-400" />
-          <span className="text-xs font-medium uppercase tracking-wider text-zinc-400">
-            Market Data
-          </span>
-          {isDone && (
+          <span className="text-xs font-medium uppercase tracking-wider text-zinc-400">Market Data</span>
+          {state.status === "loaded" && (
             <span className="flex items-center gap-1 text-xs text-emerald-400">
               <CheckCircle2 className="h-3 w-3" />
               {state.loaded} symbols
             </span>
           )}
+          <span className="rounded border border-zinc-700/80 bg-zinc-950/70 px-1.5 py-0.5 text-[10px] uppercase text-zinc-400">
+            {STATUS_LABEL[state.status]}
+          </span>
           {state.lastUpdated && (
             <span className="ml-1 hidden items-center gap-1 text-[10px] text-zinc-600 sm:flex">
               <Clock className="h-3 w-3" />
@@ -270,122 +300,84 @@ export function DataLoader() {
             </span>
           )}
         </div>
-        <ChevronDown
-          className={`h-4 w-4 text-zinc-500 transition-transform ${expanded ? "rotate-180" : ""}`}
-        />
+        <ChevronDown className={`h-4 w-4 text-zinc-500 transition-transform ${expanded ? "rotate-180" : ""}`} />
       </button>
 
-      {/* Expandable body */}
       {expanded && (
         <div className="space-y-3 border-t border-zinc-800 px-3 pb-4 pt-3 sm:px-4">
-          {/* Row 1: Preset + Load on mobile, full controls on desktop */}
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-            {/* Preset selector + mobile load button */}
             <div className="w-full lg:flex-1">
-              <label className="mb-1 block text-[11px] font-medium text-zinc-500 uppercase">
-                Danh sách
-              </label>
+              <label className="mb-1 block text-[11px] font-medium uppercase text-zinc-500">Danh sách</label>
               <div className="flex gap-2">
-                <div className="flex flex-1 rounded-md overflow-hidden border border-zinc-700">
+                <div className="flex flex-1 overflow-hidden rounded-md border border-zinc-700">
                   <button
                     onClick={() => setPreset("VN30")}
-                    disabled={isLoading}
-                    className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-colors ${preset === "VN30"
-                      ? "bg-emerald-600 text-white"
-                      : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-                      }`}
+                    disabled={isBusy}
+                    className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      preset === "VN30" ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                    }`}
                   >
                     VN30
                   </button>
                   <button
                     onClick={() => setPreset("TOP100")}
-                    disabled={isLoading}
-                    className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-colors ${preset === "TOP100"
-                      ? "bg-amber-600 text-white"
-                      : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-                      }`}
+                    disabled={isBusy}
+                    className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      preset === "TOP100" ? "bg-amber-600 text-white" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                    }`}
                   >
                     Top 100
                   </button>
                 </div>
 
-                {/* Mobile: Load button in same row with preset */}
-                <button
-                  onClick={handleLoad}
-                  className={`lg:hidden flex items-center justify-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-semibold transition-all ${
-                    isLoading
-                      ? "bg-red-600/80 text-white hover:bg-red-600"
-                      : isDone
-                        ? "bg-zinc-700 text-zinc-200 hover:bg-zinc-600"
-                        : "bg-emerald-600 text-white hover:bg-emerald-500"
-                  }`}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Stop
-                    </>
-                  ) : isDone ? (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Update
-                    </>
-                  ) : (
-                    <>
+                {isBusy ? (
+                  <button
+                    onClick={handleStop}
+                    className="flex items-center justify-center gap-1.5 rounded-md bg-red-600/90 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-600"
+                  >
+                    <Square className="h-3.5 w-3.5" />
+                    Stop
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleLoad}
+                      className="flex items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white transition-all hover:bg-emerald-500"
+                    >
                       <Download className="h-3.5 w-3.5" />
                       Load
-                    </>
-                  )}
-                </button>
+                    </button>
+                    <button
+                      onClick={handleUpdate}
+                      disabled={!canUpdate}
+                      className={`flex items-center justify-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-semibold transition-all ${
+                        canUpdate
+                          ? "bg-zinc-700 text-zinc-100 hover:bg-zinc-600"
+                          : "cursor-not-allowed bg-zinc-800 text-zinc-500"
+                      }`}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Update
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
-
-            {/* Desktop-only Load / Refresh button */}
-            <button
-              onClick={handleLoad}
-              className={`hidden lg:flex items-center justify-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-semibold transition-all ${
-                isLoading
-                  ? "bg-red-600/80 text-white hover:bg-red-600"
-                  : isDone
-                    ? "bg-zinc-700 text-zinc-200 hover:bg-zinc-600"
-                    : "bg-emerald-600 text-white hover:bg-emerald-500"
-              }`}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Stop
-                </>
-              ) : isDone ? (
-                <>
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Update
-                </>
-              ) : (
-                <>
-                  <Download className="h-3.5 w-3.5" />
-                  Load
-                </>
-              )}
-            </button>
           </div>
 
-          {/* Row 2: Years slider */}
           <div className="w-full">
             <div className="w-full lg:max-w-[540px]">
-              <label className="mb-1 block text-[11px] font-medium text-zinc-500 uppercase">
-                Dữ liệu: {years} năm
-              </label>
+              <label className="mb-1 block text-[11px] font-medium uppercase text-zinc-500">Dữ liệu: {years} năm</label>
               <input
                 type="range"
                 min={1}
                 max={10}
                 value={years}
                 onChange={(e) => setYears(Number(e.target.value))}
-                disabled={isLoading}
-                className="w-full h-1.5 appearance-none rounded-full bg-zinc-700 accent-emerald-500 cursor-pointer disabled:opacity-50"
+                disabled={isBusy}
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-zinc-700 accent-emerald-500 disabled:opacity-50"
               />
-              <div className="flex justify-between mt-0.5">
+              <div className="mt-0.5 flex justify-between">
                 <span className="text-[10px] text-zinc-600">1Y</span>
                 <span className="text-[10px] text-zinc-600">5Y</span>
                 <span className="text-[10px] text-zinc-600">10Y</span>
@@ -393,32 +385,27 @@ export function DataLoader() {
             </div>
           </div>
 
-          {/* Progress bar */}
-          {isLoading && (
-            <div className="space-y-1">
-              <div className="relative h-2 overflow-hidden rounded-full bg-zinc-800">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-300"
-                  style={{ width: `${state.percent}%` }}
-                />
+          <div className="space-y-1">
+            <div className="relative h-2 overflow-hidden rounded-full bg-zinc-800">
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-300"
+                style={{ width: `${Math.max(0, Math.min(100, state.percent))}%` }}
+              />
+              {isBusy && (
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-[shimmer_1.5s_infinite]" />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="pr-2 text-[11px] text-zinc-500">
-                  {state.currentSymbol && (
-                    <span className="text-emerald-400 font-mono">
-                      {state.currentSymbol}
-                    </span>
-                  )}
-                  {state.currentSymbol && " — "}
-                  {state.message}
-                </span>
-                <span className="text-[11px] font-mono text-zinc-400">
-                  {state.loaded}/{state.total} ({Math.round(state.percent)}%)
-                </span>
-              </div>
+              )}
             </div>
-          )}
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="pr-2 text-zinc-500">
+                {state.currentSymbol && <span className="font-mono text-emerald-400">{state.currentSymbol}</span>}
+                {state.currentSymbol && " — "}
+                {state.message}
+              </span>
+              <span className="font-mono text-zinc-400">
+                {state.loaded}/{state.total} ({Math.round(state.percent)}%)
+              </span>
+            </div>
+          </div>
         </div>
       )}
     </div>

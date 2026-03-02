@@ -310,6 +310,7 @@ async def _generate_progress(
         {
             "total": total,
             "years": years,
+            "mode": "load",
             "start_date": start_date.isoformat(),
             "end_date": end_date.isoformat(),
         },
@@ -371,7 +372,103 @@ async def _generate_progress(
             "loaded": total,
             "total": total,
             "percent": 100,
+            "mode": "load",
             "message": f"Loaded {total} symbols x {years} years",
+            "last_updated": now_str,
+        },
+    )
+
+
+async def _generate_incremental_progress(
+    symbols: list[str],
+    preset: str,
+) -> AsyncGenerator[str, None]:
+    """Stream SSE progress for incremental update using existing cached universe."""
+    conn = _get_conn()
+    meta_rows = conn.execute(
+        "SELECT years FROM load_metadata WHERE preset = ?",
+        [preset],
+    ).fetchall()
+
+    if not meta_rows:
+        yield _sse(
+            "error",
+            {
+                "mode": "update",
+                "message": "No cache available. Run full Load first.",
+            },
+        )
+        return
+
+    years = int(meta_rows[0][0])
+    total = len(symbols)
+    yield _sse(
+        "start",
+        {
+            "total": total,
+            "years": years,
+            "mode": "update",
+        },
+    )
+
+    for loaded, symbol in enumerate(symbols):
+        yield _sse(
+            "progress",
+            {
+                "symbol": symbol,
+                "loaded": loaded,
+                "total": total,
+                "percent": round(loaded / total * 100, 1),
+                "status": f"Updating {symbol}...",
+                "mode": "update",
+            },
+        )
+
+        # Incremental update: refresh latest tick snapshot only (no full candle regeneration).
+        await asyncio.sleep(random.uniform(0.01, 0.03))
+        row = conn.execute(
+            """SELECT price, reference
+               FROM market_cache
+               WHERE symbol = ? AND preset = ?""",
+            [symbol, preset],
+        ).fetchone()
+
+        rng = random.Random(f"{symbol}-{int(datetime.now(tz=UTC).timestamp())}")
+        prev_price = float(row[0]) if row else rng.uniform(10, 150)
+        reference = float(row[1]) if row else prev_price
+        change = rng.uniform(-2, 2)
+        price = round(max(1.0, prev_price + change), 2)
+        high = round(max(price, prev_price) + rng.uniform(0, 1.5), 2)
+        low = round(max(0.5, min(price, prev_price) - rng.uniform(0, 1.5)), 2)
+        volume = rng.randint(100_000, 5_000_000)
+
+        tick = {
+            "symbol": symbol,
+            "price": price,
+            "change": round(price - reference, 2),
+            "changePct": round(((price - reference) / reference * 100) if reference else 0, 2),
+            "volume": volume,
+            "high": high,
+            "low": low,
+            "open": round(prev_price, 2),
+            "ceiling": round(reference * 1.07, 2),
+            "floor": round(reference * 0.93, 2),
+            "reference": round(reference, 2),
+            "timestamp": int(datetime.now(tz=UTC).timestamp() * 1000),
+        }
+        _save_tick_to_db(tick, preset)
+        yield _sse("tick", {**tick, "mode": "update"})
+
+    _save_metadata(preset, total, years)
+    now_str = datetime.now(tz=UTC).strftime("%d/%m/%Y %H:%M")
+    yield _sse(
+        "complete",
+        {
+            "loaded": total,
+            "total": total,
+            "percent": 100,
+            "mode": "update",
+            "message": f"Updated {total} symbols from cache",
             "last_updated": now_str,
         },
     )
@@ -585,6 +682,23 @@ async def load_data(
     symbols = VN30_SYMBOLS if preset == "VN30" else TOP100_SYMBOLS[:100]
     return StreamingResponse(
         _generate_progress(symbols, years, preset),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/update-data")
+async def update_data(
+    preset: str = Query("VN30", description="VN30 or TOP100"),
+) -> StreamingResponse:
+    """Incremental update for existing cached symbol universe."""
+    symbols = VN30_SYMBOLS if preset == "VN30" else TOP100_SYMBOLS[:100]
+    return StreamingResponse(
+        _generate_incremental_progress(symbols, preset),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
