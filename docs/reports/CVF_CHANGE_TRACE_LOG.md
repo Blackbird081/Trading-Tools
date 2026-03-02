@@ -131,3 +131,18 @@ Notes:
 - Plan Mapping: Section 0.6 P0/P1 + Section 0.7 `INC-RW-20260302-DUCKDB-PERMISSION`
 - Owner: Codex + project owner
 - Notes: Canonical Railway env remains `DUCKDB_PATH=/app/data/trading.duckdb`; `/tmp/trading.duckdb` is emergency fallback to keep app operational.
+
+### CVF-TT-20260302-008
+- Date-Time (UTC+7): 2026-03-02 14:32
+- Type: bugfix
+- Scope: Normalize mobile Market Board sector tab button sizing for consistent visual layout.
+- Impact: Sector tabs (`VN30`, `Bất động sản`, `Chứng khoán`, ...) now render with equal frame size, eliminating mixed button heights/widths.
+- Root Cause: Variable label lengths combined with unconstrained button sizing caused uneven mobile tab dimensions.
+- Files Changed: `frontend/app/market-board/page.tsx`
+- Validation Evidence: `pnpm -C frontend exec tsc --noEmit` pass; `pnpm -C frontend exec vitest run __tests__/lib/market-sectors.test.ts` pass (5/5).
+- Deployment Target: frontend (Railway web)
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: Phase 4 (Frontend & Real-time UI) — mobile usability polish
+- Owner: Codex + project owner
+- Notes: Implemented fixed-size horizontal grid tabs (`auto-cols-[92px]`, `h-14`) with centered wrapped label text.

@@ -209,18 +209,20 @@ export default function MarketBoardPage() {
             >
                 <div className="flex flex-col gap-2 rounded border border-zinc-800/60 bg-zinc-900/50 px-2 py-1.5">
                     <div className="flex items-center justify-between gap-1">
-                        <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                        <div className="grid grid-flow-col auto-cols-[92px] gap-1 overflow-x-auto pb-0.5">
                             {sectors.map((sector, idx) => (
                             <button
                                 key={`mobile-sector-${sector.title}`}
                                 onClick={() => setMobileSectorIndex(idx)}
-                                className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+                                className={`h-14 w-full rounded-md px-2 text-center text-[13px] font-medium leading-tight transition-colors ${
                                     idx === mobileSectorIndex
                                         ? "bg-emerald-600 text-white"
                                         : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
                                 }`}
                             >
-                                {sector.title}
+                                <span className="flex h-full items-center justify-center break-words">
+                                    {sector.title}
+                                </span>
                             </button>
                             ))}
                         </div>
