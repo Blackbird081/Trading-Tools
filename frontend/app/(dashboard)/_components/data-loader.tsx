@@ -42,49 +42,10 @@ export function DataLoader() {
     lastUpdated: null,
   });
   const abortRef = useRef<AbortController | null>(null);
+  const autoLoadTriggeredRef = useRef<Record<string, boolean>>({});
   const replaceTicks = useMarketStore((s) => s.replaceTicks);
   const clearTicks = useMarketStore((s) => s.clearTicks);
   const updateTick = useMarketStore((s) => s.updateTick);
-
-  // ── Auto-load from DB cache when preset changes ───────────
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const res = await fetch(`${API_BASE}/cached-data?preset=${preset}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled) return;
-
-        if (data.ticks && data.ticks.length > 0) {
-          replaceTicks(data.ticks as TickData[]);
-          setState({
-            status: "cached",
-            percent: 100,
-            loaded: data.symbol_count,
-            total: data.symbol_count,
-            currentSymbol: "",
-            message: `Loaded ${data.symbol_count} symbols from cache`,
-            lastUpdated: data.last_updated,
-          });
-          setExpanded(false);
-        } else {
-          clearTicks();
-          setExpanded(true);
-        }
-      } catch {
-        if (cancelled) return;
-        clearTicks();
-        // Backend not ready — show loader expanded
-        setExpanded(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [preset, replaceTicks, clearTicks]);
 
   const handleEvent = useCallback(
     (event: string, data: Record<string, unknown>) => {
@@ -142,26 +103,21 @@ export function DataLoader() {
     [updateTick]
   );
 
-  // ── Stream-load from API ──────────────────────────────────
-  const handleLoad = useCallback(async () => {
-    if (state.status === "loading") {
-      abortRef.current?.abort();
-      setState((s) => ({ ...s, status: "idle", message: "Cancelled" }));
-      return;
-    }
+  const startLoad = useCallback(async () => {
+    if (abortRef.current) return;
 
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setState({
+    setState((prev) => ({
       status: "loading",
       percent: 0,
       loaded: 0,
       total: 0,
       currentSymbol: "",
       message: "Connecting...",
-      lastUpdated: state.lastUpdated,
-    });
+      lastUpdated: prev.lastUpdated,
+    }));
     clearTicks();
 
     try {
@@ -207,8 +163,84 @@ export function DataLoader() {
           message: `Error: ${(e as Error).message}`,
         }));
       }
+    } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
     }
-  }, [preset, years, state.status, state.lastUpdated, handleEvent, clearTicks]);
+  }, [preset, years, handleEvent, clearTicks]);
+
+  // ── Stream-load from API ──────────────────────────────────
+  const handleLoad = useCallback(() => {
+    if (state.status === "loading") {
+      abortRef.current?.abort();
+      setState((s) => ({ ...s, status: "idle", message: "Cancelled" }));
+      return;
+    }
+
+    void startLoad();
+  }, [state.status, startLoad]);
+
+  // ── Auto-load from DB cache when preset changes ───────────
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/cached-data?preset=${preset}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        if (cancelled) return;
+
+        if (Array.isArray(data.ticks) && data.ticks.length > 0) {
+          replaceTicks(data.ticks as TickData[]);
+          setState({
+            status: "cached",
+            percent: 100,
+            loaded: data.symbol_count,
+            total: data.symbol_count,
+            currentSymbol: "",
+            message: `Loaded ${data.symbol_count} symbols from cache`,
+            lastUpdated: data.last_updated,
+          });
+          setExpanded(false);
+          autoLoadTriggeredRef.current[preset] = false;
+          return;
+        }
+
+        clearTicks();
+        setExpanded(true);
+        setState((prev) => ({
+          ...prev,
+          status: "idle",
+          percent: 0,
+          loaded: 0,
+          total: 0,
+          currentSymbol: "",
+          message: "No cache found. Auto loading now...",
+        }));
+
+        if (!autoLoadTriggeredRef.current[preset]) {
+          autoLoadTriggeredRef.current[preset] = true;
+          void startLoad();
+        }
+      } catch {
+        if (cancelled) return;
+        clearTicks();
+        setExpanded(true);
+        setState((prev) => ({
+          ...prev,
+          status: "error",
+          message: "Cannot read cache. Please load data.",
+        }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [preset, replaceTicks, clearTicks, startLoad]);
 
   const isLoading = state.status === "loading";
   const isDone = state.status === "complete" || state.status === "cached";

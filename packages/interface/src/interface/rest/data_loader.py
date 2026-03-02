@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import random
 from collections.abc import AsyncGenerator
 from datetime import UTC, date, datetime, timedelta
@@ -31,10 +32,11 @@ _conn: duckdb.DuckDBPyConnection | None = None
 def _get_conn() -> duckdb.DuckDBPyConnection:
     global _conn
     if _conn is None:
-        db_path = Path("data/trading.duckdb")
+        db_path = Path(os.getenv("DUCKDB_PATH", "data/db/trading.duckdb"))
         db_path.parent.mkdir(parents=True, exist_ok=True)
         _conn = duckdb.connect(str(db_path))
         _conn.execute(_CACHE_DDL)
+        logger.info("Data loader cache DB initialized at %s", db_path)
     return _conn
 
 
