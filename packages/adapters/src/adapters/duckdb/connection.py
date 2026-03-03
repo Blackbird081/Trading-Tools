@@ -16,6 +16,48 @@ from typing import Any, Generator
 
 logger = logging.getLogger("adapters.duckdb.pool")
 
+_BASE_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS ticks (
+    symbol   VARCHAR,
+    price    DOUBLE,
+    volume   BIGINT,
+    exchange VARCHAR,
+    ts       TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    order_id         VARCHAR PRIMARY KEY,
+    symbol           VARCHAR,
+    side             VARCHAR,
+    order_type       VARCHAR,
+    quantity         INTEGER,
+    req_price        DOUBLE,
+    ceiling_price    DOUBLE,
+    floor_price      DOUBLE,
+    status           VARCHAR,
+    filled_quantity  INTEGER DEFAULT 0,
+    avg_fill_price   DOUBLE DEFAULT 0,
+    broker_order_id  VARCHAR,
+    rejection_reason VARCHAR,
+    idempotency_key  VARCHAR,
+    created_at       TIMESTAMP,
+    updated_at       TIMESTAMP
+);
+"""
+
+
+def create_connection(db_path: str | Path = ":memory:") -> object:
+    """Create a DuckDB connection and initialize baseline schema.
+
+    This function is kept for backward compatibility with integration tests
+    and tools that use direct connection style instead of pool APIs.
+    """
+    import duckdb
+
+    conn = duckdb.connect(str(db_path))
+    conn.execute(_BASE_SCHEMA_SQL)
+    return conn
+
 
 class DuckDBConnectionPool:
     """Thread-safe DuckDB connection pool.

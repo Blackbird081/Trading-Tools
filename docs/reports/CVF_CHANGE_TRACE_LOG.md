@@ -161,3 +161,18 @@ Notes:
 - Plan Mapping: Section 0.6 P0 + Section 0.8 Phase Execution Status
 - Owner: Codex + project owner
 - Notes: P0 marked gated-complete; P1 remains in-progress pending Railway production smoke validation.
+
+### CVF-TT-20260303-010
+- Date-Time (UTC+7): 2026-03-03 07:20
+- Type: test
+- Scope: Continue all phases under CVF by implementing and executing end-to-end phase gates (P0/P1 + Phase 1-5) with strict pass-before-next sequencing.
+- Impact: Project now has a repeatable gate runner (`scripts/phase-gates.ps1`) and verified pass snapshot across roadmap phases, including Railway production smoke for P1.
+- Root Cause: Phase progression previously depended on ad-hoc command runs; lacked one deterministic gate command and formal status closure for P1/Phase 1-5.
+- Files Changed: `scripts/phase-gates.ps1`, `packages/adapters/src/adapters/duckdb/connection.py`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence: `powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all` pass; includes P1 production API smoke on Railway backend (`health/live`, `load-data`, `cached-data`, `update-data`, `check-updates`) and local test gates for Phase 1-5. Added compatibility function `create_connection()` and verified with `python -m pytest tests/integration/test_duckdb_repo.py -q` (10/10).
+- Deployment Target: backend/frontend workflow + CVF governance docs
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: Section 0.8 Phase Execution Status + Phase 1/2/3/4/5 gate workflow
+- Owner: Codex + project owner
+- Notes: Phase 3 test run reported 2 runtime warnings in `test_risk_agent.py` (`AsyncMock` coroutine not awaited); non-blocking for current gate but should be cleaned in next test-hardening cycle.

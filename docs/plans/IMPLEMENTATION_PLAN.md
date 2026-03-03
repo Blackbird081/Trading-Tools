@@ -165,13 +165,28 @@ Execution policy: each phase must pass its gate tests before moving to the next 
 
 #### Phase P1 - Persistence & Update Policy
 
-- Status: `IN PROGRESS (awaiting production smoke validation)`
+- Status: `DONE (gated)`
 - Completed technical items:
   - Data loader path fallback hardened (`/app/data/...` + `/tmp/...` fallback).
   - Cache endpoints avoid hard-fail behavior on DB init errors.
   - SSE stream emits explicit terminal `error` event on failures.
-- Remaining gate:
-  - Railway production smoke: `Load` full + `Update` incremental + F5 restore consistency check on deployed app.
+- Gate evidence (production API smoke):
+  - `GET /api/health/live` on Railway backend (pass)
+  - `GET /api/load-data?preset=VN30&years=1` reached `event: complete` (pass)
+  - `GET /api/cached-data?preset=VN30` returned `symbol_count > 0` (pass)
+  - `GET /api/update-data?preset=VN30` reached `event: complete` (pass)
+  - `GET /api/check-updates?preset=VN30` returned `needs_update=false` (pass)
+
+#### Core Phase 1-5 Status Snapshot (Gate-Driven, 2026-03-03)
+
+- Phase 1: `DONE (gated)` - core domain/unit tests passed.
+- Phase 2: `DONE (gated)` - DuckDB + data pipeline integration tests passed.
+- Phase 3: `DONE (gated)` - agent pipeline unit tests passed.
+- Phase 4: `DONE (gated)` - frontend type-check + integration tests passed.
+- Phase 5: `DONE (gated)` - executor/order flow tests passed.
+
+Reference gate runner:
+- `powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all`
 
 ---
 

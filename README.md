@@ -99,6 +99,14 @@ cd frontend && pnpm install && pnpm dev
 docker-compose up --build
 ```
 
+### CVF Phase Gates
+
+Run phase-by-phase quality gates (fail-fast):
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all
+```
+
 ## Cấu hình
 
 Copy `.env.example` thành `.env`:
