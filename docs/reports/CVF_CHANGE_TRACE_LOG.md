@@ -176,3 +176,18 @@ Notes:
 - Plan Mapping: Section 0.8 Phase Execution Status + Phase 1/2/3/4/5 gate workflow
 - Owner: Codex + project owner
 - Notes: Phase 3 test run reported 2 runtime warnings in `test_risk_agent.py` (`AsyncMock` coroutine not awaited); non-blocking for current gate but should be cleaned in next test-hardening cycle.
+
+### CVF-TT-20260303-011
+- Date-Time (UTC+7): 2026-03-03 08:50
+- Type: bugfix
+- Scope: Remove Phase 3 runtime warnings by hardening `RiskAgent` repository-call execution for both sync and async adapters, then re-run full CVF gates.
+- Impact: Eliminated `AsyncMock coroutine was never awaited` warnings in risk-agent tests; improved adapter compatibility without changing gate behavior.
+- Root Cause: `RiskAgent` previously executed repository callables via `asyncio.to_thread` unconditionally, which can return awaitables for async mocks/functions and trigger unawaited coroutine warnings.
+- Files Changed: `packages/agents/src/agents/risk_agent.py`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence: `python -m py_compile packages/agents/src/agents/risk_agent.py` pass; `python -m pytest tests/unit/test_risk_agent.py tests/unit/test_supervisor_routing.py -q` pass (13/13); `powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase phase3` pass; `powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all` pass (P0/P1 + Phase 1-5).
+- Deployment Target: backend agent runtime + CVF governance docs
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: Section 0.8 Core Phase 1-5 status snapshot (hardening update)
+- Owner: Codex + project owner
+- Notes: Phase gates remain deterministic through `scripts/phase-gates.ps1`.

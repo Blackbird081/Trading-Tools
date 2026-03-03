@@ -184,6 +184,7 @@ Execution policy: each phase must pass its gate tests before moving to the next 
 - Phase 3: `DONE (gated)` - agent pipeline unit tests passed.
 - Phase 4: `DONE (gated)` - frontend type-check + integration tests passed.
 - Phase 5: `DONE (gated)` - executor/order flow tests passed.
+- Hardening update (same day): Phase 3 warnings from `test_risk_agent.py` were resolved; re-run `-Phase all` completed with clean pass.
 
 Reference gate runner:
 - `powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all`

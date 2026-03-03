@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
 import logging
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -154,13 +156,8 @@ class RiskAgent:
         try:
             fn = getattr(self._tick_repo, "calculate_var_historical", None)
             if fn is not None and callable(fn):
-                import asyncio
-
-                result = await asyncio.to_thread(
-                    fn,
-                    symbol,
-                    confidence=0.95,
-                    window_days=252,
+                result = await self._invoke_repo_call(
+                    fn, symbol, confidence=0.95, window_days=252
                 )
                 return Decimal(str(result))
         except Exception:
@@ -195,10 +192,18 @@ class RiskAgent:
         try:
             fn = getattr(self._tick_repo, "get_latest_price", None)
             if fn is not None and callable(fn):
-                import asyncio
-
-                result = await asyncio.to_thread(fn, symbol)
+                result = await self._invoke_repo_call(fn, symbol)
                 return Decimal(str(result))
         except Exception:
             logger.warning("Latest price failed for %s", symbol)
         return Decimal("100000")
+
+    async def _invoke_repo_call(self, fn: Any, *args: Any, **kwargs: Any) -> Any:
+        """Call repository function safely for both sync and async implementations."""
+        if inspect.iscoroutinefunction(fn):
+            return await fn(*args, **kwargs)
+
+        result = await asyncio.to_thread(fn, *args, **kwargs)
+        if inspect.isawaitable(result):
+            return await result
+        return result
