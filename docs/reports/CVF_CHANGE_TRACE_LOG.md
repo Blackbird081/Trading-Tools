@@ -191,3 +191,18 @@ Notes:
 - Plan Mapping: Section 0.8 Core Phase 1-5 status snapshot (hardening update)
 - Owner: Codex + project owner
 - Notes: Phase gates remain deterministic through `scripts/phase-gates.ps1`.
+
+### CVF-TT-20260303-012
+- Date-Time (UTC+7): 2026-03-03 09:03
+- Type: test
+- Scope: Enforce stricter CVF gate quality by adding strict warning mode to phase-gate runner and validating full phase chain under strict policy.
+- Impact: Phase execution can now fail on runtime warnings (`-StrictWarnings`) instead of only test failures, improving release confidence.
+- Root Cause: Gate process previously accepted warnings by default, which can hide test/runtime quality issues.
+- Files Changed: `scripts/phase-gates.ps1`, `README.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence: `powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all -StrictWarnings` pass; all P0/P1 + Phase 1-5 checks passed in strict mode.
+- Deployment Target: test governance + developer workflow
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: Section 0.8 gate-driven execution + release-grade strict mode
+- Owner: Codex + project owner
+- Notes: Strict mode currently escalates `RuntimeWarning` to errors for Python phase tests.

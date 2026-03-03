@@ -107,6 +107,12 @@ Run phase-by-phase quality gates (fail-fast):
 powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all
 ```
 
+Run with strict warning policy (recommended for release gates):
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all -StrictWarnings
+```
+
 ## Cấu hình
 
 Copy `.env.example` thành `.env`:

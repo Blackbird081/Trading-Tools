@@ -188,6 +188,8 @@ Execution policy: each phase must pass its gate tests before moving to the next 
 
 Reference gate runner:
 - `powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all`
+- Release-grade strict mode:
+  - `powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all -StrictWarnings`
 
 ---
 

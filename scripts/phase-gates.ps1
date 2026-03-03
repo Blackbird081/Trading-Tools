@@ -1,7 +1,8 @@
 param(
     [ValidateSet("p0", "p1", "phase1", "phase2", "phase3", "phase4", "phase5", "all")]
     [string]$Phase = "all",
-    [string]$ApiBase = "https://trading-tools-production.up.railway.app/api"
+    [string]$ApiBase = "https://trading-tools-production.up.railway.app/api",
+    [switch]$StrictWarnings
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,6 +20,14 @@ function Run-Step([string]$label, [scriptblock]$action) {
         exit 1
     }
     Write-Host "[PASS] $label" -ForegroundColor Green
+}
+
+function Run-Pytest([string[]]$testArgs) {
+    $args = @("-m", "pytest") + $testArgs
+    if ($StrictWarnings) {
+        $args += @("-W", "error::RuntimeWarning")
+    }
+    & python @args
 }
 
 function Assert-SseComplete([string]$mode, [string]$url, [int]$maxTimeSec = 180) {
@@ -69,7 +78,7 @@ function Run-Phase1 {
     Write-Stage "Phase 1 Gate - Foundation and Core Domain"
     $env:PYTHONPATH = "packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src"
     Run-Step "Core unit tests" {
-        python -m pytest tests/unit/test_entities.py tests/unit/test_price_band.py tests/unit/test_settlement.py -q
+        Run-Pytest @("tests/unit/test_entities.py", "tests/unit/test_price_band.py", "tests/unit/test_settlement.py", "-q")
     }
 }
 
@@ -77,10 +86,10 @@ function Run-Phase2 {
     Write-Stage "Phase 2 Gate - Market Connectivity and Data Pipeline"
     $env:PYTHONPATH = "packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src"
     Run-Step "DuckDB integration tests" {
-        python -m pytest tests/integration/test_duckdb_repo.py -q
+        Run-Pytest @("tests/integration/test_duckdb_repo.py", "-q")
     }
     Run-Step "Data pipeline integration tests" {
-        python -m pytest tests/integration/test_data_pipeline.py -q
+        Run-Pytest @("tests/integration/test_data_pipeline.py", "-q")
     }
 }
 
@@ -88,7 +97,13 @@ function Run-Phase3 {
     Write-Stage "Phase 3 Gate - Intelligence Engine"
     $env:PYTHONPATH = "packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src"
     Run-Step "Agent pipeline unit tests" {
-        python -m pytest tests/unit/test_screener_agent.py tests/unit/test_technical_agent.py tests/unit/test_risk_agent.py tests/unit/test_supervisor_routing.py -q
+        Run-Pytest @(
+            "tests/unit/test_screener_agent.py",
+            "tests/unit/test_technical_agent.py",
+            "tests/unit/test_risk_agent.py",
+            "tests/unit/test_supervisor_routing.py",
+            "-q"
+        )
     }
 }
 
@@ -104,11 +119,17 @@ function Run-Phase5 {
     Write-Stage "Phase 5 Gate - Execution and Order Flow"
     $env:PYTHONPATH = "packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src"
     Run-Step "Order execution tests" {
-        python -m pytest tests/unit/test_executor_agent.py tests/unit/test_place_order.py tests/integration/test_order_sync.py -q
+        Run-Pytest @(
+            "tests/unit/test_executor_agent.py",
+            "tests/unit/test_place_order.py",
+            "tests/integration/test_order_sync.py",
+            "-q"
+        )
     }
 }
 
-Write-Host "CVF Phase Gates starting - target: $Phase" -ForegroundColor Magenta
+$strictMsg = if ($StrictWarnings) { "on" } else { "off" }
+Write-Host "CVF Phase Gates starting - target: $Phase - strict-warnings: $strictMsg" -ForegroundColor Magenta
 
 switch ($Phase) {
     "p0" { Run-P0 }
