@@ -46,11 +46,17 @@ if ($WithFrontend) {
     Run-Step "Frontend regression coverage snapshot" {
         pnpm -C frontend exec vitest run `
             __tests__/integration/data-loader.test.tsx `
+            __tests__/integration/order-form.test.tsx `
+            __tests__/integration/pipeline-runner.test.tsx `
+            __tests__/integration/market-board-mobile.test.tsx `
             __tests__/stores/market-store.test.ts `
             __tests__/stores/signal-store.test.ts `
             __tests__/lib/market-sectors.test.ts `
             --coverage `
             --coverage.include="app/(dashboard)/_components/data-loader.tsx" `
+            --coverage.include="app/orders/_components/order-form.tsx" `
+            --coverage.include="app/screener/_components/pipeline-runner.tsx" `
+            --coverage.include="app/market-board/page.tsx" `
             --coverage.include="stores/market-store.ts" `
             --coverage.include="stores/signal-store.ts" `
             --coverage.include="lib/market-sectors.ts" `

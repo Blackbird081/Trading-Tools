@@ -563,3 +563,21 @@ Notes:
 - Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`Hardening-A4`) + `IMPLEMENTATION_PLAN.md` (`AR-4` continuation)
 - Owner: Codex + project owner
 - Notes: Hardening-A4 is now `PARTIAL (in progress)`; remaining work is expanding beyond dashboard critical-flow scope to orders/screener/market-board for sustained release-grade confidence.
+
+### CVF-TT-20260304-033
+- Date-Time (UTC+7): 2026-03-04 18:55
+- Type: test
+- Scope: Continue `Hardening-A4` by shipping integration tests for `OrderForm`, `PipelineRunner`, and mobile `MarketBoard` controls; widen frontend regression coverage gate scope in `pre-live-api-gate.ps1`; re-run release validation.
+- Impact: Risk-critical frontend test scope now includes order submit confirmation flow, screener SSE completion/error flow, and market-board sector tab sizing/paging controls. Expanded frontend critical snapshot is now `82.45%` lines/statements (release floor `>=80%` passes; target `>=90%` remains open).
+- Root Cause: Hardening-A4 previously validated only dashboard loader flow, leaving orders/screener/market-board under-covered relative to roadmap acceptance intent.
+- Files Changed: `frontend/__tests__/integration/order-form.test.tsx`, `frontend/__tests__/integration/pipeline-runner.test.tsx`, `frontend/__tests__/integration/market-board-mobile.test.tsx`, `scripts/pre-live-api-gate.ps1`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/AI_RELIABILITY_WEEKLY_LATEST.md`, `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `pnpm -C frontend exec vitest run __tests__/integration/order-form.test.tsx __tests__/integration/pipeline-runner.test.tsx __tests__/integration/market-board-mobile.test.tsx` (pass, 6 tests)
+  - `powershell -ExecutionPolicy Bypass -File scripts/pre-live-api-gate.ps1 -StrictWarnings -WithFrontend` (pass; frontend expanded critical snapshot lines/statements `82.45%`)
+  - `powershell -ExecutionPolicy Bypass -File scripts/release-validation.ps1` (pass; overall `PASS`)
+- Deployment Target: frontend integration test pack + release gate script + roadmap governance artifacts
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`Hardening-A4`) + `IMPLEMENTATION_PLAN.md` (`AR-4` continuation)
+- Owner: Codex + project owner
+- Notes: Next step is raising expanded critical-flow snapshot from `82.45%` toward `>=90%` with additional high-risk scenarios (pagination/filter branches, error/retry edges, order-history actions).

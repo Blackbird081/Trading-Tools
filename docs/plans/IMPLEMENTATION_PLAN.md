@@ -300,7 +300,7 @@ Execution update (2026-03-04):
 - `AI-R2 Provider A/B + Consensus` DONE (baseline): evaluator now reports `agreement_rate`, per-provider hit-rate, and `consensus_hit_rate` via `tests/evals/provider_ab_consensus.py`.
 - `AI-R3 Weekly Drift Monitor` DONE (baseline): weekly recommendation-vs-outcome report and drift alerts are generated via `tests/evals/weekly_drift_monitor.py`.
 - `AI-R4` DONE (baseline): weekly reliability automation is wired via `scripts/run-weekly-reliability-pack.ps1` and scheduled CI workflow `.github/workflows/reliability-weekly.yml`.
-- `AR-4` is now IN PROGRESS: dashboard DataLoader critical-flow tests were expanded and release-validation frontend critical snapshot is now `96.6%` lines/statements; remaining scope is broader orders/screener/market-board/global coverage uplift.
+- `AR-4` is now IN PROGRESS: expanded integration suites now cover dashboard/order/screener/market-board critical flows, and frontend gate scope in `pre-live-api-gate.ps1` was widened accordingly; latest release-validation critical snapshot is `82.45%` lines/statements on the expanded scope.
 
 ### 0.12 Re-Assessment Snapshot (2026-03-04)
 
@@ -315,7 +315,7 @@ Current baseline metric snapshot (fixed dataset pack):
 - Quant benchmark: `Precision@K=0.60`, `Hit-rate=0.50`, `MDD=0.1554`.
 - Provider A/B: `agreement_rate=0.40`, `consensus_hit_rate=0.40`.
 - Drift monitor: weekly drift alerts are generated correctly; scheduler now publishes weekly artifacts.
-- Frontend critical-flow snapshot (release-validation scope): lines/statements `96.6%`, branches `70.58%`, functions `85.71%`.
+- Frontend critical-flow snapshot (expanded release-validation scope): lines/statements `82.45%`, branches `69.75%`, functions `53.19%`.
 
 Risk interpretation:
 - Security, provider policy, and monetary precision gates are in place.
@@ -413,7 +413,7 @@ Execution update (2026-03-04):
 - `E4` is now `DONE (baseline)`:
   - `OBS-01`: correlation-id propagation across REST/SSE and observability events query API.
   - `OPS-01`: consolidated local operator runbook linked into release checklist gate.
-- Next active phase: continue `Hardening-A4` / `AR-4` from current dashboard critical-flow uplift (`96.6%` lines/statements) to full risk-critical UI coverage and sustained release-grade targets.
+- Next active phase: continue `Hardening-A4` / `AR-4` from expanded-scope snapshot (`82.45%` lines/statements) to sustained release target (`>=90%` critical-flow while maintaining `>=80%` release floor).
 
 ---
 
