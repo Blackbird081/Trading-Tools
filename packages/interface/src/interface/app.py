@@ -11,6 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from interface.rest.company import router as company_router
 from interface.rest.data_loader import router as data_loader_router
 from interface.rest.health import router as health_router
+from interface.rest.portfolio import router as portfolio_router
+from interface.rest.setup import router as setup_router
 from interface.ws.market_ws import router as market_ws_router
 
 logger = logging.getLogger("interface.app")
@@ -94,6 +96,8 @@ def create_app() -> FastAPI:
     app.include_router(health_router, prefix="/api")
     app.include_router(data_loader_router, prefix="/api")
     app.include_router(company_router, prefix="/api")
+    app.include_router(portfolio_router, prefix="/api")
+    app.include_router(setup_router, prefix="/api")
     app.include_router(market_ws_router)
     return app
 

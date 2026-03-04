@@ -87,6 +87,12 @@ uv run uvicorn interface.app:app --reload --port 8000
 uv run pytest tests/ -v --cov=packages
 ```
 
+Optional technical-indicator profile (`pandas` + `pandas_ta`):
+
+```bash
+pip install "pandas>=2.2" "pandas_ta>=0.3.14b0"
+```
+
 ### Frontend
 
 ```bash
@@ -97,6 +103,14 @@ cd frontend && pnpm install && pnpm dev
 
 ```bash
 docker-compose up --build
+```
+
+### Local Profiles (Wizard Roadmap)
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/local-run.ps1 -Profile dev -Target both
+powershell -ExecutionPolicy Bypass -File scripts/local-run.ps1 -Profile local-prod -Target both
+powershell -ExecutionPolicy Bypass -File scripts/local-run.ps1 -Profile docker
 ```
 
 ### CVF Phase Gates
@@ -143,6 +157,9 @@ Copy `.env.example` thành `.env`:
 | `GET /api/portfolio` | Portfolio state |
 | `GET /api/portfolio/positions` | Positions với T+2.5 settlement |
 | `GET /api/portfolio/pnl?days=30` | P&L history |
+| `GET /api/setup/status` | Runtime setup status + connection checks |
+| `POST /api/setup/validate` | Validate setup draft (no persistence) |
+| `POST /api/setup/init-local` | Initialize local DuckDB path for first run |
 | `ws://host/ws/market` | Real-time market data (WebSocket) |
 
 ## Kiến trúc

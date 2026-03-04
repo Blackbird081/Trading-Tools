@@ -3,9 +3,32 @@
 ## CVF Traceability
 - CVF-Doc-ID: CVF-TT-LOCAL-20260302-R1
 - Owner: Product + Engineering
-- Last-Updated: 2026-03-02
-- Status: Draft Approved for Execution
+- Last-Updated: 2026-03-03
+- Status: In execution
 - Scope: Turn Trading-Tools from demo/mixed-mock to local personal trading product.
+
+## Execution Mapping Snapshot (Updated, 2026-03-03)
+
+Status scale:
+- `DONE`: exit criteria completed and evidenced.
+- `PARTIAL`: some technical assets exist, but exit criteria are not met.
+- `NOT STARTED`: no meaningful implementation yet.
+
+| Roadmap Item | Status | Evidence (current repository) | Gap to close |
+|---|---|---|---|
+| Phase 0 - Baseline Freeze and Contract Lock | `DONE (artifacts)` | Local baseline tag `baseline-local-roadmap-r1` created; contract doc added (`docs/plans/LOCAL_API_CONTRACTS.md`); smoke checklist added (`docs/plans/LOCAL_SMOKE_CHECKLIST.md`); baseline UI snapshot log added (`docs/plans/LOCAL_UI_BASELINE_SNAPSHOTS.md`). | Push tag to remote and enforce smoke checklist in release workflow. |
+| Phase 1 - Local Runtime and Setup Wizard | `PARTIAL` | Added `scripts/local-run.ps1` profiles (`dev`, `local-prod`, `docker`), setup APIs (`/api/setup/status`, `/api/setup/validate`, `/api/setup/init-local`), and frontend setup wizard (`frontend/app/settings/_components/setup-wizard.tsx`). | Complete real external connection probe, and validate onboarding time <= 15 minutes on clean machine. |
+| Phase 2 - Secure Key and Profile Management | `NOT STARTED` | No profile vault, no encryption-at-rest flow, no profile switch/import/export policy in runtime. | Implement profile model, encryption, rotation/revoke workflow. |
+| Phase 3 - OMS and Broker Execution (Dry-Run First) | `PARTIAL` | Core order use case exists (`packages/core/src/core/use_cases/place_order.py`), but no REST order endpoints and frontend orders still local UI state (`frontend/stores/order-store.ts`). | Wire backend order APIs + frontend integration + persistent order history. |
+| Phase 4 - Real Portfolio Sync | `NOT STARTED` | Portfolio REST is still stub (`packages/interface/src/interface/rest/portfolio.py`), UI portfolio is placeholder (`frontend/app/portfolio/page.tsx`). | Implement portfolio/positions/pnl APIs + sync/reconciliation + UI binding. |
+| Phase 5 - Real Agent/AI Pipeline Integration | `PARTIAL` | Agent modules exist, but `/run-screener` still streams simulated pipeline and mock results (`packages/interface/src/interface/rest/data_loader.py`). | Wire real runner/supervisor execution and persist run metadata. |
+| Phase 6 - Guardrails and Trading Safety | `PARTIAL` | Guardrail module exists (`packages/agents/src/agents/guardrails.py`) and dry-run concept exists, but live-mode controls are not enforced end-to-end in UI/API. | Add live guardrails, kill-switch/cooldown checks, emergency fallback. |
+| Phase 7 - Quality, Packaging, and Release | `PARTIAL` | Phase gates and tests exist (`scripts/phase-gates.ps1`), but local distribution packaging + upgrade/rollback validation for personal users is incomplete. | Add release checklist for local product distribution and clean-machine validation. |
+| Fix-01 DLQ failed orders | `NOT STARTED` | No `failed_orders_dlq` schema/worker/admin API. | Implement DLQ persistence + retry worker + notifier. |
+| Fix-02 Optional `pandas_ta` | `DONE` | Added optional extra `technical` with `pandas` + `pandas_ta` in `packages/agents/pyproject.toml`; fallback test added in `tests/unit/test_technical_agent.py` to verify graceful behavior when `pandas_ta` is unavailable. | Monitor package pin compatibility in CI matrix. |
+| Fix-03 OpenTelemetry for DuckDB calls | `NOT STARTED` | No span wrapper around DuckDB query paths. | Add tracing instrumentation and exporter wiring. |
+| Fix-04 Async factory for DuckDBIdempotencyStore | `NOT STARTED` | `DuckDBIdempotencyStore` only sync constructor (`packages/adapters/src/adapters/duckdb/idempotency_store.py`). | Add async factory + non-breaking migration path. |
+| Fix-05 Refine `bank_account` guardrail pattern | `DONE` | Replaced broad numeric regex with VN-context strategy (`packages/agents/src/agents/guardrails.py`) and added unit tests (`tests/unit/test_guardrails.py`). | Monitor false-positive/false-negative drift with real production text samples. |
 
 ## Product Direction
 - User downloads and runs app locally on personal machine.
@@ -13,6 +36,11 @@
 - Portfolio is personal and persistent per user.
 - Screener pipeline runs real agents/AI (not mock SSE).
 - Default trading mode is `dry-run`; `live` requires explicit confirmation and safeguards.
+
+## Master Plan Alignment
+- `IMPLEMENTATION_PLAN.md` core phases (`P0/P1`, `Phase 1-5`) are tracked as gate-complete baseline.
+- This local roadmap tracks productization scope on top of that baseline.
+- Completion of master gated phases does not close local personal trading phases automatically.
 
 ## Current Gaps (As-Is)
 - Portfolio API/UI is still stub/placeholder in multiple paths.

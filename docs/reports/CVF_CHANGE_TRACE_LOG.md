@@ -206,3 +206,48 @@ Notes:
 - Plan Mapping: Section 0.8 gate-driven execution + release-grade strict mode
 - Owner: Codex + project owner
 - Notes: Strict mode currently escalates `RuntimeWarning` to errors for Python phase tests.
+
+### CVF-TT-20260303-013
+- Date-Time (UTC+7): 2026-03-03 15:10
+- Type: feature
+- Scope: Map and kick off `LOCAL_PERSONAL_TRADING_ROADMAP` by delivering Phase 0 baseline artifacts and Phase 1 setup foundation (API + UI + local profiles).
+- Impact: Roadmap now has explicit execution status mapping; local setup flow is no longer static and can validate runtime/config with dedicated setup endpoints.
+- Root Cause: Local roadmap was approved but lacked concrete execution mapping and first-phase implementation artifacts in repository.
+- Files Changed: `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/LOCAL_API_CONTRACTS.md`, `docs/plans/LOCAL_SMOKE_CHECKLIST.md`, `packages/interface/src/interface/rest/setup.py`, `packages/interface/src/interface/app.py`, `frontend/app/settings/page.tsx`, `frontend/app/settings/_components/setup-wizard.tsx`, `scripts/local-run.ps1`, `tests/integration/test_setup_api.py`, `README.md`
+- Validation Evidence: `python -m py_compile packages/interface/src/interface/rest/setup.py packages/interface/src/interface/app.py` pass; `pnpm -C frontend exec tsc --noEmit` pass; setup API smoke via `.venv` TestClient script (`/api/setup/status`, `/api/setup/validate`, `/api/setup/init-local`) pass (`setup_api_smoke=PASS`).
+- Deployment Target: local development/runtime + repository docs
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` — Phase 0 (`Baseline Freeze and Contract Lock`) + Phase 1 (`Local Runtime and Setup Wizard`)
+- Owner: Codex + project owner
+- Notes: Full pytest execution is blocked in current shell environment because `pytest` is not installed in project `.venv`; smoke checks were executed via direct `.venv` TestClient script.
+
+### CVF-TT-20260303-014
+- Date-Time (UTC+7): 2026-03-03 16:05
+- Type: feature
+- Scope: Close planning gaps across `docs/plans` and continue roadmap execution by implementing Fix-05 (`bank_account` guardrail refinement) with tests.
+- Impact: Plan artifacts are now aligned (workspace path, master-vs-local scope note, mobile roadmap execution status, local baseline snapshot link, smoke checklist completeness). Guardrails reduce false positives on benign market numeric text while preserving account-number redaction in VN banking context.
+- Root Cause: Plan documents had path/status inconsistencies and missing trace links after rapid hotfix iterations; guardrail rule remained overly broad (`10-19 digits`) and caused false-positive risk.
+- Files Changed: `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/plans/MARKET_BOARD_MOBILE_FIX_ROADMAP.md`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/LOCAL_SMOKE_CHECKLIST.md`, `docs/plans/CVF_WORKSPACE_MIGRATION_CHECKLIST.md`, `docs/plans/LOCAL_UI_BASELINE_SNAPSHOTS.md`, `packages/agents/src/agents/guardrails.py`, `tests/unit/test_guardrails.py`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence: `python -m py_compile packages/agents/src/agents/guardrails.py` pass; `python -m pytest tests/unit/test_guardrails.py -q` pass in global Python env with `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src`.
+- Deployment Target: repository docs + backend agent guardrail logic
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` (Fix-05 + governance alignment), `MARKET_BOARD_MOBILE_FIX_ROADMAP.md` status synchronization, `IMPLEMENTATION_PLAN.md` Section 0 alignment note
+- Owner: Codex + project owner
+- Notes: `MARKET_BOARD_MOBILE_FIX_ROADMAP` marked P1-P6 implemented based on existing code evidence; P7 remains pending QA/release validation.
+
+### CVF-TT-20260304-015
+- Date-Time (UTC+7): 2026-03-04 09:35
+- Type: feature
+- Scope: Continue roadmap execution with Fix-02 (`pandas_ta` optional dependency) and fallback verification.
+- Impact: Technical indicator stack is now explicitly optional; runtime remains stable when `pandas_ta` is absent, reducing dependency friction on local installs.
+- Root Cause: Roadmap Fix-02 was still open; optional TA dependency and explicit fallback verification were missing from package config and tests.
+- Files Changed: `packages/agents/pyproject.toml`, `tests/unit/test_technical_agent.py`, `README.md`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence: `python -m py_compile packages/agents/src/agents/technical_agent.py` pass; `python -m pytest tests/unit/test_technical_agent.py -q` pass in global Python env with `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src`.
+- Deployment Target: backend agents package + docs
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` -> Fix-02
+- Owner: Codex + project owner
+- Notes: Optional profile documented as install-on-demand; base runtime continues to support no-`pandas_ta` mode.

@@ -13,6 +13,13 @@ Suggested layout:
 - `D:\Work\.Controlled-Vibe-Framework-CVF`
 - `D:\Work\Trading-Tools`
 
+## Active Workspace (Current Standard)
+- Workspace root in use:
+  - `D:\UNG DUNG AI\TOOL AI 2026\CVF-Workspace`
+- Expected sibling layout:
+  - `D:\UNG DUNG AI\TOOL AI 2026\CVF-Workspace\.Controlled-Vibe-Framework-CVF`
+  - `D:\UNG DUNG AI\TOOL AI 2026\CVF-Workspace\Trading-Tools`
+
 ## Workspace Isolation Rule (Locked)
 - Khi clone CVF, bắt buộc dùng thư mục có tiền tố dấu chấm:
   - `D:\Work\.Controlled-Vibe-Framework-CVF`
@@ -56,6 +63,14 @@ Suggested layout:
    - documentation links,
    - shared checklists,
    - optional scripts referencing sibling path.
+
+Workspace-specific equivalent:
+1. Create parent folder:
+   - `D:\UNG DUNG AI\TOOL AI 2026\CVF-Workspace`
+2. Clone CVF:
+   - `git clone https://github.com/Blackbird081/Controlled-Vibe-Framework-CVF.git "D:\UNG DUNG AI\TOOL AI 2026\CVF-Workspace\.Controlled-Vibe-Framework-CVF"`
+3. Clone Trading-Tools:
+   - `git clone https://github.com/Blackbird081/Trading-Tools.git "D:\UNG DUNG AI\TOOL AI 2026\CVF-Workspace\Trading-Tools"`
 
 ## If you must move existing folder
 1. Move only repository directory, do not merge repos.

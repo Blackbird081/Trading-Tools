@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
@@ -22,6 +23,22 @@ class TestComputeIndicators:
 
     def test_two_rows_returns_score(self) -> None:
         data = [{"close": 100}, {"close": 105}]
+        result = compute_indicators(data)
+        assert "composite_score" in result
+        assert "recommended_action" in result
+
+    def test_fallback_when_pandas_ta_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        real_import = builtins.__import__
+
+        def fake_import(name: str, globals_: object = None, locals_: object = None, fromlist: object = (), level: int = 0) -> object:
+            if name == "pandas_ta":
+                msg = "pandas_ta intentionally unavailable for fallback test"
+                raise ImportError(msg)
+            return real_import(name, globals_, locals_, fromlist, level)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+
+        data = [{"close": 100}, {"close": 105}, {"close": 110}]
         result = compute_indicators(data)
         assert "composite_score" in result
         assert "recommended_action" in result

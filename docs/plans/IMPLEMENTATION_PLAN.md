@@ -110,7 +110,7 @@ These two items are locked as immediate priority and must be completed before ad
 #### P1 — Data Persistence & Update Policy (1 day)
 
 - Railway must use persistent volume mounted to `/app/data`.
-- Standardize environment path: `DUCKDB_PATH=/app/data/db/trading.duckdb`.
+- Standardize environment path: `DUCKDB_PATH=/app/data/trading.duckdb`.
 - Split actions:
   - `Load`: full data load by `preset + years`.
   - `Update`: incremental cache refresh (no full redownload).
@@ -190,6 +190,12 @@ Reference gate runner:
 - `powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all`
 - Release-grade strict mode:
   - `powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all -StrictWarnings`
+
+### 0.9 Plan Alignment Note (Master vs Local Product Roadmap)
+
+- `IMPLEMENTATION_PLAN.md` status in Section `0.8` tracks gate completion of core technical phases (`P0/P1`, `Phase 1-5`) for the current architecture baseline.
+- `LOCAL_PERSONAL_TRADING_ROADMAP.md` tracks productization work to convert this baseline into a local personal trading product.
+- Therefore, `DONE (gated)` in this master plan does **not** mean all local roadmap phases are complete.
 
 ---
 

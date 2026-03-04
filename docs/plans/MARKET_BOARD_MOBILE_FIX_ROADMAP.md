@@ -3,8 +3,8 @@
 ## CVF Traceability
 - CVF-Doc-ID: CVF-MB-MOBILE-20260301-R2
 - Owner: Frontend
-- Last-Updated: 2026-03-01
-- Status: Draft for approval
+- Last-Updated: 2026-03-03
+- Status: In execution (P1-P6 implemented, P7 pending release validation)
 - Related files:
   - frontend/app/market-board/page.tsx
   - frontend/components/sector-column.tsx
@@ -20,6 +20,18 @@
 5. Market-board should hide duplicated data controls (Market Data, VN30/Top100, years, Load).
 6. Remove duplicate LIVE indicator in top area to reduce visual noise.
 7. Add color intensity scale for gain/loss with neutral amber for 0%.
+
+## Execution Mapping Snapshot (2026-03-03)
+
+| Phase | Status | Evidence | Remaining |
+|---|---|---|---|
+| P1 - Mobile Board Interaction Baseline | `DONE` | One-sector mobile flow + swipe handling + vertical list scrolling in `frontend/app/market-board/page.tsx` and `frontend/components/sector-column.tsx`. | Keep regression tests in P7. |
+| P2 - Remove Duplicate Controls on Market Board | `DONE` | Market Board page renders sector view without duplicated `DataLoader` controls. | None. |
+| P3 - Dynamic Category Generation | `DONE` | `buildMarketSectors()` used by Market Board to render category rail from loaded universe. | Continue symbol classification refinement if universe expands. |
+| P4 - Dashboard Mobile Control Compaction | `DONE` | Mobile `DataLoader` places preset buttons + load/update actions in same row (`frontend/app/(dashboard)/_components/data-loader.tsx`). | None. |
+| P5 - Remove Duplicate LIVE in Top Area | `DONE` | `MarketIndexBar` right status hidden on mobile (`md:flex`), mobile LIVE shown in `TopNav` only. | None. |
+| P6 - Color Scale and Sort Readability | `DONE` | Multi-band red/amber/green intensity + neutral amber applied in `frontend/components/sector-column.tsx`. | Tune visual thresholds only if product requests. |
+| P7 - QA, Coverage, and Release | `PARTIAL` | Core checks were run during implementation cycles; roadmap-specific release checklist entry still pending. | Complete viewport regression matrix + publish release note with coverage. |
 
 ## Problem Summary
 - Current market-board categories are hard-coded to 6 blocks; not auto-generated from loaded Top100 data.

@@ -9,6 +9,12 @@ dependencies = [
     "langgraph>=0.2",
 ]
 
+[project.optional-dependencies]
+technical = [
+    "pandas>=2.2",
+    "pandas_ta>=0.3.14b0",
+]
+
 [tool.uv.sources]
 core = { workspace = true }
 adapters = { workspace = true }
