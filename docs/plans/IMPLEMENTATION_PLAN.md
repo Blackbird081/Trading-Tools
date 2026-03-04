@@ -293,6 +293,7 @@ Execution update (2026-03-04):
 - `AR-2` DONE (gated): `DATA_PROVIDER_MODE` contract implemented (`mock`/`live`), with production guard that blocks `mock`.
 - `AR-3` DONE (gated): OMS risk-sensitive monetary checks migrated to `Decimal` with boundary precision regression coverage.
 - `AR-5` DONE (gated): `phase-gates.ps1` now defaults to local API base and requires explicit `-AllowProductionTarget` for production endpoints.
+- `AI-Orchestrator` DONE (gated): Fundamental analysis now uses a single-provider multi-role subagent pattern (contextual role routing + deterministic arbitration) to avoid cross-provider conflicts while preserving traceable role outputs.
 - `AR-4` remains OPEN and is the next hardening priority (frontend global coverage uplift >= 80%).
 
 ---

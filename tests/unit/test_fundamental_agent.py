@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -127,3 +128,99 @@ class TestFundamentalAgent:
         }
         result = await agent.run(state)
         assert "[Analysis unavailable]" in str(result["ai_insights"].get("FPT", ""))
+
+    @pytest.mark.asyncio
+    async def test_subroles_are_recorded_in_output(
+        self,
+        mock_engine: AsyncMock,
+        mock_news: MagicMock,
+        prompt_builder: FinancialPromptBuilder,
+    ) -> None:
+        financial_data_port = MagicMock()
+        financial_data_port.get_financial_data = MagicMock(
+            return_value={
+                "financial_ratios": {"roe": 0.2, "debt_to_equity": 0.5, "net_margin": 0.15},
+                "balance_sheet": {"total_assets": 1_000_000, "total_equity": 500_000},
+                "income_statement": {"net_income": 100_000, "revenue": 600_000},
+                "cash_flow": {"operating_cash_flow": 120_000},
+            }
+        )
+
+        agent = FundamentalAgent(
+            engine=mock_engine,
+            prompt_builder=prompt_builder,
+            news_port=mock_news,
+            financial_data_port=financial_data_port,
+        )
+        now = datetime.now(UTC)
+        state: AgentState = {
+            "watchlist": [
+                ScreenerResult(
+                    symbol=Symbol("FPT"),
+                    eps_growth=0.15,
+                    pe_ratio=12.0,
+                    volume_spike=True,
+                    passed_at=now,
+                ),
+            ],
+            "technical_scores": [],
+        }
+        result = await agent.run(state)
+        role_payload = result["ai_role_outputs"]["FPT"]
+        assert "thesis" in role_payload["active_roles"]
+        assert "risk_challenge" in role_payload["active_roles"]
+        assert "valuation" in role_payload["active_roles"]
+
+    @pytest.mark.asyncio
+    async def test_risk_veto_overrides_action_to_hold(
+        self,
+        mock_engine: AsyncMock,
+        mock_news: MagicMock,
+        prompt_builder: FinancialPromptBuilder,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "agents.fundamental_agent.calculate_early_warning",
+            lambda **_: SimpleNamespace(
+                risk_score=92.0,
+                risk_level="critical",
+                alerts=["critical leverage"],
+                positive_signals=[],
+                recommendation="avoid",
+                summary="critical risk",
+            ),
+        )
+
+        financial_data_port = MagicMock()
+        financial_data_port.get_financial_data = MagicMock(
+            return_value={
+                "financial_ratios": {"roe": 0.05, "debt_to_equity": 4.2, "net_margin": 0.01},
+                "balance_sheet": {"total_assets": 1_000_000, "total_equity": 100_000},
+                "income_statement": {"net_income": 10_000, "revenue": 600_000},
+                "cash_flow": {"operating_cash_flow": -10_000},
+            }
+        )
+
+        agent = FundamentalAgent(
+            engine=mock_engine,
+            prompt_builder=prompt_builder,
+            news_port=mock_news,
+            financial_data_port=financial_data_port,
+        )
+        now = datetime.now(UTC)
+        state: AgentState = {
+            "watchlist": [
+                ScreenerResult(
+                    symbol=Symbol("FPT"),
+                    eps_growth=0.15,
+                    pe_ratio=12.0,
+                    volume_spike=True,
+                    passed_at=now,
+                ),
+            ],
+            "technical_scores": [],
+        }
+        result = await agent.run(state)
+        arbitration = result["ai_role_outputs"]["FPT"]["arbitration"]
+        assert arbitration["final_action"] == "HOLD"
+        assert arbitration["risk_veto"] is True

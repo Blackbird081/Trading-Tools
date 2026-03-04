@@ -34,6 +34,7 @@ Status scale:
 | Hardening-A3 Monetary Precision (`Decimal`) | `DONE (gated)` | Migrated OMS request/risk checks to `Decimal` in `interface.rest.orders` (price/notional/daily-loss/buying-power path); added boundary precision regression test in `tests/integration/test_order_safety_controls.py`. | Continue Decimal migration in downstream analytics/store paths for full end-to-end precision parity. |
 | Hardening-A4 Frontend Coverage Expansion | `NOT STARTED (locked)` | Current frontend global statement coverage is low for release confidence. | Raise frontend global coverage to >= 80% with risk-based test expansion (orders, dashboard, screener, market board). |
 | Hardening-A5 Safe Gate Targeting | `DONE (gated)` | `scripts/phase-gates.ps1` default API base changed to local (`http://localhost:8000/api`) and production targets now require explicit `-AllowProductionTarget` override with fail-fast guard. | Add CI usage examples for guarded production smoke execution. |
+| AI-06 Single-Provider Multi-Role Subagent Orchestration | `DONE (gated)` | `FundamentalAgent` now runs contextual subroles (`thesis`, `valuation`, `news_catalyst`, `risk_challenge`) via a single AI engine/API key and applies deterministic arbitration (`risk_veto_then_consensus`); pipeline emits role metadata (`ai_role_outputs`, `ai_subroles`, `ai_final_action`). | Add strict JSON schema per role and provider-level benchmark calibration (OpenAI/Claude/Gemini parity). |
 
 ## Product Direction
 - User downloads and runs app locally on personal machine.
@@ -50,17 +51,16 @@ Status scale:
 ## Current Gaps (As-Is)
 - Real broker execution path still uses guarded placeholder; live adapter integration remains.
 - External data quality in live mode depends on broker/data provider availability and credentials.
-- Runtime bootstrap does not enforce rate-limit/auth middleware activation policy.
-- Data-loader runtime path still includes mock-generation logic that must be disabled in production mode.
-- Order monetary inputs still rely on floating-point type in API schema.
 - Frontend global coverage remains below release-grade target.
-- Phase-gate script default API target is production and needs safety hardening.
+- Native provider adapters for Anthropic/Gemini are not yet implemented (current remote LLM path is OpenAI-compatible).
+- Role outputs are currently narrative text; schema-locked role JSON contract is not yet enforced.
 
 ## Target State (To-Be)
 - One-command local bootstrap and setup wizard.
 - Secure local key storage with profile-based config.
 - Real broker sync for portfolio/order status.
 - Real agent pipeline execution with explainable outputs.
+- Single active AI provider per run with contextual subroles and deterministic conflict arbitration.
 - Stable release process aligned with CVF controlled changes.
 
 ## Phase Plan
@@ -239,6 +239,20 @@ Exit criteria:
   - Local `phase-gates` cannot accidentally hit production without explicit override.
   - Production smoke is still possible but controlled and auditable.
 
+### AI-06 — Single-Provider Multi-Role Subagent Orchestration
+- Priority: High
+- Owner: Agents + Product AI
+- Dependency: Hardening-A1/A2/A3 completed
+- Scope:
+  - Keep one active AI provider/engine per run (single API key context).
+  - Execute contextual subroles inside one orchestrated agent (`thesis`, `valuation`, `news_catalyst`, `risk_challenge`).
+  - Apply deterministic arbitration policy (`risk_veto_then_consensus`) before final AI summary is emitted.
+  - Persist role metadata (`active_roles`, role outputs, arbitration action) for traceability.
+- Definition of Done:
+  - Single-provider run path is verifiable in metadata.
+  - Role outputs are captured per symbol and linked to final action.
+  - Risk veto deterministically overrides optimistic narrative when risk level is `high`/`critical`.
+
 ### Fix-01 — Dead Letter Queue for Failed Orders
 - Priority: Critical
 - Owner: Backend (OMS) + SRE
@@ -308,7 +322,8 @@ Exit criteria:
 4. Execute Fix-04 with non-breaking migration once idempotency flow is stable.
 5. Execute Hardening-A1/A3 immediately before enabling real API keys.
 6. Execute Hardening-A2 and Hardening-A5 before any production-like smoke from developer machines.
-7. Execute Hardening-A4 as release gate uplift before public/beta user expansion.
+7. Execute AI-06 single-provider subagent orchestration to eliminate cross-provider AI conflicts.
+8. Execute Hardening-A4 as release gate uplift before public/beta user expansion.
 
 ## Workstreams
 - WS1: Runtime + Installer + Config

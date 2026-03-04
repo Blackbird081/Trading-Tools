@@ -16,6 +16,24 @@ logger = logging.getLogger("agents.fundamental")
 
 _guardrails = AgentGuardrailPipeline()
 
+_ROLE_INSTRUCTIONS: dict[str, str] = {
+    "thesis": (
+        "Role thesis_analyst: summarize core trade thesis in max 3 bullet points "
+        "using technical + fundamental context."
+    ),
+    "valuation": (
+        "Role valuation_analyst: evaluate valuation/fundamental quality and state whether "
+        "current valuation is attractive, fair, or expensive."
+    ),
+    "news_catalyst": (
+        "Role catalyst_analyst: highlight near-term catalysts and headline risks from recent news."
+    ),
+    "risk_challenge": (
+        "Role risk_challenger: challenge the bullish/bearish thesis, emphasize failure modes, "
+        "and provide strict downside warnings."
+    ),
+}
+
 
 class FundamentalAgent:
     """AI-powered financial analysis agent.
@@ -31,11 +49,13 @@ class FundamentalAgent:
         prompt_builder: FinancialPromptBuilder,
         news_port: Any,
         financial_data_port: Any = None,  # ★ NEW: optional financial data source
+        enable_subroles: bool = True,
     ) -> None:
         self._engine = engine
         self._prompt_builder = prompt_builder
         self._news = news_port
         self._financial_data = financial_data_port
+        self._enable_subroles = enable_subroles
 
     async def run(self, state: AgentState) -> dict[str, Any]:
         """LangGraph node: generate AI insights for watchlist symbols.
@@ -48,6 +68,7 @@ class FundamentalAgent:
         watchlist = state.get("watchlist", [])
         scores = {s.symbol: s for s in state.get("technical_scores", [])}
         insights: dict[str, str] = {}
+        ai_role_outputs: dict[str, dict[str, Any]] = {}
         early_warning_results: dict[str, Any] = {}
         industry_analysis_results: dict[str, Any] = {}
         dupont_results: dict[str, Any] = {}
@@ -160,23 +181,163 @@ class FundamentalAgent:
                     extra_context=early_warning_context + dupont_context,  # ★ NEW
                 )
 
-                # NPU/engine inference
-                response = await self._generate(prompt)
-                insights[str(item.symbol)] = response
-            except Exception as exc:
-                logger.warning("Prompt generation failed for %s: %s", symbol_str, exc)
-                insights[str(item.symbol)] = (
-                    f"{symbol_str}: Prompt configuration unavailable; fallback insight only. "
-                    "Please verify prompts manifest and agent settings."
+                role_payload = await self._run_subroles(
+                    symbol=symbol_str,
+                    base_prompt=prompt,
+                    technical_action=(str(tech.recommended_action) if tech else "HOLD"),
+                    has_financial_data=financial_data is not None,
+                    has_news=bool(news),
+                    ew_result=ew_result,
                 )
+                ai_role_outputs[symbol_str] = role_payload
+                insights[symbol_str] = str(role_payload["final_summary"])
+            except Exception as exc:
+                logger.warning("Prompt/subrole generation failed for %s: %s", symbol_str, exc)
+                fallback = (
+                    f"{symbol_str}: prompt/subrole configuration unavailable; "
+                    "fallback insight only."
+                )
+                ai_role_outputs[symbol_str] = {
+                    "active_roles": [],
+                    "role_outputs": {},
+                    "arbitration": {"final_action": "HOLD", "risk_veto": False, "policy": "fallback"},
+                    "final_summary": fallback,
+                }
+                insights[symbol_str] = fallback
 
         logger.info("Fundamental analysis: %d insights generated", len(insights))
         return {
             "ai_insights": insights,
+            "ai_role_outputs": ai_role_outputs,
             "early_warning_results": early_warning_results,  # ★ NEW
             "industry_analysis_results": industry_analysis_results,  # ★ NEW
             "dupont_results": dupont_results,  # ★ NEW
         }
+
+    async def _run_subroles(
+        self,
+        symbol: str,
+        base_prompt: str,
+        technical_action: str,
+        has_financial_data: bool,
+        has_news: bool,
+        ew_result: Any | None,
+    ) -> dict[str, Any]:
+        if not self._enable_subroles:
+            response = await self._generate(base_prompt)
+            return {
+                "active_roles": [],
+                "role_outputs": {},
+                "arbitration": {
+                    "final_action": technical_action,
+                    "risk_veto": False,
+                    "policy": "single-shot",
+                },
+                "final_summary": response,
+            }
+
+        active_roles = self._select_active_roles(has_financial_data=has_financial_data, has_news=has_news)
+        role_outputs: dict[str, str] = {}
+
+        for role in active_roles:
+            role_prompt = self._build_role_prompt(role=role, base_prompt=base_prompt)
+            role_outputs[role] = await self._generate(role_prompt)
+
+        arbitration = self._arbitrate(
+            symbol=symbol,
+            technical_action=technical_action,
+            ew_result=ew_result,
+            role_outputs=role_outputs,
+        )
+        final_summary = self._compose_final_summary(
+            symbol=symbol,
+            role_outputs=role_outputs,
+            arbitration=arbitration,
+        )
+        return {
+            "active_roles": active_roles,
+            "role_outputs": role_outputs,
+            "arbitration": arbitration,
+            "final_summary": final_summary,
+        }
+
+    def _select_active_roles(self, has_financial_data: bool, has_news: bool) -> list[str]:
+        roles = ["thesis", "risk_challenge"]
+        if has_financial_data:
+            roles.append("valuation")
+        if has_news:
+            roles.append("news_catalyst")
+        return roles
+
+    def _build_role_prompt(self, role: str, base_prompt: str) -> str:
+        instruction = _ROLE_INSTRUCTIONS.get(role, "Role analyst: provide structured analysis.")
+        return (
+            f"{instruction}\n"
+            "Output format:\n"
+            "- key_findings: ...\n"
+            "- recommendation_bias: BUY/SELL/HOLD\n"
+            "- confidence: low/medium/high\n\n"
+            f"{base_prompt}"
+        )
+
+    def _arbitrate(
+        self,
+        symbol: str,
+        technical_action: str,
+        ew_result: Any | None,
+        role_outputs: dict[str, str],
+    ) -> dict[str, Any]:
+        risk_level = str(getattr(ew_result, "risk_level", "")).strip().lower()
+        policy = "risk_veto_then_consensus"
+        if risk_level in {"critical", "high"}:
+            return {
+                "final_action": "HOLD",
+                "risk_veto": True,
+                "risk_level": risk_level,
+                "policy": policy,
+                "reason": f"Risk veto active ({risk_level})",
+            }
+
+        sentiment = 0
+        for output in role_outputs.values():
+            lower = output.lower()
+            if "sell" in lower or "avoid" in lower:
+                sentiment -= 1
+            if "buy" in lower or "accumulate" in lower:
+                sentiment += 1
+
+        base_action = technical_action if technical_action in {"BUY", "SELL", "HOLD"} else "HOLD"
+        final_action = base_action
+        if base_action == "BUY" and sentiment <= -2:
+            final_action = "HOLD"
+        if base_action == "SELL" and sentiment >= 2:
+            final_action = "HOLD"
+
+        return {
+            "final_action": final_action,
+            "risk_veto": False,
+            "risk_level": risk_level or "low",
+            "policy": policy,
+            "reason": f"Consensus sentiment score={sentiment}",
+            "technical_action": base_action,
+        }
+
+    def _compose_final_summary(
+        self,
+        symbol: str,
+        role_outputs: dict[str, str],
+        arbitration: dict[str, Any],
+    ) -> str:
+        lines = [
+            f"{symbol}: Final action = {arbitration.get('final_action', 'HOLD')}",
+            f"Policy: {arbitration.get('policy', 'n/a')}",
+            f"Reason: {arbitration.get('reason', 'n/a')}",
+            "Role outputs:",
+        ]
+        for role, output in role_outputs.items():
+            compact = " ".join(output.strip().split())
+            lines.append(f"- {role}: {compact[:320]}")
+        return "\n".join(lines)
 
     async def _get_financial_data(self, symbol: str) -> dict[str, Any] | None:
         """Fetch financial data from port (if available)."""

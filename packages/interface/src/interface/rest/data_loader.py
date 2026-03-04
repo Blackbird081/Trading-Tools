@@ -1278,6 +1278,7 @@ async def _generate_screener_progress(
     risk_scores = {str(item.symbol): item for item in aggregated_state.get("risk_assessments", [])}
     execution = {str(item.symbol): item for item in aggregated_state.get("execution_plans", [])}
     ai_insights = {str(k): str(v) for k, v in dict(aggregated_state.get("ai_insights", {})).items()}
+    ai_role_outputs = {str(k): v for k, v in dict(aggregated_state.get("ai_role_outputs", {})).items()}
     early_warning = {str(k): v for k, v in dict(aggregated_state.get("early_warning_results", {})).items()}
     dupont = {str(k): v for k, v in dict(aggregated_state.get("dupont_results", {})).items()}
     universe = list(watchlist.keys()) if watchlist else symbols
@@ -1299,6 +1300,8 @@ async def _generate_screener_progress(
         qty = int(plan.quantity) if plan else 0
         risk_text = _risk_label(bool(risk_assess.approved) if risk_assess else False, score)
         insight = ai_insights.get(symbol, "")
+        role_bundle = ai_role_outputs.get(symbol, {}) if isinstance(ai_role_outputs.get(symbol), dict) else {}
+        role_arb = role_bundle.get("arbitration", {}) if isinstance(role_bundle, dict) else {}
         ew_summary = (
             str(early_warning.get(symbol, {}).get("summary", ""))
             if isinstance(early_warning.get(symbol), dict)
@@ -1334,6 +1337,8 @@ async def _generate_screener_progress(
                 "vol_change_pct": 0.0,
                 "ma_trend": str(tech.trend_ma) if tech else "neutral",
                 "fundamental_summary": fundamental_note,
+                "ai_subroles": role_bundle.get("active_roles", []),
+                "ai_final_action": str(role_arb.get("final_action", action)),
                 "news_headlines": headlines[:3],
                 "dupont_driver": dupont_driver,
                 "data_sources": {
@@ -1367,6 +1372,11 @@ async def _generate_screener_progress(
     news_coverage = sum(1 for r in results if isinstance(r.get("news_headlines"), list) and len(r["news_headlines"]) > 0)
     fundamental_coverage = sum(1 for r in results if str(r.get("fundamental_summary", "")).strip())
     insight_coverage = len([v for v in ai_insights.values() if v.strip()])
+    role_coverage = sum(
+        1
+        for r in results
+        if isinstance(r.get("ai_subroles"), list) and len(r["ai_subroles"]) > 0
+    )
 
     save_screener_run(
         run_id=run_id,
@@ -1381,6 +1391,7 @@ async def _generate_screener_progress(
             "insight_coverage": insight_coverage,
             "fundamental_coverage": fundamental_coverage,
             "news_coverage": news_coverage,
+            "role_coverage": role_coverage,
             "external_sources": use_external_sources,
             "ai_provider": ai_provider,
             "ai_remote_enabled": ai_remote_enabled,
@@ -1404,6 +1415,7 @@ async def _generate_screener_progress(
             "insight_coverage": insight_coverage,
             "fundamental_coverage": fundamental_coverage,
             "news_coverage": news_coverage,
+            "role_coverage": role_coverage,
             "results": results,
         },
     )

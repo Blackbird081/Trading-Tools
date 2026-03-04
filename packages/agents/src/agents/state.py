@@ -101,6 +101,7 @@ class AgentState(TypedDict, total=False):
     execution_plans: list[ExecutionPlan]
     # Fundamental Agent Output (Optional)
     ai_insights: dict[Symbol, str]
+    ai_role_outputs: dict[str, Any]
     # ★ NEW: Financial Analysis Results (baocaotaichinh-inspired)
     early_warning_results: dict[str, Any]   # symbol → EarlyWarningResult.summary
     industry_analysis_results: dict[str, Any]  # symbol → industry metrics dict

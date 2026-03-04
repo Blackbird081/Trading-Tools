@@ -398,3 +398,20 @@ Notes:
 - Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.11` remediation continuity + setup usability hardening
 - Owner: Codex + project owner
 - Notes: OpenAI provider path is opt-in via env (`AGENT_AI_PROVIDER=openai`) and gracefully falls back to deterministic engine when key is missing/invalid.
+
+### CVF-TT-20260304-024
+- Date-Time (UTC+7): 2026-03-04 22:40
+- Type: feature
+- Scope: Implement single-provider multi-role subagent orchestration inside Fundamental analysis with deterministic conflict arbitration (risk veto first) to avoid cross-provider conflicts while keeping one active API key.
+- Impact: Screener AI stage now executes contextual subroles (`thesis`, `valuation`, `news_catalyst`, `risk_challenge`) through one engine/provider and emits traceable role metadata (`ai_role_outputs`, `ai_subroles`, `ai_final_action`) for auditability and downstream UI/reporting.
+- Root Cause: User requirement to avoid inconsistent recommendations from multiple AI providers and enforce CVF-style deterministic conflict control in financial inference flow.
+- Files Changed: `packages/agents/src/agents/fundamental_agent.py`, `packages/agents/src/agents/state.py`, `packages/interface/src/interface/rest/data_loader.py`, `tests/unit/test_fundamental_agent.py`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `python -m py_compile packages/agents/src/agents/fundamental_agent.py packages/agents/src/agents/state.py packages/interface/src/interface/rest/data_loader.py` (pass)
+  - `python -m pytest tests/unit/test_fundamental_agent.py tests/unit/test_upgrades.py tests/integration/test_data_loader_api.py -q` with `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src` (pass, 32 tests)
+- Deployment Target: backend AI pipeline + CVF plan/trace docs
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` AI-06 orchestration track + `IMPLEMENTATION_PLAN.md` Section `0.11` execution update
+- Owner: Codex + project owner
+- Notes: Arbitration policy is deterministic (`risk_veto_then_consensus`) and provider-agnostic; native Anthropic/Gemini adapters remain a separate follow-up.
