@@ -103,6 +103,24 @@ def test_max_notional_blocks_live_orders(client: TestClient, monkeypatch: pytest
     assert "Order notional exceeds limit" in response.json()["detail"]
 
 
+def test_decimal_notional_boundary_is_exact(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MAX_ORDER_NOTIONAL", "10000")
+
+    at_limit = _live_payload("it-live-notional-boundary-01")
+    at_limit["price"] = 100.0
+    at_limit["quantity"] = 100
+    accepted = client.post("/api/orders", json=at_limit)
+    assert accepted.status_code == 200
+    assert accepted.json()["requires_confirmation"] is True
+
+    above_limit = _live_payload("it-live-notional-boundary-02")
+    above_limit["price"] = 100.0001
+    above_limit["quantity"] = 100
+    rejected = client.post("/api/orders", json=above_limit)
+    assert rejected.status_code == 409
+    assert "Order notional exceeds limit" in rejected.json()["detail"]
+
+
 def test_order_request_validators_and_not_found_paths(client: TestClient) -> None:
     bad_symbol = client.post(
         "/api/orders",

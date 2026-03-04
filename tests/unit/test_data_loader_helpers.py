@@ -20,6 +20,20 @@ def test_score_and_risk_helpers() -> None:
     assert data_loader._risk_label(True, 1.0) == "HIGH"  # noqa: SLF001
 
 
+def test_data_provider_mode_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.delenv("DATA_PROVIDER_MODE", raising=False)
+    assert data_loader._resolve_data_provider_mode() == "mock"  # noqa: SLF001
+
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("DATA_PROVIDER_MODE", "live")
+    assert data_loader._resolve_data_provider_mode() == "live"  # noqa: SLF001
+
+    monkeypatch.setenv("DATA_PROVIDER_MODE", "mock")
+    with pytest.raises(RuntimeError):
+        data_loader._resolve_data_provider_mode()  # noqa: SLF001
+
+
 def test_build_reasoning_and_sse_format() -> None:
     text = data_loader._build_reasoning(  # noqa: SLF001
         symbol="FPT",

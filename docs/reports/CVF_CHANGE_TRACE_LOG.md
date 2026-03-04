@@ -344,3 +344,57 @@ Notes:
 - Plan Mapping: CVF governance Section `0.4`/`0.5` documentation traceability
 - Owner: Codex + project owner
 - Notes: `SOUL_VN.md` remains intentionally Vietnamese by product direction.
+
+### CVF-TT-20260304-021
+- Date-Time (UTC+7): 2026-03-04 14:40
+- Type: docs
+- Scope: Update roadmap baselines to include an independent-audit remediation pack for runtime security wiring, mock-data policy, monetary precision, frontend coverage uplift, and safe phase-gate targeting.
+- Impact: Planning now contains explicit corrective phases with locked execution order and release-blocking criteria before broader live rollout.
+- Root Cause: Existing roadmap status was mostly marked complete while independent audit identified additional production-hardening gaps requiring formal plan mapping and acceptance gates.
+- Files Changed: `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `rg -n "Hardening-A1|Hardening-A2|Hardening-A3|Hardening-A4|Hardening-A5" docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md` (pass)
+  - `rg -n "AR-1|AR-2|AR-3|AR-4|AR-5|Release blocking rule" docs/plans/IMPLEMENTATION_PLAN.md` (pass)
+- Deployment Target: planning/governance baseline
+- Deployment Status: local update completed
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.11` + `LOCAL_PERSONAL_TRADING_ROADMAP.md` hardening pack
+- Owner: Codex + project owner
+- Notes: This entry updates roadmap scope only; implementation is tracked in subsequent change-trace entries.
+
+### CVF-TT-20260304-022
+- Date-Time (UTC+7): 2026-03-04 21:10
+- Type: bugfix
+- Scope: Execute hardening roadmap pack AR-1/AR-2/AR-3/AR-5 end-to-end (runtime security middleware wiring, production mock-data block, Decimal monetary checks, safe gate targeting).
+- Impact: Sensitive runtime endpoints now support protected-mode auth + active throttling, production data loader cannot run synthetic mock path, OMS risk path avoids float monetary arithmetic, and local phase gates no longer default to production endpoints.
+- Root Cause: Independent audit identified four critical/high gaps still open despite prior phase completion claims.
+- Files Changed: `packages/interface/src/interface/middleware/auth.py`, `packages/interface/src/interface/app.py`, `packages/interface/src/interface/rest/orders.py`, `packages/interface/src/interface/rest/data_loader.py`, `scripts/phase-gates.ps1`, `tests/integration/test_runtime_security_middleware.py`, `tests/integration/test_order_safety_controls.py`, `tests/integration/test_data_loader_api.py`, `tests/unit/test_data_loader_helpers.py`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `python -m py_compile packages/interface/src/interface/middleware/auth.py packages/interface/src/interface/app.py packages/interface/src/interface/rest/orders.py packages/interface/src/interface/rest/data_loader.py` (pass)
+  - `python -m pytest tests/integration/test_runtime_security_middleware.py tests/integration/test_order_safety_controls.py -q` with `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src` (pass, 14 tests)
+  - `python -m pytest tests/unit/test_data_loader_helpers.py tests/integration/test_data_loader_api.py -q` with same `PYTHONPATH` (pass, 13 tests)
+  - `powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase p1 -ApiBase https://trading-tools-production.up.railway.app/api` (expected fail-fast pass: blocked without `-AllowProductionTarget`)
+- Deployment Target: backend runtime + gate tooling + CVF governance docs
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.11` (AR-1/2/3/5), `LOCAL_PERSONAL_TRADING_ROADMAP.md` Hardening-A1/A2/A3/A5
+- Owner: Codex + project owner
+- Notes: `AR-4` (frontend global coverage uplift) remains open and is the next release-blocking quality item.
+
+### CVF-TT-20260304-023
+- Date-Time (UTC+7): 2026-03-04 22:00
+- Type: bugfix
+- Scope: Stabilize Screener pipeline when prompt manifest/template is missing and add explicit Agent AI key/provider configuration in Settings + setup API validation.
+- Impact: `/api/run-screener` no longer crashes with `KeyError: 'prompts'`; Settings now exposes `AGENT_AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, and runtime status reports active AI provider.
+- Root Cause: Prompt registry assumed `manifest.json` always had `prompts` contract and failed late at runtime; setup UX had no explicit field path for remote LLM credentials/provider selection.
+- Files Changed: `packages/agents/src/agents/prompt_builder.py`, `packages/agents/src/agents/fundamental_agent.py`, `packages/interface/src/interface/rest/data_loader.py`, `packages/interface/src/interface/rest/setup.py`, `frontend/app/settings/_components/setup-wizard.tsx`, `tests/integration/test_data_loader_api.py`, `tests/integration/test_setup_api.py`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `python -m py_compile packages/agents/src/agents/prompt_builder.py packages/agents/src/agents/fundamental_agent.py packages/interface/src/interface/rest/data_loader.py packages/interface/src/interface/rest/setup.py` (pass)
+  - `python -m pytest tests/integration/test_setup_api.py tests/integration/test_data_loader_api.py tests/unit/test_data_loader_helpers.py -q` with `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src` (pass, 19 tests)
+  - `pnpm -C frontend exec tsc --noEmit` (pass)
+- Deployment Target: backend screener/runtime + frontend settings UX
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.11` remediation continuity + setup usability hardening
+- Owner: Codex + project owner
+- Notes: OpenAI provider path is opt-in via env (`AGENT_AI_PROVIDER=openai`) and gracefully falls back to deterministic engine when key is missing/invalid.

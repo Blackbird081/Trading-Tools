@@ -8,6 +8,8 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from interface.middleware.auth import AuthMiddleware
+from interface.middleware.rate_limit import RateLimitMiddleware
 from interface.rest.company import router as company_router
 from interface.rest.data_loader import router as data_loader_router
 from interface.rest.health import router as health_router
@@ -110,6 +112,12 @@ def create_app() -> FastAPI:
         allow_methods=_ALLOWED_METHODS,
         allow_headers=_ALLOWED_HEADERS,
     )
+    app.add_middleware(
+        RateLimitMiddleware,
+        requests_per_minute=int(os.getenv("RATE_LIMIT_REQUESTS_PER_MINUTE", "240")),
+        order_requests_per_minute=int(os.getenv("RATE_LIMIT_ORDER_REQUESTS_PER_MINUTE", "60")),
+    )
+    app.add_middleware(AuthMiddleware)
     app.include_router(health_router, prefix="/api")
     app.include_router(data_loader_router, prefix="/api")
     app.include_router(company_router, prefix="/api")

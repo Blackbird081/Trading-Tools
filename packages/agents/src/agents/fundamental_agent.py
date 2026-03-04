@@ -145,23 +145,30 @@ class FundamentalAgent:
             if symbol_str in dupont_results:
                 dupont_context = f"\n\nDuPont Analysis:\n{dupont_results[symbol_str]['summary']}"
 
-            prompt, _pv = self._prompt_builder.build_analysis_prompt(
-                symbol=symbol_str,
-                company_name="",
-                technical_score=tech.composite_score if tech else 0.0,
-                rsi=tech.rsi_14 if tech else 50.0,
-                macd_signal=tech.macd_signal if tech else "neutral",
-                bb_position=tech.bb_position if tech else "inside",
-                trend_ma=tech.trend_ma if tech else "neutral",
-                eps_growth=item.eps_growth,
-                pe_ratio=item.pe_ratio,
-                news_headlines=news,
-                extra_context=early_warning_context + dupont_context,  # ★ NEW
-            )
+            try:
+                prompt, _pv = self._prompt_builder.build_analysis_prompt(
+                    symbol=symbol_str,
+                    company_name="",
+                    technical_score=tech.composite_score if tech else 0.0,
+                    rsi=tech.rsi_14 if tech else 50.0,
+                    macd_signal=tech.macd_signal if tech else "neutral",
+                    bb_position=tech.bb_position if tech else "inside",
+                    trend_ma=tech.trend_ma if tech else "neutral",
+                    eps_growth=item.eps_growth,
+                    pe_ratio=item.pe_ratio,
+                    news_headlines=news,
+                    extra_context=early_warning_context + dupont_context,  # ★ NEW
+                )
 
-            # NPU Inference
-            response = await self._generate(prompt)
-            insights[str(item.symbol)] = response
+                # NPU/engine inference
+                response = await self._generate(prompt)
+                insights[str(item.symbol)] = response
+            except Exception as exc:
+                logger.warning("Prompt generation failed for %s: %s", symbol_str, exc)
+                insights[str(item.symbol)] = (
+                    f"{symbol_str}: Prompt configuration unavailable; fallback insight only. "
+                    "Please verify prompts manifest and agent settings."
+                )
 
         logger.info("Fundamental analysis: %d insights generated", len(insights))
         return {

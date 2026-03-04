@@ -1,8 +1,9 @@
 param(
     [ValidateSet("p0", "p1", "phase1", "phase2", "phase3", "phase4", "phase5", "all")]
     [string]$Phase = "all",
-    [string]$ApiBase = "https://trading-tools-production.up.railway.app/api",
-    [switch]$StrictWarnings
+    [string]$ApiBase = "http://localhost:8000/api",
+    [switch]$StrictWarnings,
+    [switch]$AllowProductionTarget
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,6 +31,14 @@ function Run-Pytest([string[]]$testArgs) {
     & python @args
 }
 
+function Assert-SafeApiBase() {
+    $target = $ApiBase.Trim().ToLowerInvariant()
+    $isProdHost = $target -match "trading-tools-production\.up\.railway\.app" -or $target -match "test-trading\.up\.railway\.app"
+    if ($isProdHost -and -not $AllowProductionTarget) {
+        throw "Refusing to run phase gates against production target '$ApiBase' without -AllowProductionTarget."
+    }
+}
+
 function Assert-SseComplete([string]$mode, [string]$url, [int]$maxTimeSec = 180) {
     $sse = curl.exe -sS -N --max-time $maxTimeSec $url
     if ($LASTEXITCODE -ne 0) {
@@ -53,6 +62,7 @@ function Run-P0 {
 
 function Run-P1 {
     Write-Stage "P1 Gate - Persistence and Update Policy"
+    Assert-SafeApiBase
     Run-Step "API live health" { curl.exe -sS "$ApiBase/health/live" | Out-Null }
     Run-Step "Load full (VN30, 1Y) reaches complete" {
         Assert-SseComplete "load" "$ApiBase/load-data?preset=VN30&years=1" 180

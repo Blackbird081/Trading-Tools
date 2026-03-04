@@ -36,6 +36,9 @@ def test_setup_validate_returns_checks(client: TestClient, tmp_path: Path) -> No
         "ssi_consumer_secret": "consumer-secret",
         "ssi_account_no": "12345678",
         "ssi_private_key_b64": "dGVzdA==",
+        "ai_provider": "deterministic",
+        "openai_api_key": "",
+        "openai_model": "gpt-4o-mini",
         "ai_model_path": str(tmp_path / "model"),
     }
     response = client.post("/api/setup/validate", json=payload)
@@ -44,6 +47,7 @@ def test_setup_validate_returns_checks(client: TestClient, tmp_path: Path) -> No
     assert isinstance(data["checks"], list)
     assert "recommended_env" in data
     assert "valid" in data
+    assert "AGENT_AI_PROVIDER" in data["recommended_env"]
 
 
 def test_setup_init_local_creates_db(client: TestClient, tmp_path: Path) -> None:

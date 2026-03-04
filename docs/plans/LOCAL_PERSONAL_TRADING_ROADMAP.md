@@ -29,6 +29,11 @@ Status scale:
 | Fix-03 OpenTelemetry for DuckDB calls | `DONE` | Added `execute_with_trace()` wrapper (`packages/adapters/src/adapters/duckdb/telemetry.py`) and applied to core DuckDB paths in `interface/trading_store.py`. | Add optional exporter configuration docs for external trace backends. |
 | Fix-04 Async factory for DuckDBIdempotencyStore | `DONE` | Added `DuckDBIdempotencyStore.create()` async factory and migrated runtime wiring to async path (`interface/trading_store.py`). | Monitor deprecation path for legacy sync-only initialization. |
 | Fix-05 Refine `bank_account` guardrail pattern | `DONE` | Replaced broad numeric regex with VN-context strategy (`packages/agents/src/agents/guardrails.py`) and added unit tests (`tests/unit/test_guardrails.py`). | Monitor false-positive/false-negative drift with real production text samples. |
+| Hardening-A1 Runtime Security Middleware Wiring | `DONE (gated)` | Added `AuthMiddleware` + runtime wiring of `RateLimitMiddleware` in `interface.app`; added integration coverage in `tests/integration/test_runtime_security_middleware.py` for unauthorized/reject + rate-limit behavior. | Monitor token distribution policy for non-dev protected environments. |
+| Hardening-A2 Real Data Provider Policy | `DONE (gated)` | Added explicit provider contract (`DATA_PROVIDER_MODE=mock/live`) with production guard (`mock` blocked) in `interface.rest.data_loader`; added integration/unit tests (`tests/integration/test_data_loader_api.py`, `tests/unit/test_data_loader_helpers.py`). | Keep live provider dependency (`vnstock`) and source reliability monitored in production. |
+| Hardening-A3 Monetary Precision (`Decimal`) | `DONE (gated)` | Migrated OMS request/risk checks to `Decimal` in `interface.rest.orders` (price/notional/daily-loss/buying-power path); added boundary precision regression test in `tests/integration/test_order_safety_controls.py`. | Continue Decimal migration in downstream analytics/store paths for full end-to-end precision parity. |
+| Hardening-A4 Frontend Coverage Expansion | `NOT STARTED (locked)` | Current frontend global statement coverage is low for release confidence. | Raise frontend global coverage to >= 80% with risk-based test expansion (orders, dashboard, screener, market board). |
+| Hardening-A5 Safe Gate Targeting | `DONE (gated)` | `scripts/phase-gates.ps1` default API base changed to local (`http://localhost:8000/api`) and production targets now require explicit `-AllowProductionTarget` override with fail-fast guard. | Add CI usage examples for guarded production smoke execution. |
 
 ## Product Direction
 - User downloads and runs app locally on personal machine.
@@ -45,6 +50,11 @@ Status scale:
 ## Current Gaps (As-Is)
 - Real broker execution path still uses guarded placeholder; live adapter integration remains.
 - External data quality in live mode depends on broker/data provider availability and credentials.
+- Runtime bootstrap does not enforce rate-limit/auth middleware activation policy.
+- Data-loader runtime path still includes mock-generation logic that must be disabled in production mode.
+- Order monetary inputs still rely on floating-point type in API schema.
+- Frontend global coverage remains below release-grade target.
+- Phase-gate script default API target is production and needs safety hardening.
 
 ## Target State (To-Be)
 - One-command local bootstrap and setup wizard.
@@ -169,6 +179,66 @@ Exit criteria:
 
 ## Parallel Fix Pack (Execute Alongside Main Roadmap)
 
+### Hardening-A1 — Runtime Security Middleware Wiring
+- Priority: Critical
+- Owner: Backend Platform + Security
+- Dependency: none
+- Scope:
+  - Attach `RateLimitMiddleware` in application bootstrap.
+  - Add authentication middleware wiring policy for sensitive REST endpoints (`orders`, `safety`, `setup`).
+  - Add integration tests for unauthorized/rate-limited behavior.
+- Definition of Done:
+  - Middleware stack is active in runtime (verified through tests and startup logs).
+  - Sensitive endpoints reject unauthorized calls in protected mode.
+
+### Hardening-A2 — Real Data Provider Policy (No Mock in Production)
+- Priority: Critical
+- Owner: Data Pipeline
+- Dependency: Hardening-A1 in place for endpoint abuse control
+- Scope:
+  - Refactor loader into explicit provider modes (`mock`, `live`).
+  - Add `DATA_PROVIDER_MODE` / equivalent guard with `production => live only`.
+  - Add tests to assert production mode cannot execute mock branch.
+- Definition of Done:
+  - Production mode rejects/mock-disables synthetic data generation path.
+  - Load/Update acceptance uses real provider contract in non-mock mode.
+
+### Hardening-A3 — Monetary Precision Migration (`Decimal`)
+- Priority: Critical
+- Owner: OMS + Risk
+- Dependency: none
+- Scope:
+  - Replace `float` price handling in order request/validation with `Decimal`.
+  - Normalize notional, max-notional, buying-power, and daily-loss checks to `Decimal`.
+  - Add regression tests for edge decimals and rounding-sensitive values.
+- Definition of Done:
+  - No float-based monetary calculation remains in order-risk path.
+  - Precision tests cover boundary values and pass in CI.
+
+### Hardening-A4 — Frontend Coverage Expansion Pack
+- Priority: High
+- Owner: Frontend + QA
+- Dependency: none
+- Scope:
+  - Expand tests for high-risk UI flows (order form/history, dashboard load/update state model, screener pipeline table, market board controls).
+  - Add release gate threshold for frontend global statement coverage >= 80%.
+  - Publish coverage trend artifact per release candidate.
+- Definition of Done:
+  - Frontend coverage gate passes at >= 80% statements globally.
+  - Critical UI flows are covered with deterministic integration tests.
+
+### Hardening-A5 — Safe Gate Targeting and Environment Guard
+- Priority: High
+- Owner: DevEx + SRE
+- Dependency: none
+- Scope:
+  - Remove/override production default API base in local gate script.
+  - Require explicit confirmation flag for production smoke runs.
+  - Add environment banner + fail-fast checks for unsafe target combinations.
+- Definition of Done:
+  - Local `phase-gates` cannot accidentally hit production without explicit override.
+  - Production smoke is still possible but controlled and auditable.
+
 ### Fix-01 — Dead Letter Queue for Failed Orders
 - Priority: Critical
 - Owner: Backend (OMS) + SRE
@@ -236,6 +306,9 @@ Exit criteria:
 2. Deliver Phase 3 OMS API first, then execute Fix-01 (DLQ).
 3. Run Fix-03 (OpenTelemetry) after core order/portfolio flows are stable.
 4. Execute Fix-04 with non-breaking migration once idempotency flow is stable.
+5. Execute Hardening-A1/A3 immediately before enabling real API keys.
+6. Execute Hardening-A2 and Hardening-A5 before any production-like smoke from developer machines.
+7. Execute Hardening-A4 as release gate uplift before public/beta user expansion.
 
 ## Workstreams
 - WS1: Runtime + Installer + Config

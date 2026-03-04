@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from interface import profile_vault
 
 router = APIRouter(tags=["setup"])
+_AI_PROVIDERS = {"deterministic", "openvino", "openai"}
 
 
 def _to_mode(raw_mode: str, raw_dry_run: str) -> Literal["dry-run", "live"]:
@@ -76,6 +77,9 @@ class SetupValidateRequest(BaseModel):
     ssi_consumer_secret: str = Field(default="", max_length=256)
     ssi_account_no: str = Field(default="", max_length=32)
     ssi_private_key_b64: str = Field(default="", max_length=16384)
+    ai_provider: Literal["deterministic", "openvino", "openai"] = "deterministic"
+    openai_api_key: str = Field(default="", max_length=256)
+    openai_model: str = Field(default="gpt-4o-mini", max_length=120)
     ai_model_path: str = Field(default="data/models/phi-3-mini-int4", max_length=256)
 
 
@@ -163,7 +167,17 @@ async def get_setup_status() -> dict[str, object]:
     has_private_key = bool(
         os.getenv("SSI_PRIVATE_KEY_B64", "").strip() or os.getenv("SSI_PRIVATE_KEY_PEM", "").strip()
     )
+    ai_provider = os.getenv("AGENT_AI_PROVIDER", "deterministic").strip().lower()
+    if ai_provider not in _AI_PROVIDERS:
+        ai_provider = "deterministic"
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+    openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
     model_path = Path(os.getenv("OPENVINO_MODEL_PATH", "data/models/phi-3-mini-int4")).expanduser()
+    ai_engine_ready = (
+        (ai_provider == "deterministic")
+        or (ai_provider == "openvino" and model_path.exists())
+        or (ai_provider == "openai" and len(openai_key) >= 20)
+    )
     checks = [
         _status_line("data_path", writable, writable_detail),
         _status_line("vnstock_api_key", bool(vnstock_key.strip()), "Configured" if vnstock_key.strip() else "Missing"),
@@ -179,11 +193,28 @@ async def get_setup_status() -> dict[str, object]:
             model_path.exists(),
             f"{model_path} {'exists' if model_path.exists() else 'not found'}",
         ),
+        _status_line(
+            "agent_ai_provider",
+            ai_engine_ready,
+            (
+                "deterministic fallback enabled"
+                if ai_provider == "deterministic"
+                else ("OpenVINO model ready" if ai_provider == "openvino" else "OpenAI key configured")
+            )
+            if ai_engine_ready
+            else (
+                "OpenVINO model missing"
+                if ai_provider == "openvino"
+                else "OpenAI key missing/invalid"
+            ),
+        ),
     ]
 
     return {
         "mode": mode,
         "data_path": str(data_path),
+        "ai_provider": ai_provider,
+        "openai_model": openai_model,
         "checks": checks,
         "all_ready": all(c["status"] == "ok" for c in checks),
         "timestamp": datetime.now(UTC).isoformat(),
@@ -199,6 +230,13 @@ async def validate_setup(payload: SetupValidateRequest) -> dict[str, object]:
     account_ok = payload.ssi_account_no.strip().isdigit() and 6 <= len(payload.ssi_account_no.strip()) <= 20
     private_key_ok = _looks_like_b64(payload.ssi_private_key_b64)
     vnstock_ok = len(payload.vnstock_api_key.strip()) >= 10
+    openai_key_ok = len(payload.openai_api_key.strip()) >= 20
+    ai_provider = payload.ai_provider if payload.ai_provider in _AI_PROVIDERS else "deterministic"
+    ai_provider_ok = (
+        ai_provider == "deterministic"
+        or (ai_provider == "openvino" and model_exists)
+        or (ai_provider == "openai" and openai_key_ok)
+    )
 
     checks = [
         _status_line("duckdb_path", writable, writable_detail),
@@ -214,6 +252,15 @@ async def validate_setup(payload: SetupValidateRequest) -> dict[str, object]:
             "ai_model_path",
             model_exists,
             f"{payload.ai_model_path} {'exists' if model_exists else 'not found (CPU fallback still possible)'}",
+        ),
+        _status_line(
+            "agent_ai_provider",
+            ai_provider_ok,
+            (
+                "deterministic fallback enabled"
+                if ai_provider == "deterministic"
+                else ("openvino model is available" if ai_provider == "openvino" else "OpenAI key length >= 20")
+            ),
         ),
         _status_line(
             "trading_mode",
@@ -233,6 +280,9 @@ async def validate_setup(payload: SetupValidateRequest) -> dict[str, object]:
             "SSI_CONSUMER_SECRET": "***" if payload.ssi_consumer_secret else "",
             "SSI_ACCOUNT_NO": payload.ssi_account_no,
             "SSI_PRIVATE_KEY_B64": "***" if payload.ssi_private_key_b64 else "",
+            "AGENT_AI_PROVIDER": ai_provider,
+            "OPENAI_API_KEY": "***" if payload.openai_api_key else "",
+            "OPENAI_MODEL": payload.openai_model,
             "OPENVINO_MODEL_PATH": payload.ai_model_path,
         },
         "timestamp": datetime.now(UTC).isoformat(),

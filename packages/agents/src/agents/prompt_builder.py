@@ -41,10 +41,33 @@ class PromptRegistry:
         manifest_path = self._dir / "manifest.json"
         if manifest_path.exists():
             self._manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            return
+
+        # Fallback contract: allow runtime to continue even when manifest is missing.
+        default_template = self._dir / "financial_analysis" / "v1.0.0.md"
+        self._manifest = {
+            "prompts": {
+                "financial_analysis": {
+                    "active_version": "v1.0.0",
+                    "versions": {
+                        "v1.0.0": {
+                            "file": str(default_template.relative_to(self._dir)).replace("\\", "/"),
+                            "model_target": "local-fallback",
+                            "max_tokens": 768,
+                            "temperature": 0.2,
+                        }
+                    },
+                }
+            }
+        }
 
     def get_active(self, prompt_name: str) -> PromptVersion:
         """Get the currently active version of a prompt."""
-        prompt_config = self._manifest["prompts"][prompt_name]
+        prompts = self._manifest.get("prompts", {})
+        if prompt_name not in prompts:
+            msg = f"Prompt '{prompt_name}' is not configured in manifest."
+            raise KeyError(msg)
+        prompt_config = prompts[prompt_name]
         active_ver: str = prompt_config["active_version"]
         return self.get_version(prompt_name, active_ver)
 
@@ -54,11 +77,22 @@ class PromptRegistry:
         if cache_key in self._cache:
             return self._cache[cache_key]
 
-        prompt_config = self._manifest["prompts"][prompt_name]
+        prompts = self._manifest.get("prompts", {})
+        if prompt_name not in prompts:
+            msg = f"Prompt '{prompt_name}' is not configured in manifest."
+            raise KeyError(msg)
+        prompt_config = prompts[prompt_name]
         ver_config = prompt_config["versions"][version]
 
         template_path = self._dir / ver_config["file"]
-        template = template_path.read_text(encoding="utf-8")
+        if template_path.exists():
+            template = template_path.read_text(encoding="utf-8")
+        else:
+            logger.warning("Prompt template missing at %s; using built-in fallback.", template_path)
+            template = (
+                "You are a financial analysis assistant. "
+                "Summarize technical/fundamental risk and produce a concise recommendation."
+            )
 
         pv = PromptVersion(
             name=prompt_name,

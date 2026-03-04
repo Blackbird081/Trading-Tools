@@ -24,12 +24,15 @@ from types import SimpleNamespace
 from typing import Any
 
 import duckdb
+import httpx
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 
 logger = logging.getLogger("interface.data_loader")
 
 router = APIRouter()
+_PROVIDER_MODES = {"mock", "live"}
+_PRODUCTION_ENVS = {"prod", "production"}
 
 # ── DB connection (lazy singleton) ──────────────────────────────
 _conn: duckdb.DuckDBPyConnection | None = None
@@ -337,6 +340,131 @@ def _save_metadata(preset: str, count: int, years: int) -> None:
     )
 
 
+def _runtime_env() -> str:
+    for name in ("APP_ENV", "ENVIRONMENT", "TRADING_ENV"):
+        raw = os.getenv(name, "").strip().lower()
+        if raw:
+            return raw
+    return "development"
+
+
+def _resolve_data_provider_mode() -> str:
+    env = _runtime_env()
+    raw = os.getenv("DATA_PROVIDER_MODE", "").strip().lower()
+    mode = raw or ("live" if env in _PRODUCTION_ENVS else "mock")
+    if mode not in _PROVIDER_MODES:
+        raise RuntimeError(f"Invalid DATA_PROVIDER_MODE={mode!r}; expected one of {sorted(_PROVIDER_MODES)}")
+    if env in _PRODUCTION_ENVS and mode == "mock":
+        raise RuntimeError("Mock data provider is disabled in production. Set DATA_PROVIDER_MODE=live.")
+    return mode
+
+
+def _as_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_datetime(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time(), tzinfo=UTC)
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    to_pydt = getattr(value, "to_pydatetime", None)
+    if callable(to_pydt):
+        maybe_dt = to_pydt()
+        if isinstance(maybe_dt, datetime):
+            return maybe_dt if maybe_dt.tzinfo is not None else maybe_dt.replace(tzinfo=UTC)
+    return None
+
+
+def _load_symbol_live_data(symbol: str, start_date: date, end_date: date) -> tuple[dict[str, object], list[dict[str, object]]]:
+    try:
+        import vnstock  # type: ignore[import-untyped]
+    except Exception as exc:  # pragma: no cover - dependency/runtime specific
+        raise RuntimeError(f"Live provider requires vnstock: {exc}") from exc
+
+    try:
+        stock = vnstock.Vnstock().stock(symbol=symbol, source="VCI")
+        df = stock.quote.history(start=start_date.isoformat(), end=end_date.isoformat())
+    except Exception as exc:  # pragma: no cover - external provider dependent
+        raise RuntimeError(f"Live provider failed to fetch history for {symbol}: {exc}") from exc
+
+    if df is None or bool(getattr(df, "empty", True)):
+        raise RuntimeError(f"Live provider returned no history for {symbol}.")
+
+    candles: list[dict[str, object]] = []
+    for _, row in df.iterrows():
+        ts_raw = (
+            row.get("time")
+            if hasattr(row, "get")
+            else None
+        ) or (row.get("date") if hasattr(row, "get") else None)
+        ts_dt = _as_datetime(ts_raw)
+        if ts_dt is None:
+            continue
+
+        candles.append(
+            {
+                "symbol": symbol,
+                "ts": int(ts_dt.timestamp()),
+                "open": round(_as_float(row.get("open") if hasattr(row, "get") else 0), 2),
+                "high": round(_as_float(row.get("high") if hasattr(row, "get") else 0), 2),
+                "low": round(_as_float(row.get("low") if hasattr(row, "get") else 0), 2),
+                "close": round(_as_float(row.get("close") if hasattr(row, "get") else 0), 2),
+                "volume": _as_int(row.get("volume") if hasattr(row, "get") else 0),
+            }
+        )
+
+    if not candles:
+        raise RuntimeError(f"Live provider returned empty candle set for {symbol}.")
+
+    candles.sort(key=lambda item: int(item["ts"]))
+    latest = candles[-1]
+    previous = candles[-2] if len(candles) > 1 else latest
+    price = _as_float(latest["close"])
+    reference = _as_float(previous["close"] if len(candles) > 1 else latest["open"], default=price)
+    change = price - reference
+    change_pct = (change / reference * 100) if reference else 0.0
+    tick = {
+        "symbol": symbol,
+        "price": round(price, 2),
+        "change": round(change, 2),
+        "changePct": round(change_pct, 2),
+        "volume": _as_int(latest["volume"]),
+        "high": round(_as_float(latest["high"], default=price), 2),
+        "low": round(_as_float(latest["low"], default=price), 2),
+        "open": round(_as_float(latest["open"], default=price), 2),
+        "ceiling": round(reference * 1.07, 2),
+        "floor": round(reference * 0.93, 2),
+        "reference": round(reference, 2),
+        "timestamp": int(datetime.now(tz=UTC).timestamp() * 1000),
+    }
+    return tick, candles
+
+
+def _load_symbol_live_tick(symbol: str, preset: str) -> dict[str, object]:
+    end_date = date.today()
+    start_date = end_date - timedelta(days=45)
+    tick, candles = _load_symbol_live_data(symbol, start_date, end_date)
+    _save_candles_to_db(candles[-45:])
+    _save_tick_to_db(tick, preset)
+    return tick
+
+
 # ── SSE progress generator ─────────────────────────────────────
 async def _generate_progress(
     symbols: list[str],
@@ -344,6 +472,7 @@ async def _generate_progress(
     preset: str,
 ) -> AsyncGenerator[str, None]:
     """Stream SSE progress events while loading data."""
+    provider_mode = _resolve_data_provider_mode()
     total = len(symbols)
     end_date = date.today()
     start_date = end_date - timedelta(days=365 * years)
@@ -356,6 +485,7 @@ async def _generate_progress(
             "mode": "load",
             "start_date": start_date.isoformat(),
             "end_date": end_date.isoformat(),
+            "provider_mode": provider_mode,
         },
     )
 
@@ -371,37 +501,36 @@ async def _generate_progress(
             },
         )
 
-        # Generate mock data (replace with real vnstock in production)
-        delay = random.uniform(0.03, 0.10)
-        await asyncio.sleep(delay)
+        if provider_mode == "mock":
+            delay = random.uniform(0.03, 0.10)
+            await asyncio.sleep(delay)
 
-        rng = random.Random(hash(symbol))
-        base_price = rng.uniform(10, 150)
-        change = random.uniform(-3, 3)
-        price = round(base_price + change, 2)
-        ref = round(base_price, 2)
-        volume = random.randint(100_000, 5_000_000)
+            rng = random.Random(hash(symbol))
+            base_price = rng.uniform(10, 150)
+            change = random.uniform(-3, 3)
+            price = round(base_price + change, 2)
+            ref = round(base_price, 2)
+            volume = random.randint(100_000, 5_000_000)
 
-        tick = {
-            "symbol": symbol,
-            "price": price,
-            "change": round(change, 2),
-            "changePct": round(change / base_price * 100, 2),
-            "volume": volume,
-            "high": round(price + random.uniform(0, 2), 2),
-            "low": round(price - random.uniform(0, 2), 2),
-            "open": round(base_price + random.uniform(-1, 1), 2),
-            "ceiling": round(ref * 1.07, 2),
-            "floor": round(ref * 0.93, 2),
-            "reference": ref,
-            "timestamp": int(datetime.now(tz=UTC).timestamp() * 1000),
-        }
+            tick = {
+                "symbol": symbol,
+                "price": price,
+                "change": round(change, 2),
+                "changePct": round(change / base_price * 100, 2),
+                "volume": volume,
+                "high": round(price + random.uniform(0, 2), 2),
+                "low": round(price - random.uniform(0, 2), 2),
+                "open": round(base_price + random.uniform(-1, 1), 2),
+                "ceiling": round(ref * 1.07, 2),
+                "floor": round(ref * 0.93, 2),
+                "reference": ref,
+                "timestamp": int(datetime.now(tz=UTC).timestamp() * 1000),
+            }
+            candles = _generate_candles(symbol, years)
+        else:
+            tick, candles = _load_symbol_live_data(symbol, start_date, end_date)
 
-        # Save to DB
         _save_tick_to_db(tick, preset)
-
-        # Generate and save candle data
-        candles = _generate_candles(symbol, years)
         _save_candles_to_db(candles)
 
         yield _sse("tick", {**tick, "candles": len(candles)})
@@ -427,6 +556,7 @@ async def _generate_incremental_progress(
     preset: str,
 ) -> AsyncGenerator[str, None]:
     """Stream SSE progress for incremental update using existing cached universe."""
+    provider_mode = _resolve_data_provider_mode()
     conn = _get_conn()
     meta_rows = conn.execute(
         "SELECT years FROM load_metadata WHERE preset = ?",
@@ -451,6 +581,7 @@ async def _generate_incremental_progress(
             "total": total,
             "years": years,
             "mode": "update",
+            "provider_mode": provider_mode,
         },
     )
 
@@ -467,39 +598,41 @@ async def _generate_incremental_progress(
             },
         )
 
-        # Incremental update: refresh latest tick snapshot only (no full candle regeneration).
-        await asyncio.sleep(random.uniform(0.01, 0.03))
-        row = conn.execute(
-            """SELECT price, reference
-               FROM market_cache
-               WHERE symbol = ? AND preset = ?""",
-            [symbol, preset],
-        ).fetchone()
+        if provider_mode == "mock":
+            await asyncio.sleep(random.uniform(0.01, 0.03))
+            row = conn.execute(
+                """SELECT price, reference
+                   FROM market_cache
+                   WHERE symbol = ? AND preset = ?""",
+                [symbol, preset],
+            ).fetchone()
 
-        rng = random.Random(f"{symbol}-{int(datetime.now(tz=UTC).timestamp())}")
-        prev_price = float(row[0]) if row else rng.uniform(10, 150)
-        reference = float(row[1]) if row else prev_price
-        change = rng.uniform(-2, 2)
-        price = round(max(1.0, prev_price + change), 2)
-        high = round(max(price, prev_price) + rng.uniform(0, 1.5), 2)
-        low = round(max(0.5, min(price, prev_price) - rng.uniform(0, 1.5)), 2)
-        volume = rng.randint(100_000, 5_000_000)
+            rng = random.Random(f"{symbol}-{int(datetime.now(tz=UTC).timestamp())}")
+            prev_price = float(row[0]) if row else rng.uniform(10, 150)
+            reference = float(row[1]) if row else prev_price
+            change = rng.uniform(-2, 2)
+            price = round(max(1.0, prev_price + change), 2)
+            high = round(max(price, prev_price) + rng.uniform(0, 1.5), 2)
+            low = round(max(0.5, min(price, prev_price) - rng.uniform(0, 1.5)), 2)
+            volume = rng.randint(100_000, 5_000_000)
 
-        tick = {
-            "symbol": symbol,
-            "price": price,
-            "change": round(price - reference, 2),
-            "changePct": round(((price - reference) / reference * 100) if reference else 0, 2),
-            "volume": volume,
-            "high": high,
-            "low": low,
-            "open": round(prev_price, 2),
-            "ceiling": round(reference * 1.07, 2),
-            "floor": round(reference * 0.93, 2),
-            "reference": round(reference, 2),
-            "timestamp": int(datetime.now(tz=UTC).timestamp() * 1000),
-        }
-        _save_tick_to_db(tick, preset)
+            tick = {
+                "symbol": symbol,
+                "price": price,
+                "change": round(price - reference, 2),
+                "changePct": round(((price - reference) / reference * 100) if reference else 0, 2),
+                "volume": volume,
+                "high": high,
+                "low": low,
+                "open": round(prev_price, 2),
+                "ceiling": round(reference * 1.07, 2),
+                "floor": round(reference * 0.93, 2),
+                "reference": round(reference, 2),
+                "timestamp": int(datetime.now(tz=UTC).timestamp() * 1000),
+            }
+            _save_tick_to_db(tick, preset)
+        else:
+            tick = _load_symbol_live_tick(symbol, preset)
         yield _sse("tick", {**tick, "mode": "update"})
 
     _save_metadata(preset, total, years)
@@ -551,6 +684,45 @@ class _DeterministicInsightEngine:
             f"ưu tiên kiểm soát rủi ro trước khi nâng tỷ trọng. "
             f"Số tín hiệu tin tức tham chiếu: {max(0, news_count - 1)}."
         )
+
+
+class _OpenAIInsightEngine:
+    """Remote LLM insight engine using OpenAI-compatible chat completions API."""
+
+    def __init__(self, api_key: str, model: str, base_url: str = "https://api.openai.com/v1") -> None:
+        self._api_key = api_key.strip()
+        self._model = model.strip() or "gpt-4o-mini"
+        self._base_url = base_url.rstrip("/")
+
+    async def generate(self, prompt: str) -> str:
+        if not self._api_key:
+            raise RuntimeError("OPENAI_API_KEY is missing.")
+        payload = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": "You are a financial analysis assistant for Vietnam stocks."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+            "max_tokens": 700,
+        }
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        url = f"{self._base_url}/chat/completions"
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+        if response.status_code >= 400:
+            raise RuntimeError(f"OpenAI API error {response.status_code}: {response.text[:240]}")
+        body = response.json()
+        choices = body.get("choices", [])
+        if not choices:
+            raise RuntimeError("OpenAI API returned empty choices.")
+        content = choices[0].get("message", {}).get("content", "")
+        if not isinstance(content, str) or not content.strip():
+            raise RuntimeError("OpenAI API returned empty content.")
+        return content.strip()
 
 
 class _LocalNewsPort:
@@ -964,12 +1136,32 @@ async def _generate_screener_progress(
     executor = ExecutorAgent(broker_port=None)
     fundamental: FundamentalAgent | None = None
     steps = _AGENT_STEPS_BASE
+    ai_provider = "deterministic"
+    ai_remote_enabled = False
     try:
+        provider_raw = os.getenv("AGENT_AI_PROVIDER", "deterministic").strip().lower()
+        ai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+        if provider_raw in {"openai", "llm"}:
+            openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+            openai_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").strip()
+            if openai_key:
+                engine: Any = _OpenAIInsightEngine(api_key=openai_key, model=ai_model, base_url=openai_base_url)
+                ai_provider = "openai"
+                ai_remote_enabled = True
+            else:
+                engine = _DeterministicInsightEngine()
+                ai_provider = "deterministic"
+                logger.warning("AGENT_AI_PROVIDER=openai but OPENAI_API_KEY is missing; fallback to deterministic engine.")
+        else:
+            engine = _DeterministicInsightEngine()
+
         prompts_dir = Path(os.getenv("PROMPTS_DIR", "data/prompts"))
         registry = PromptRegistry(prompts_dir)
+        # Validate prompt contract at startup to avoid late KeyError in stream runtime.
+        registry.get_active("financial_analysis")
         prompt_builder = FinancialPromptBuilder(registry)
         fundamental = FundamentalAgent(
-            engine=_DeterministicInsightEngine(),
+            engine=engine,
             prompt_builder=prompt_builder,
             news_port=news_port,
             financial_data_port=financial_data_port,
@@ -999,6 +1191,8 @@ async def _generate_screener_progress(
             "device": "CPU",
             "fundamental_enabled": fundamental is not None,
             "external_sources": use_external_sources,
+            "ai_provider": ai_provider,
+            "ai_remote_enabled": ai_remote_enabled,
         },
     )
 
@@ -1188,6 +1382,8 @@ async def _generate_screener_progress(
             "fundamental_coverage": fundamental_coverage,
             "news_coverage": news_coverage,
             "external_sources": use_external_sources,
+            "ai_provider": ai_provider,
+            "ai_remote_enabled": ai_remote_enabled,
             "executed_at": datetime.now(UTC).isoformat(),
         },
     )

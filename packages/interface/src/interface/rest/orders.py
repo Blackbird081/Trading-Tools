@@ -5,6 +5,7 @@ import json
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
@@ -40,7 +41,7 @@ class PlaceOrderRequest(BaseModel):
     side: Literal["BUY", "SELL"]
     order_type: Literal["LO", "ATO", "ATC", "MP"] = "LO"
     quantity: int = Field(ge=100, le=10_000_000)
-    price: float = Field(gt=0)
+    price: Decimal = Field(gt=Decimal("0"))
     idempotency_key: str = Field(min_length=8, max_length=128)
     mode: Literal["dry-run", "live"] | None = None
     confirm_token: str | None = None
@@ -83,17 +84,25 @@ def _is_true(value: str) -> bool:
 
 
 def _payload_hash(payload: PlaceOrderRequest, mode: str) -> str:
+    price = payload.price.quantize(Decimal("0.000001"))
     canonical = {
         "symbol": payload.symbol,
         "side": payload.side,
         "order_type": payload.order_type,
         "quantity": payload.quantity,
-        "price": round(payload.price, 6),
+        "price": str(price),
         "mode": mode,
         "idempotency_key": payload.idempotency_key,
     }
     encoded = json.dumps(canonical, ensure_ascii=True, sort_keys=True).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _as_decimal(value: Any, default: str = "0") -> Decimal:
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal(default)
 
 
 def _validate_live_guardrails(payload: PlaceOrderRequest, mode: str) -> dict[str, Any]:
@@ -116,24 +125,25 @@ def _validate_live_guardrails(payload: PlaceOrderRequest, mode: str) -> dict[str
         raise HTTPException(status_code=429, detail="Cooldown active after repeated rejections.")
 
     summary = compute_portfolio(mode=mode)
-    pnl_total = float(summary.get("realized_pnl", 0)) + float(summary.get("unrealized_pnl", 0))
-    daily_loss = max(0.0, -pnl_total)
-    max_daily_loss = float(os.getenv("MAX_DAILY_LOSS", "50000000"))
+    pnl_total = _as_decimal(summary.get("realized_pnl", 0)) + _as_decimal(summary.get("unrealized_pnl", 0))
+    daily_loss = max(Decimal("0"), -pnl_total)
+    max_daily_loss = _as_decimal(os.getenv("MAX_DAILY_LOSS", "50000000"))
     if daily_loss > max_daily_loss:
         record_order_rejection(None, "LIVE_BLOCKED_DAILY_LOSS")
         raise HTTPException(status_code=409, detail="Daily loss limit exceeded.")
 
-    notional = payload.price * payload.quantity
-    max_notional = float(os.getenv("MAX_ORDER_NOTIONAL", "200000000"))
+    notional = payload.price * Decimal(payload.quantity)
+    max_notional = _as_decimal(os.getenv("MAX_ORDER_NOTIONAL", "200000000"))
     if notional > max_notional:
         record_order_rejection(None, "LIVE_BLOCKED_MAX_NOTIONAL")
-        raise HTTPException(status_code=409, detail=f"Order notional exceeds limit {max_notional:,.0f}.")
+        raise HTTPException(status_code=409, detail=f"Order notional exceeds limit {float(max_notional):,.0f}.")
 
-    if payload.side == "BUY" and notional > float(summary.get("purchasing_power", 0)):
+    buying_power = _as_decimal(summary.get("purchasing_power", 0))
+    if payload.side == "BUY" and notional > buying_power:
         record_order_rejection(None, "LIVE_BLOCKED_BUYING_POWER")
         raise HTTPException(status_code=409, detail="Insufficient purchasing power.")
 
-    return {"portfolio": summary, "notional": notional}
+    return {"portfolio": summary, "notional": float(notional)}
 
 
 def _live_confirm_key(token: str) -> str:
@@ -204,7 +214,8 @@ async def place_order(payload: PlaceOrderRequest) -> dict[str, Any]:
         return {**cached, "was_duplicate": True}
 
     order_id = str(uuid.uuid4())
-    reference, ceiling, floor = reference_prices(payload.symbol, fallback_price=payload.price)
+    payload_json = payload.model_dump(mode="json")
+    reference, ceiling, floor = reference_prices(payload.symbol, fallback_price=float(payload.price))
     created_at = now_utc()
     risk_summary = {
         "mode": mode,
@@ -229,7 +240,7 @@ async def place_order(payload: PlaceOrderRequest) -> dict[str, Any]:
             rejection_reason = "Live broker adapter unavailable"
             success = False
             error = rejection_reason
-            dlq_id = enqueue_dlq(order_id, payload.model_dump(), rejection_reason)
+            dlq_id = enqueue_dlq(order_id, payload_json, rejection_reason)
             record_order_rejection(order_id, rejection_reason)
 
     order = {
@@ -253,7 +264,7 @@ async def place_order(payload: PlaceOrderRequest) -> dict[str, Any]:
         "updated_at": created_at,
     }
     upsert_order(order)
-    log_order_audit(order_id, "placed", {"payload": payload.model_dump(), "status": status, "mode": mode, "dlq_id": dlq_id})
+    log_order_audit(order_id, "placed", {"payload": payload_json, "status": status, "mode": mode, "dlq_id": dlq_id})
 
     if status == "MATCHED":
         save_portfolio_snapshot(mode=mode)

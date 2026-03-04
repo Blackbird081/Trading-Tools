@@ -226,6 +226,75 @@ Policy note:
 - Full frontend global coverage is tracked separately and is not yet at 90% total-line level.
 - Real API key onboarding is blocked until this pre-live backend gate passes on the release candidate branch.
 
+### 0.11 Independent Audit Remediation Roadmap (Locked)
+
+Based on independent technical audit, the following remediation pack is mandatory before broad live-trading rollout.
+
+#### AR-1 Runtime Security Middleware Activation (Critical)
+- Problem:
+  - Runtime bootstrap does not yet enforce full middleware activation policy for rate-limit/auth on sensitive endpoints.
+- Scope:
+  - Wire `RateLimitMiddleware` and auth middleware policy in app bootstrap.
+  - Add endpoint-level tests for unauthorized and throttled access.
+- Acceptance:
+  - Sensitive endpoints (`/api/orders*`, `/api/safety*`, `/api/setup*`) are protected in non-dev mode.
+  - Automated tests verify both allow and reject paths.
+
+#### AR-2 Data Provider Policy: No Mock in Production (Critical)
+- Problem:
+  - Loader runtime path still includes synthetic data generation branch.
+- Scope:
+  - Introduce explicit provider mode contract (`mock` vs `live`).
+  - Enforce production environment to run `live` provider only.
+- Acceptance:
+  - Production-like run cannot execute mock branch.
+  - `load`/`update` flow passes with real provider contract.
+
+#### AR-3 Monetary Precision Migration to `Decimal` (Critical)
+- Problem:
+  - Monetary request/validation path still includes `float` usage.
+- Scope:
+  - Replace `float` with `Decimal` for order price/notional and related risk checks.
+  - Add precision regression tests for boundary cases.
+- Acceptance:
+  - No float-based monetary arithmetic in OMS risk-sensitive path.
+  - Precision test suite passes in CI.
+
+#### AR-4 Frontend Coverage Uplift (High)
+- Problem:
+  - Frontend global statement coverage is still below release-grade threshold.
+- Scope:
+  - Expand risk-based integration tests for dashboard/order/screener/market-board critical flows.
+  - Add gate threshold `frontend statements >= 80%` for release branch.
+- Acceptance:
+  - Frontend global coverage reaches and maintains >= 80%.
+  - Coverage artifact published per release candidate.
+
+#### AR-5 Safe Gate Targeting (High)
+- Problem:
+  - Phase-gate script currently has production API base default.
+- Scope:
+  - Change default target to local/non-production.
+  - Require explicit override + safety confirmation for production smoke.
+- Acceptance:
+  - Local gate execution cannot hit production unintentionally.
+  - Production smoke remains available with explicit, auditable opt-in.
+
+Execution order (locked):
+1. AR-1 + AR-3
+2. AR-2 + AR-5
+3. AR-4
+
+Release blocking rule:
+- Real API key onboarding and broad live rollout are blocked until AR-1/2/3 pass acceptance.
+
+Execution update (2026-03-04):
+- `AR-1` DONE (gated): runtime `AuthMiddleware` + `RateLimitMiddleware` are active in app bootstrap with integration tests for unauthorized/429 paths.
+- `AR-2` DONE (gated): `DATA_PROVIDER_MODE` contract implemented (`mock`/`live`), with production guard that blocks `mock`.
+- `AR-3` DONE (gated): OMS risk-sensitive monetary checks migrated to `Decimal` with boundary precision regression coverage.
+- `AR-5` DONE (gated): `phase-gates.ps1` now defaults to local API base and requires explicit `-AllowProductionTarget` for production endpoints.
+- `AR-4` remains OPEN and is the next hardening priority (frontend global coverage uplift >= 80%).
+
 ---
 
 ## PHASE 1: FOUNDATION & CORE DOMAIN

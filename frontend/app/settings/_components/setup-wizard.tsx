@@ -6,6 +6,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 const STORAGE_KEY = "tt.local.setup.draft.v1";
 
 type TradingMode = "dry-run" | "live";
+type AiProvider = "deterministic" | "openvino" | "openai";
 
 interface SetupDraft {
   tradingMode: TradingMode;
@@ -15,6 +16,9 @@ interface SetupDraft {
   ssiConsumerSecret: string;
   ssiAccountNo: string;
   ssiPrivateKeyB64: string;
+  aiProvider: AiProvider;
+  openaiApiKey: string;
+  openaiModel: string;
   aiModelPath: string;
 }
 
@@ -40,6 +44,9 @@ const DEFAULT_DRAFT: SetupDraft = {
   ssiConsumerSecret: "",
   ssiAccountNo: "",
   ssiPrivateKeyB64: "",
+  aiProvider: "deterministic",
+  openaiApiKey: "",
+  openaiModel: "gpt-4o-mini",
   aiModelPath: "data/models/phi-3-mini-int4",
 };
 
@@ -56,6 +63,8 @@ export function SetupWizard() {
   const [probeChecks, setProbeChecks] = useState<CheckItem[]>([]);
   const [runtimeMode, setRuntimeMode] = useState<TradingMode>("dry-run");
   const [runtimeDataPath, setRuntimeDataPath] = useState<string>("-");
+  const [runtimeAiProvider, setRuntimeAiProvider] = useState<AiProvider>("deterministic");
+  const [runtimeOpenAiModel, setRuntimeOpenAiModel] = useState<string>("gpt-4o-mini");
   const [busy, setBusy] = useState<"idle" | "runtime" | "validate" | "init" | "probe">("idle");
   const [message, setMessage] = useState<string>("");
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
@@ -116,10 +125,14 @@ export function SetupWizard() {
       const data = (await res.json()) as {
         mode?: TradingMode;
         data_path?: string;
+        ai_provider?: AiProvider;
+        openai_model?: string;
         checks?: CheckItem[];
       };
       setRuntimeMode(data.mode ?? "dry-run");
       setRuntimeDataPath(data.data_path ?? "-");
+      setRuntimeAiProvider(data.ai_provider ?? "deterministic");
+      setRuntimeOpenAiModel(data.openai_model ?? "gpt-4o-mini");
       setRuntimeChecks(Array.isArray(data.checks) ? data.checks : []);
       setMessage("Runtime status refreshed.");
     } catch {
@@ -144,6 +157,9 @@ export function SetupWizard() {
           ssi_consumer_secret: draft.ssiConsumerSecret,
           ssi_account_no: draft.ssiAccountNo,
           ssi_private_key_b64: draft.ssiPrivateKeyB64,
+          ai_provider: draft.aiProvider,
+          openai_api_key: draft.openaiApiKey,
+          openai_model: draft.openaiModel,
           ai_model_path: draft.aiModelPath,
         }),
       });
@@ -219,6 +235,9 @@ export function SetupWizard() {
             ssi_consumer_secret: draft.ssiConsumerSecret,
             ssi_account_no: draft.ssiAccountNo,
             ssi_private_key_b64: draft.ssiPrivateKeyB64,
+            agent_ai_provider: draft.aiProvider,
+            openai_api_key: draft.openaiApiKey,
+            openai_model: draft.openaiModel,
             ai_model_path: draft.aiModelPath,
           },
         }),
@@ -387,6 +406,27 @@ export function SetupWizard() {
             placeholder="SSI_PRIVATE_KEY_B64"
             className="min-h-20 rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
           />
+          <select
+            value={draft.aiProvider}
+            onChange={(e) => updateDraft("aiProvider", e.target.value as AiProvider)}
+            className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
+          >
+            <option value="deterministic">AGENT_AI_PROVIDER=deterministic</option>
+            <option value="openvino">AGENT_AI_PROVIDER=openvino</option>
+            <option value="openai">AGENT_AI_PROVIDER=openai</option>
+          </select>
+          <input
+            value={draft.openaiModel}
+            onChange={(e) => updateDraft("openaiModel", e.target.value)}
+            placeholder="OPENAI_MODEL (e.g. gpt-4o-mini)"
+            className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+          />
+          <input
+            value={draft.openaiApiKey}
+            onChange={(e) => updateDraft("openaiApiKey", e.target.value)}
+            placeholder="OPENAI_API_KEY"
+            className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
+          />
           <input
             value={draft.aiModelPath}
             onChange={(e) => updateDraft("aiModelPath", e.target.value)}
@@ -454,6 +494,8 @@ export function SetupWizard() {
             <div className="rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-300">
               <div>Mode: {runtimeMode}</div>
               <div>Data path: {runtimeDataPath}</div>
+              <div>Agent AI provider: {runtimeAiProvider}</div>
+              <div>OpenAI model: {runtimeOpenAiModel}</div>
               <div>Ready: {localReady ? "yes" : "no"}</div>
             </div>
             <div className="space-y-2">
