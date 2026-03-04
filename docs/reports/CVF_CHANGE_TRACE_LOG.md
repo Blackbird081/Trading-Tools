@@ -436,3 +436,111 @@ Notes:
 - Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` AI-07/AI-08/AI-09 + `IMPLEMENTATION_PLAN.md` execution update (`AI-R1/AI-R2/AI-R3`)
 - Owner: Codex + project owner
 - Notes: Current implementation is baseline/offline and dataset-fixed by design; next step is scheduled weekly automation and production-snapshot dataset versioning.
+
+### CVF-TT-20260304-026
+- Date-Time (UTC+7): 2026-03-04 15:55
+- Type: docs
+- Scope: Re-assess and update master implementation governance section with current risk posture, baseline reliability metrics snapshot, and locked next-execution order after AI reliability pack rollout.
+- Impact: `IMPLEMENTATION_PLAN.md` now provides a current decision-ready checkpoint (`0.12`) with explicit status summary, risk interpretation, and prioritized next gates (`AR-4`, reliability automation, provider parity calibration).
+- Root Cause: User requested a fresh assessment update in the master plan to keep execution and release governance synchronized with latest repository state.
+- Files Changed: `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `rg -n "Release blocking rule|0.12 Re-Assessment Snapshot|Locked next execution order|Next checkpoint acceptance" docs/plans/IMPLEMENTATION_PLAN.md` (pass)
+  - Manual consistency check against roadmap status table (`docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`) (pass)
+- Deployment Target: planning/governance baseline
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.11` execution continuity + Section `0.12` re-assessment checkpoint
+- Owner: Codex + project owner
+- Notes: This update does not change runtime behavior; it updates governance decisions and sequencing only.
+
+### CVF-TT-20260304-027
+- Date-Time (UTC+7): 2026-03-04 16:35
+- Type: feature
+- Scope: Implement native multi-provider AI runtime support (`OpenAI`, `Anthropic`, `Gemini`, `Alibaba`) in screener pipeline; add task-router model policy (`coder/reasoning/writing`) across providers; and expose direct provider selection/config in setup status/validation + Settings draft/profile flow.
+- Impact: Local users can select provider natively via `AGENT_AI_PROVIDER` (`openai|anthropic|gemini|alibaba`) and configure provider-specific key/model fields in Settings/profile; screener metadata reports active `ai_provider` + routed `ai_model`; settings clearly states draft auto-save behavior and secure profile-save path.
+- Root Cause: Product direction requires local users to choose preferred AI provider directly instead of relying only on OpenAI-compatible path.
+- Files Changed: `packages/interface/src/interface/rest/data_loader.py`, `packages/interface/src/interface/rest/setup.py`, `frontend/app/settings/_components/setup-wizard.tsx`, `tests/integration/test_setup_api.py`, `tests/unit/test_data_loader_helpers.py`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `python -m py_compile packages/interface/src/interface/rest/setup.py packages/interface/src/interface/rest/data_loader.py` (pass)
+  - `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src;. python -m pytest tests/integration/test_setup_api.py tests/unit/test_data_loader_helpers.py -q` (pass, 18 tests)
+  - `pnpm -C frontend exec tsc --noEmit` (pass)
+- Deployment Target: backend screener/setup runtime + frontend settings
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` AI-10 baseline + `IMPLEMENTATION_PLAN.md` execution update (`AI-Provider Native Runtime`)
+- Owner: Codex + project owner
+- Notes: This phase adds native provider wiring and settings path; provider parity calibration and weekly reliability automation remain separate follow-ups.
+
+### CVF-TT-20260304-028
+- Date-Time (UTC+7): 2026-03-04 23:20
+- Type: docs
+- Scope: Update master/local roadmaps with a locked pre-live expert completion pack before implementation start (`REL-01`, `UX-01`, `DATA-01`, `SEC-01`, `AI-11`, `AI-12`, `OBS-01`, `OPS-01`).
+- Impact: Roadmap now has explicit execution order (`E1 -> E4`), release-blocking policy, and acceptance mapping so the next implementation cycle can proceed with CVF-controlled sequencing.
+- Root Cause: User requested roadmap lock/update first before executing additional hardening and product-completion work.
+- Files Changed: `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `rg -n "0.13 Expert Completion Roadmap Update|REL-01|UX-01|DATA-01|SEC-01|AI-11|AI-12|OBS-01|OPS-01|Locked execution order \\(updated\\)" docs/plans/IMPLEMENTATION_PLAN.md` (pass)
+  - `rg -n "REL-01|UX-01|DATA-01|SEC-01|AI-11|AI-12|OBS-01|OPS-01|Immediate Expert Completion Pack" docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md` (pass)
+- Deployment Target: planning/governance baseline
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.13` + `LOCAL_PERSONAL_TRADING_ROADMAP.md` execution mapping snapshot / immediate pack
+- Owner: Codex + project owner
+- Notes: This entry is roadmap/governance only; technical implementation starts in subsequent change sets.
+
+### CVF-TT-20260304-029
+- Date-Time (UTC+7): 2026-03-04 23:55
+- Type: feature
+- Scope: Execute `E1` roadmap pack (`REL-01` + `UX-01`) by implementing explicit Setup Save/Apply UX and enforcing release quality gates with backend/frontend coverage thresholds.
+- Impact: Settings no longer relies on implicit autosave behavior; users now have explicit `Save Draft` / `Apply Draft` / `Revert` controls with clear saved state. Release validation now blocks on backend critical coverage and frontend critical-flow coverage thresholds.
+- Root Cause: Prior setup flow caused autosave ambiguity; release validation did not enforce end-to-end coverage gates aligned with financial-safe policy.
+- Files Changed: `frontend/app/settings/_components/setup-wizard.tsx`, `frontend/__tests__/integration/setup-wizard.test.tsx`, `tests/unit/test_data_loader_helpers.py`, `scripts/pre-live-api-gate.ps1`, `scripts/release-validation.ps1`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `pnpm -C frontend exec tsc --noEmit` (pass)
+  - `pnpm -C frontend exec vitest run __tests__/integration/setup-wizard.test.tsx __tests__/integration/data-loader.test.tsx` (pass, 4 tests)
+  - `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src python -m pytest tests/unit/test_data_loader_helpers.py tests/integration/test_data_loader_api.py --cov=interface.rest.data_loader --cov-report=term -q` (pass, module coverage `98%`)
+  - `powershell -ExecutionPolicy Bypass -File scripts/pre-live-api-gate.ps1 -StrictWarnings -WithFrontend` (pass; backend critical total `98.36%`, frontend critical lines `81.06%`)
+  - `powershell -ExecutionPolicy Bypass -File scripts/release-validation.ps1` (pass; overall `PASS`)
+- Deployment Target: frontend settings UX + backend/test release gate workflow + roadmap docs
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.13` (`E1`) + `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`REL-01`, `UX-01`)
+- Owner: Codex + project owner
+- Notes: `E1` completed; next active phase is `E2` (`DATA-01` + `SEC-01`).
+
+### CVF-TT-20260304-030
+- Date-Time (UTC+7): 2026-03-04 17:20
+- Type: bugfix
+- Scope: Execute `E2` completion pack (`DATA-01` + `SEC-01`) for local runtime hardening.
+- Impact: Data cache now has schema marker + migration metadata and startup integrity checks; backup/restore commands are available; setup/runtime diagnostics paths redact sensitive values consistently.
+- Root Cause: `E2` roadmap items were still open (`NOT STARTED`) and lacked enforceable operational controls/evidence for cache integrity and secret safety.
+- Files Changed: `packages/interface/src/interface/rest/data_loader.py`, `packages/interface/src/interface/app.py`, `packages/interface/src/interface/rest/setup.py`, `packages/interface/src/interface/redaction.py`, `scripts/data-cache-backup.ps1`, `scripts/data-cache-restore.ps1`, `tests/unit/test_redaction.py`, `tests/unit/test_data_loader_helpers.py`, `tests/integration/test_setup_api.py`, `tests/integration/test_setup_profiles_api.py`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src python -m pytest tests/unit/test_redaction.py tests/unit/test_data_loader_helpers.py tests/integration/test_setup_api.py tests/integration/test_setup_profiles_api.py -q` (pass, 36 tests)
+- Deployment Target: backend runtime + setup security + roadmap governance docs
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.13` (`E2`) + `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`DATA-01`, `SEC-01`)
+- Owner: Codex + project owner
+- Notes: Cache integrity is now visible in setup status and startup logs with redacted failure output.
+
+### CVF-TT-20260304-031
+- Date-Time (UTC+7): 2026-03-04 17:55
+- Type: feature
+- Scope: Execute `E3` + `E4` baseline completion (`AI-11`, `AI-12`, `AI-R4`, `OBS-01`, `OPS-01`) with test-backed integration.
+- Impact: Settings now exposes model recommendation matrix + failover/cost policy controls; screener AI runtime enforces fallback order and per-run timeout/budget/max-call constraints; correlation-id propagates through REST/SSE and failed flows are queryable via observability API; weekly reliability pack automation and consolidated operator runbook are in place.
+- Root Cause: Remaining roadmap items in `E3/E4` were still open and blocked broader local distribution per CVF execution policy.
+- Files Changed: `packages/interface/src/interface/rest/data_loader.py`, `packages/interface/src/interface/rest/setup.py`, `packages/interface/src/interface/rest/orders.py`, `packages/interface/src/interface/app.py`, `packages/interface/src/interface/observability.py`, `packages/interface/src/interface/middleware/correlation_id.py`, `packages/interface/src/interface/rest/observability.py`, `frontend/app/settings/_components/setup-wizard.tsx`, `frontend/__tests__/integration/setup-wizard.test.tsx`, `tests/integration/test_observability_api.py`, `tests/integration/test_setup_api.py`, `tests/unit/test_data_loader_helpers.py`, `scripts/run-weekly-reliability-pack.ps1`, `.github/workflows/reliability-weekly.yml`, `scripts/release-validation.ps1`, `docs/plans/LOCAL_OPERATOR_RUNBOOK.md`, `docs/plans/LOCAL_RELEASE_CHECKLIST.md`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `README.md`, `docs/reports/AI_RELIABILITY_WEEKLY_LATEST.md`, `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src python -m pytest tests/unit/test_redaction.py tests/unit/test_data_loader_helpers.py tests/integration/test_setup_api.py tests/integration/test_setup_profiles_api.py tests/integration/test_observability_api.py tests/integration/test_local_product_api.py tests/integration/test_order_safety_controls.py -q` (pass, 51 tests)
+  - `pnpm -C frontend exec tsc --noEmit` (pass)
+  - `pnpm -C frontend exec vitest run __tests__/integration/setup-wizard.test.tsx` (pass, 2 tests)
+  - `powershell -ExecutionPolicy Bypass -File scripts/run-weekly-reliability-pack.ps1` (pass, artifact updated)
+  - `powershell -ExecutionPolicy Bypass -File scripts/release-validation.ps1` (pass, overall `PASS`)
+- Deployment Target: backend runtime + frontend settings UX + release/reliability automation + governance docs
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.13` (`E3`, `E4`) + `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`AI-11`, `AI-12`, `OBS-01`, `OPS-01`)
+- Owner: Codex + project owner
+- Notes: Frontend release gate remains at baseline `>=80%`; target `>=90%` uplift is still tracked under `Hardening-A4`.

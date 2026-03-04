@@ -33,11 +33,20 @@ Status scale:
 | Hardening-A2 Real Data Provider Policy | `DONE (gated)` | Added explicit provider contract (`DATA_PROVIDER_MODE=mock/live`) with production guard (`mock` blocked) in `interface.rest.data_loader`; added integration/unit tests (`tests/integration/test_data_loader_api.py`, `tests/unit/test_data_loader_helpers.py`). | Keep live provider dependency (`vnstock`) and source reliability monitored in production. |
 | Hardening-A3 Monetary Precision (`Decimal`) | `DONE (gated)` | Migrated OMS request/risk checks to `Decimal` in `interface.rest.orders` (price/notional/daily-loss/buying-power path); added boundary precision regression test in `tests/integration/test_order_safety_controls.py`. | Continue Decimal migration in downstream analytics/store paths for full end-to-end precision parity. |
 | Hardening-A4 Frontend Coverage Expansion | `NOT STARTED (locked)` | Current frontend global statement coverage is low for release confidence. | Raise frontend global coverage to >= 80% with risk-based test expansion (orders, dashboard, screener, market board). |
+| REL-01 Release Quality Gate Uplift (financial-safe) | `DONE (gated)` | `scripts/pre-live-api-gate.ps1` now supports configurable backend threshold and risk-based frontend coverage scope; `scripts/release-validation.ps1` now enforces backend gate + frontend threshold parsing from coverage artifact; release validation pass with backend critical `98%` and frontend critical lines `81.06%`. | Raise frontend critical-flow threshold from `>=80%` baseline to `>=90%` target after test-pack expansion. |
+| UX-01 Setup Save/Apply Clarity | `DONE (gated)` | `frontend/app/settings/_components/setup-wizard.tsx` now uses explicit `Save Draft`, `Apply Draft`, `Revert` actions with `Saved/Unsaved` status + last-saved timestamp; added integration test `frontend/__tests__/integration/setup-wizard.test.tsx`. | Extend UX consistency to profile import/export rotate flows with same dirty-state semantics. |
+| DATA-01 DuckDB Migration + Backup/Restore + Integrity Gate | `DONE (gated)` | Added cache schema marker + migration metadata + startup integrity probe (`interface.rest.data_loader`, `interface.app`, `interface.rest.setup`) and backup/restore scripts (`scripts/data-cache-backup.ps1`, `scripts/data-cache-restore.ps1`). | Maintain migration marker policy for future schema upgrades. |
+| SEC-01 Secret Redaction Hardening | `DONE (gated)` | Added shared redaction utilities (`interface.redaction`) and applied redaction in setup/data-loader runtime errors, profile decrypt response, and diagnostics paths with tests (`tests/unit/test_redaction.py`, setup/data-loader test updates). | Extend redaction policy to any new external adapter error path. |
 | Hardening-A5 Safe Gate Targeting | `DONE (gated)` | `scripts/phase-gates.ps1` default API base changed to local (`http://localhost:8000/api`) and production targets now require explicit `-AllowProductionTarget` override with fail-fast guard. | Add CI usage examples for guarded production smoke execution. |
 | AI-06 Single-Provider Multi-Role Subagent Orchestration | `DONE (gated)` | `FundamentalAgent` now runs contextual subroles (`thesis`, `valuation`, `news_catalyst`, `risk_challenge`) via a single AI engine/API key and applies deterministic arbitration (`risk_veto_then_consensus`); pipeline emits role metadata (`ai_role_outputs`, `ai_subroles`, `ai_final_action`). | Add strict JSON schema per role and provider-level benchmark calibration (OpenAI/Claude/Gemini parity). |
 | AI-07 Quant Benchmark Pack (`Precision@K`, `Hit-rate`, `MDD`) | `DONE (baseline)` | Added fixed-dataset benchmark artifacts (`tests/evals/data/recommendation_outcomes_fixed.csv`, `tests/evals/reliability_metrics.py`, `tests/evals/benchmark_fixed_dataset.py`) and unit coverage (`tests/unit/test_reliability_eval_pack.py`). | Promote fixed dataset to versioned rolling snapshots from production-like history. |
 | AI-08 Provider A/B + Consensus Check | `DONE (baseline)` | Added provider A/B dataset and evaluator (`tests/evals/data/provider_ab_consensus_fixed.csv`, `tests/evals/provider_ab_consensus.py`) with agreement/per-provider/consensus metrics and tests. | Extend from offline benchmark to runtime dual-provider experiment mode with strict cost controls. |
 | AI-09 Weekly Drift Monitoring (Recommendation vs Outcome) | `DONE (baseline)` | Added weekly drift evaluator (`tests/evals/weekly_drift_monitor.py`) and unified runner (`tests/evals/run_reliability_pack.py`) producing per-week summary + alerts. | Add scheduled weekly CI/job execution and threshold-based release gate integration. |
+| AI-10 Native Multi-Provider Runtime (OpenAI + Anthropic + Gemini + Alibaba) | `DONE (baseline)` | Added native provider wiring in runtime/setup/settings (`interface.rest.data_loader`, `interface.rest.setup`, `frontend/app/settings/_components/setup-wizard.tsx`) with provider-specific API key/model fields/validation and task-router model mapping (`coder/reasoning/writing`) across providers. | Add profile-level provider failover policy and runtime cost controls. |
+| AI-11 Task/Role Model Recommendation Matrix | `DONE (baseline)` | Added setup recommendation API (`GET /api/setup/model-recommendations`) and Settings matrix UI for per-task/per-role provider-model guidance. | Keep matrix calibrated with rolling provider eval results. |
+| AI-12 Provider Failover + Cost Control Policy | `DONE (baseline)` | Added configurable policy (`AGENT_AI_FALLBACK_ORDER`, `AGENT_AI_TIMEOUT_SECONDS`, `AGENT_AI_BUDGET_USD_PER_RUN`, `AGENT_AI_MAX_REMOTE_CALLS`) with runtime failover/budget enforcement in screener AI engine. | Add per-profile UI presets and tighter cost telemetry thresholds. |
+| OBS-01 Correlation-ID + Pipeline Observability | `DONE (baseline)` | Added correlation-id middleware/headers, SSE+REST payload propagation, and observability event API (`/api/observability/events`) wired from load/update/screener/order failure paths. | Expand event coverage to broker adapter and websocket pipeline internals. |
+| OPS-01 Local Runbook and Incident Playbook Closure | `DONE (baseline)` | Added consolidated operator runbook (`docs/plans/LOCAL_OPERATOR_RUNBOOK.md`) and bound it to release checklist + reliability artifact gate. | Keep incident templates and escalation contacts synchronized per release. |
 
 ## Product Direction
 - User downloads and runs app locally on personal machine.
@@ -55,9 +64,14 @@ Status scale:
 - Real broker execution path still uses guarded placeholder; live adapter integration remains.
 - External data quality in live mode depends on broker/data provider availability and credentials.
 - Frontend global coverage remains below release-grade target.
-- Native provider adapters for Anthropic/Gemini are not yet implemented (current remote LLM path is OpenAI-compatible).
+- Frontend critical-flow gate baseline is now `>=80%`; target uplift to `>=90%` is still open.
+- Database operational safeguards (schema migration marker, backup/restore/integrity gate) are not yet formalized.
+- Secret redaction hardening in runtime diagnostics/log paths still needs explicit test-backed enforcement.
+- Provider parity calibration across OpenAI/Anthropic/Gemini/Alibaba is not automated yet.
 - Role outputs are currently narrative text; schema-locked role JSON contract is not yet enforced.
-- AI reliability pack currently uses fixed baseline datasets; scheduled weekly automation is not wired yet.
+- AI reliability pack automation exists; next step is enforce threshold-based release rejection on alert severity.
+- Correlation-id observability exists for REST/SSE/order failures; websocket/broker deep-path coverage remains open.
+- Consolidated local operator runbook is in place; continue runbook drills on each release candidate.
 
 ## Target State (To-Be)
 - One-command local bootstrap and setup wizard.
@@ -65,6 +79,7 @@ Status scale:
 - Real broker sync for portfolio/order status.
 - Real agent pipeline execution with explainable outputs.
 - Single active AI provider per run with contextual subroles and deterministic conflict arbitration.
+- Native user-selectable providers in Settings/profile vault (`OpenAI`, `Anthropic`, `Gemini`, `Alibaba`) on local runtime.
 - Measurable reliability governance via benchmark metrics, A/B consensus validation, and weekly drift alerts.
 - Stable release process aligned with CVF controlled changes.
 
@@ -329,6 +344,23 @@ Exit criteria:
 6. Execute Hardening-A2 and Hardening-A5 before any production-like smoke from developer machines.
 7. Execute AI-06 single-provider subagent orchestration to eliminate cross-provider AI conflicts.
 8. Execute Hardening-A4 as release gate uplift before public/beta user expansion.
+
+## Immediate Expert Completion Pack (Locked, 2026-03-04)
+1. `E1` - `REL-01` + `UX-01`
+2. `E2` - `DATA-01` + `SEC-01`
+3. `E3` - `AI-11` + `AI-12` + automated `AI-09` weekly runner integration
+4. `E4` - `OBS-01` + `OPS-01`
+
+Execution update (2026-03-04):
+- `E1` completed with gate evidence (`release-validation` PASS, explicit settings Save/Apply UX shipped).
+- `E2` completed (cache schema marker/integrity + backup/restore + secret redaction hardening with tests).
+- `E3` completed baseline (model recommendation matrix + provider failover/cost policy + weekly reliability runner automation).
+- `E4` completed baseline (correlation-id propagation + observability events API + consolidated operator runbook).
+- Next focus: Hardening-A4 coverage uplift to move frontend gate from baseline to target.
+
+Exit policy:
+- Do not move to broader real API-key onboarding until `E1` and `E2` are complete.
+- Do not promote to wider local distribution until `E3` and `E4` are complete.
 
 ## Workstreams
 - WS1: Runtime + Installer + Config

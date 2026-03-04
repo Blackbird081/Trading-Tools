@@ -16,6 +16,9 @@
 6. One-shot validation script passes:
    - `powershell -ExecutionPolicy Bypass -File scripts/release-validation.ps1`
    - Output artifact: `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md`
+7. Weekly reliability artifact is refreshed:
+   - `powershell -ExecutionPolicy Bypass -File scripts/run-weekly-reliability-pack.ps1`
+   - Output artifact: `docs/reports/AI_RELIABILITY_WEEKLY_LATEST.md`
 
 ## 2. Local Packaging Validation (Clean Machine)
 1. Clone fresh repo on clean machine.
@@ -55,6 +58,8 @@
 5. Run emergency fallback drill before final sign-off:
    - `powershell -ExecutionPolicy Bypass -File scripts/emergency-fallback-drill.ps1`
    - Output artifact: `docs/reports/LOCAL_EMERGENCY_DRILL_LATEST.md`
+6. Verify consolidated operator runbook is up to date:
+   - `docs/plans/LOCAL_OPERATOR_RUNBOOK.md`
 
 ## 5. Release Output
 1. Release notes include:

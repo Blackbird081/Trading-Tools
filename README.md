@@ -146,6 +146,10 @@ Copy `.env.example` to `.env`:
 | `CORS_ORIGINS` |List of origins for CORS (comma separated)|
 | `TRADING_AUDIT_LOG_DIR` |Audit log directory (default: `.trading/audit`)|
 | `TRADING_SCRATCHPAD_DIR` |scratchpad folder (default: `.trading/scratchpad`)|
+| `AGENT_AI_FALLBACK_ORDER` | Provider failover order (e.g. `anthropic,gemini,deterministic`) |
+| `AGENT_AI_TIMEOUT_SECONDS` | Per-call AI timeout budget (seconds) |
+| `AGENT_AI_BUDGET_USD_PER_RUN` | Estimated max remote AI spend per screener run |
+| `AGENT_AI_MAX_REMOTE_CALLS` | Max number of remote AI calls per screener run |
 
 ## API Endpoints
 
@@ -161,6 +165,8 @@ Copy `.env.example` to `.env`:
 | `POST /api/setup/validate` | Validate setup draft (no persistence) |
 | `POST /api/setup/init-local` | Initialize local DuckDB path for first run |
 | `POST /api/setup/probe-external` | Probe SSI/VNStock/model-path connectivity for setup wizard |
+| `GET /api/setup/model-recommendations` | Model recommendation matrix by task/role |
+| `GET /api/observability/events` | Recent failure events (`load`, `update`, `screener`, `orders`) with correlation IDs |
 | `ws://host/ws/market` | Real-time market data (WebSocket) |
 
 ## Architecture
@@ -218,6 +224,10 @@ Sharpe ratio, Sortino ratio, Calmar ratio, Max Drawdown, CAGR, SQN, Profit Facto
 - **Credentials**: AES-GCM + scrypt KDF, RSA 2048+ bit
 - **Input Validation**: Pydantic models for all API requests (lot size, symbol format, price)
 - **Audit Log**: Append-only JSONL audit trail for all order operations (daily rotation)
+
+## Author
+
+Developed by Tien - Tan Thuan Port @2026
 - **Tool Approval Flow**: confirm before placing the actual order (allow-once/session/deny)
 
 ## Resilience (9.5/10)

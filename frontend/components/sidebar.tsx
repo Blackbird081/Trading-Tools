@@ -62,6 +62,12 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {!collapsed && (
+        <div className="border-t border-zinc-800 px-3 py-2 text-[11px] leading-4 text-zinc-500">
+          Developed by Tien - Tan Thuan Port @2026
+        </div>
+      )}
     </aside>
   );
 }

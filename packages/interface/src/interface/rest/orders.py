@@ -11,6 +11,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
+from interface.observability import get_correlation_id, record_event
 from interface.trading_store import (
     compute_portfolio,
     enqueue_dlq,
@@ -113,15 +114,33 @@ def _validate_live_guardrails(payload: PlaceOrderRequest, mode: str) -> dict[str
     if bool(kill.get("active")):
         reason = str(kill.get("reason") or "Kill switch active")
         record_order_rejection(None, f"LIVE_BLOCKED_KILL_SWITCH: {reason}")
+        record_event(
+            flow="orders",
+            level="warn",
+            message=f"Live order blocked by kill-switch: {reason}",
+            metadata={"symbol": payload.symbol, "side": payload.side},
+        )
         raise HTTPException(status_code=423, detail=reason)
 
     if not market_session_open():
         record_order_rejection(None, "LIVE_BLOCKED_SESSION_CLOSED")
+        record_event(
+            flow="orders",
+            level="warn",
+            message="Live order blocked: session closed",
+            metadata={"symbol": payload.symbol, "side": payload.side},
+        )
         raise HTTPException(status_code=409, detail="Live mode allowed only during market session.")
 
     cooldown_threshold = int(os.getenv("ORDER_REJECT_COOLDOWN_THRESHOLD", "3"))
     if recent_rejection_count(window_minutes=10) >= cooldown_threshold:
         record_order_rejection(None, "LIVE_BLOCKED_REJECTION_COOLDOWN")
+        record_event(
+            flow="orders",
+            level="warn",
+            message="Live order blocked: rejection cooldown active",
+            metadata={"symbol": payload.symbol, "side": payload.side},
+        )
         raise HTTPException(status_code=429, detail="Cooldown active after repeated rejections.")
 
     summary = compute_portfolio(mode=mode)
@@ -130,17 +149,35 @@ def _validate_live_guardrails(payload: PlaceOrderRequest, mode: str) -> dict[str
     max_daily_loss = _as_decimal(os.getenv("MAX_DAILY_LOSS", "50000000"))
     if daily_loss > max_daily_loss:
         record_order_rejection(None, "LIVE_BLOCKED_DAILY_LOSS")
+        record_event(
+            flow="orders",
+            level="warn",
+            message="Live order blocked: daily loss limit exceeded",
+            metadata={"symbol": payload.symbol, "side": payload.side},
+        )
         raise HTTPException(status_code=409, detail="Daily loss limit exceeded.")
 
     notional = payload.price * Decimal(payload.quantity)
     max_notional = _as_decimal(os.getenv("MAX_ORDER_NOTIONAL", "200000000"))
     if notional > max_notional:
         record_order_rejection(None, "LIVE_BLOCKED_MAX_NOTIONAL")
+        record_event(
+            flow="orders",
+            level="warn",
+            message="Live order blocked: max notional exceeded",
+            metadata={"symbol": payload.symbol, "side": payload.side},
+        )
         raise HTTPException(status_code=409, detail=f"Order notional exceeds limit {float(max_notional):,.0f}.")
 
     buying_power = _as_decimal(summary.get("purchasing_power", 0))
     if payload.side == "BUY" and notional > buying_power:
         record_order_rejection(None, "LIVE_BLOCKED_BUYING_POWER")
+        record_event(
+            flow="orders",
+            level="warn",
+            message="Live order blocked: insufficient buying power",
+            metadata={"symbol": payload.symbol, "side": payload.side},
+        )
         raise HTTPException(status_code=409, detail="Insufficient purchasing power.")
 
     return {"portfolio": summary, "notional": float(notional)}
@@ -242,6 +279,12 @@ async def place_order(payload: PlaceOrderRequest) -> dict[str, Any]:
             error = rejection_reason
             dlq_id = enqueue_dlq(order_id, payload_json, rejection_reason)
             record_order_rejection(order_id, rejection_reason)
+            record_event(
+                flow="orders",
+                level="error",
+                message=f"Live broker unavailable. Routed to DLQ: {rejection_reason}",
+                metadata={"order_id": order_id, "symbol": payload.symbol},
+            )
 
     order = {
         "order_id": order_id,
@@ -278,6 +321,7 @@ async def place_order(payload: PlaceOrderRequest) -> dict[str, Any]:
         "status": status,
         "mode": mode,
         "dlq_id": dlq_id,
+        "correlation_id": get_correlation_id(),
     }
     await idempotency.record(payload.idempotency_key, result)
     return result
@@ -298,25 +342,25 @@ async def get_orders(
     limit: int = Query(default=200, ge=1, le=2000),
 ) -> dict[str, Any]:
     rows = list_orders(limit=limit, status=status, symbol=symbol)
-    return {"orders": rows, "count": len(rows)}
+    return {"orders": rows, "count": len(rows), "correlation_id": get_correlation_id()}
 
 
 @router.get("/orders/open")
 async def get_open_orders(limit: int = Query(default=200, ge=1, le=2000)) -> dict[str, Any]:
     statuses = {"CREATED", "PENDING", "PARTIAL_FILL"}
     rows = [o for o in list_orders(limit=limit) if str(o.get("status")) in statuses]
-    return {"orders": rows, "count": len(rows)}
+    return {"orders": rows, "count": len(rows), "correlation_id": get_correlation_id()}
 
 @router.get("/orders/dlq")
 async def get_order_dlq() -> dict[str, Any]:
     rows = list_dlq()
-    return {"items": rows, "count": len(rows)}
+    return {"items": rows, "count": len(rows), "correlation_id": get_correlation_id()}
 
 
 @router.post("/orders/dlq/replay")
 async def replay_order_dlq(payload: DLQReplayRequest) -> dict[str, Any]:
     replayed = try_replay_dlq(payload.dlq_id)
-    return {"replayed": replayed, "count": len(replayed)}
+    return {"replayed": replayed, "count": len(replayed), "correlation_id": get_correlation_id()}
 
 
 @router.get("/orders/{order_id}")

@@ -1,0 +1,32 @@
+name: Weekly AI Reliability Pack
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * 1"
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  reliability-pack:
+    name: Reliability Pack Runner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Run weekly reliability script
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts/run-weekly-reliability-pack.ps1
+      - name: Upload reliability artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: reliability-pack-weekly
+          path: |
+            tests/evals/results/reliability_pack_*.json
+            docs/reports/AI_RELIABILITY_WEEKLY_LATEST.md

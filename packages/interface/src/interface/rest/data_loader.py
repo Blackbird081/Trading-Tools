@@ -17,6 +17,7 @@ import re
 import tempfile
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -28,11 +29,16 @@ import httpx
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 
+from interface.observability import get_correlation_id, record_event
+from interface.redaction import redact_text
+
 logger = logging.getLogger("interface.data_loader")
 
 router = APIRouter()
 _PROVIDER_MODES = {"mock", "live"}
 _PRODUCTION_ENVS = {"prod", "production"}
+_CACHE_SCHEMA_VERSION = "2026.03.04-e2"
+_CACHE_MIGRATION_MARKER = "data-loader-cache-migration-e2"
 
 # ── DB connection (lazy singleton) ──────────────────────────────
 _conn: duckdb.DuckDBPyConnection | None = None
@@ -71,17 +77,18 @@ def _get_conn() -> duckdb.DuckDBPyConnection:
             try:
                 db_path.parent.mkdir(parents=True, exist_ok=True)
                 _conn = duckdb.connect(str(db_path))
-                _conn.execute(_CACHE_DDL)
+                _ensure_cache_schema(_conn)
+                _run_cache_integrity_check(_conn)
                 logger.info("Data loader cache DB initialized at %s", db_path)
                 break
             except Exception as exc:  # pragma: no cover - environment-specific fallback
                 last_error = exc
-                logger.warning("Failed to initialize data loader DB at %s: %s", db_path, exc)
+                logger.warning("Failed to initialize data loader DB at %s: %s", db_path, redact_text(str(exc)))
                 _conn = None
 
         if _conn is None:
             raise RuntimeError(
-                f"Unable to initialize data loader DB at candidates={_db_path_candidates()}: {last_error}"
+                f"Unable to initialize data loader DB at candidates={_db_path_candidates()}: {redact_text(str(last_error))}"
             )
     return _conn
 
@@ -121,7 +128,71 @@ CREATE TABLE IF NOT EXISTS load_metadata (
     symbol_count INTEGER NOT NULL,
     years        INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS cache_metadata (
+    key          VARCHAR PRIMARY KEY,
+    value        VARCHAR NOT NULL,
+    updated_at   TIMESTAMP NOT NULL
+);
 """
+
+
+def _ensure_cache_schema(conn: duckdb.DuckDBPyConnection) -> None:
+    conn.execute(_CACHE_DDL)
+    now = datetime.now(tz=UTC)
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO cache_metadata (key, value, updated_at)
+        VALUES ('schema_version', ?, ?)
+        """,
+        [_CACHE_SCHEMA_VERSION, now],
+    )
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO cache_metadata (key, value, updated_at)
+        VALUES ('migration_marker', ?, ?)
+        """,
+        [_CACHE_MIGRATION_MARKER, now],
+    )
+
+
+def _run_cache_integrity_check(conn: duckdb.DuckDBPyConnection) -> dict[str, object]:
+    required_tables = {"market_cache", "market_candles", "load_metadata", "cache_metadata"}
+    rows = conn.execute(
+        """
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'main'
+        """
+    ).fetchall()
+    existing = {str(row[0]) for row in rows}
+    missing = sorted(required_tables - existing)
+    if missing:
+        raise RuntimeError(f"Cache integrity check failed. Missing tables: {', '.join(missing)}")
+
+    schema_row = conn.execute("SELECT value FROM cache_metadata WHERE key = 'schema_version'").fetchone()
+    if not schema_row:
+        raise RuntimeError("Cache integrity check failed. schema_version metadata is missing.")
+
+    marker_row = conn.execute("SELECT value FROM cache_metadata WHERE key = 'migration_marker'").fetchone()
+    if not marker_row:
+        raise RuntimeError("Cache integrity check failed. migration_marker metadata is missing.")
+
+    conn.execute("SELECT COUNT(*) FROM market_cache").fetchone()
+    conn.execute("SELECT COUNT(*) FROM market_candles").fetchone()
+    conn.execute("SELECT COUNT(*) FROM load_metadata").fetchone()
+    return {
+        "ok": True,
+        "schema_version": str(schema_row[0]),
+        "migration_marker": str(marker_row[0]),
+        "tables": sorted(existing),
+    }
+
+
+def get_cache_runtime_health() -> dict[str, object]:
+    """Public helper for startup/runtime diagnostics."""
+    conn = _get_conn()
+    return _run_cache_integrity_check(conn)
 
 # ── Symbol lists ────────────────────────────────────────────────
 VN30_SYMBOLS: list[str] = [
@@ -686,19 +757,175 @@ class _DeterministicInsightEngine:
         )
 
 
+def _detect_task_type(prompt: str) -> str:
+    """Detect task type for model routing: coder | reasoning | writing."""
+    text = prompt.lower()
+    code_keywords = [
+        "code", "refactor", "debug", "bug", "function", "class", "api",
+        "script", "python", "typescript", "sql", "implementation",
+    ]
+    reasoning_keywords = [
+        "plan", "workflow", "reason", "logic", "trade-off", "architecture",
+        "risk", "strategy", "analysis", "why", "how", "thesis", "valuation",
+        "risk_challenge", "recommendation_bias",
+    ]
+    writing_keywords = [
+        "css", "ui", "ux", "style", "layout", "design", "document", "docs",
+        "readme", "copywriting", "thiet ke", "giao dien", "summary", "headline",
+    ]
+    if any(keyword in text for keyword in code_keywords):
+        return "coder"
+    if any(keyword in text for keyword in writing_keywords):
+        return "writing"
+    if any(keyword in text for keyword in reasoning_keywords):
+        return "reasoning"
+    return "reasoning"
+
+
+def _select_model_by_task(prompt: str, *, coder: str, reasoning: str, writing: str) -> str:
+    task = _detect_task_type(prompt)
+    if task == "coder":
+        return coder
+    if task == "writing":
+        return writing
+    return reasoning
+
+
+_PROVIDER_ALIASES = {
+    "openai": "openai",
+    "llm": "openai",
+    "anthropic": "anthropic",
+    "claude": "anthropic",
+    "gemini": "gemini",
+    "google": "gemini",
+    "alibaba": "alibaba",
+    "qwen": "alibaba",
+    "kimi": "alibaba",
+    "minimax": "alibaba",
+    "deterministic": "deterministic",
+}
+_REMOTE_COST_PER_1K_TOKENS_USD: dict[str, float] = {
+    "openai": 0.0008,
+    "anthropic": 0.0010,
+    "gemini": 0.0005,
+    "alibaba": 0.0006,
+}
+
+
+def _normalize_provider(raw: str) -> str:
+    key = raw.strip().lower()
+    return _PROVIDER_ALIASES.get(key, "deterministic")
+
+
+def _parse_fallback_order(primary: str, fallback_raw: str) -> list[str]:
+    chain: list[str] = [_normalize_provider(primary)]
+    for token in fallback_raw.split(","):
+        normalized = _normalize_provider(token)
+        if normalized in chain:
+            continue
+        chain.append(normalized)
+    return chain
+
+
+def _estimate_call_cost_usd(prompt: str, provider: str) -> float:
+    if provider == "deterministic":
+        return 0.0
+    per_1k = _REMOTE_COST_PER_1K_TOKENS_USD.get(provider, 0.001)
+    estimated_tokens = max(120, len(prompt) // 4)
+    return round((estimated_tokens / 1000.0) * per_1k, 6)
+
+
+@dataclass(slots=True)
+class _EngineCandidate:
+    provider: str
+    model_banner: str
+    engine: Any
+    remote: bool
+
+
+class _FailoverBudgetEngine:
+    """Failover wrapper with per-run timeout/cost safeguards."""
+
+    def __init__(
+        self,
+        candidates: list[_EngineCandidate],
+        *,
+        budget_usd_per_run: float,
+        max_remote_calls: int,
+    ) -> None:
+        self._candidates = candidates
+        self._budget_usd_per_run = max(0.01, budget_usd_per_run)
+        self._max_remote_calls = max(1, max_remote_calls)
+        self._spent_usd = 0.0
+        self._remote_calls = 0
+        self.last_provider = "deterministic"
+        self.last_model = "deterministic-v1"
+
+    async def generate(self, prompt: str) -> str:
+        errors: list[str] = []
+        for candidate in self._candidates:
+            estimated_cost = _estimate_call_cost_usd(prompt, candidate.provider)
+            if candidate.remote:
+                if self._remote_calls >= self._max_remote_calls:
+                    errors.append(
+                        f"{candidate.provider} skipped: remote call limit {self._max_remote_calls} reached"
+                    )
+                    continue
+                if self._spent_usd + estimated_cost > self._budget_usd_per_run:
+                    errors.append(
+                        (
+                            f"{candidate.provider} skipped: budget exceeded "
+                            f"({self._spent_usd:.4f}+{estimated_cost:.4f}>{self._budget_usd_per_run:.4f})"
+                        )
+                    )
+                    continue
+            try:
+                text = await candidate.engine.generate(prompt)
+                if candidate.remote:
+                    self._remote_calls += 1
+                    self._spent_usd += estimated_cost
+                self.last_provider = candidate.provider
+                self.last_model = candidate.model_banner
+                return text
+            except Exception as exc:
+                errors.append(f"{candidate.provider} failed: {redact_text(str(exc))}")
+
+        raise RuntimeError("; ".join(errors) if errors else "No AI engine candidate available.")
+
+
 class _OpenAIInsightEngine:
     """Remote LLM insight engine using OpenAI-compatible chat completions API."""
 
-    def __init__(self, api_key: str, model: str, base_url: str = "https://api.openai.com/v1") -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model_reasoning: str,
+        model_coder: str,
+        model_writing: str,
+        base_url: str = "https://api.openai.com/v1",
+        timeout_seconds: float = 20.0,
+    ) -> None:
         self._api_key = api_key.strip()
-        self._model = model.strip() or "gpt-4o-mini"
+        self._model_reasoning = model_reasoning.strip() or "gpt-4o-mini"
+        self._model_coder = model_coder.strip() or self._model_reasoning
+        self._model_writing = model_writing.strip() or self._model_reasoning
         self._base_url = base_url.rstrip("/")
+        self._timeout_seconds = max(3.0, float(timeout_seconds))
+
+    def _select_model(self, prompt: str) -> str:
+        return _select_model_by_task(
+            prompt,
+            coder=self._model_coder,
+            reasoning=self._model_reasoning,
+            writing=self._model_writing,
+        )
 
     async def generate(self, prompt: str) -> str:
         if not self._api_key:
             raise RuntimeError("OPENAI_API_KEY is missing.")
+        model_name = self._select_model(prompt)
         payload = {
-            "model": self._model,
+            "model": model_name,
             "messages": [
                 {"role": "system", "content": "You are a financial analysis assistant for Vietnam stocks."},
                 {"role": "user", "content": prompt},
@@ -711,10 +938,10 @@ class _OpenAIInsightEngine:
             "Content-Type": "application/json",
         }
         url = f"{self._base_url}/chat/completions"
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
             response = await client.post(url, headers=headers, json=payload)
         if response.status_code >= 400:
-            raise RuntimeError(f"OpenAI API error {response.status_code}: {response.text[:240]}")
+            raise RuntimeError(f"OpenAI API error {response.status_code}: {redact_text(response.text[:240])}")
         body = response.json()
         choices = body.get("choices", [])
         if not choices:
@@ -723,6 +950,369 @@ class _OpenAIInsightEngine:
         if not isinstance(content, str) or not content.strip():
             raise RuntimeError("OpenAI API returned empty content.")
         return content.strip()
+
+
+class _AnthropicInsightEngine:
+    """Native Anthropic Messages API engine."""
+
+    def __init__(
+        self,
+        api_key: str,
+        model_reasoning: str,
+        model_coder: str,
+        model_writing: str,
+        base_url: str = "https://api.anthropic.com/v1",
+        timeout_seconds: float = 20.0,
+    ) -> None:
+        self._api_key = api_key.strip()
+        self._model_reasoning = model_reasoning.strip() or "claude-3-5-haiku-latest"
+        self._model_coder = model_coder.strip() or self._model_reasoning
+        self._model_writing = model_writing.strip() or self._model_reasoning
+        self._base_url = base_url.rstrip("/")
+        self._timeout_seconds = max(3.0, float(timeout_seconds))
+
+    def _select_model(self, prompt: str) -> str:
+        return _select_model_by_task(
+            prompt,
+            coder=self._model_coder,
+            reasoning=self._model_reasoning,
+            writing=self._model_writing,
+        )
+
+    async def generate(self, prompt: str) -> str:
+        if not self._api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY is missing.")
+        model_name = self._select_model(prompt)
+        payload = {
+            "model": model_name,
+            "max_tokens": 700,
+            "temperature": 0.2,
+            "system": "You are a financial analysis assistant for Vietnam stocks.",
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        headers = {
+            "x-api-key": self._api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+        url = f"{self._base_url}/messages"
+        async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+            response = await client.post(url, headers=headers, json=payload)
+        if response.status_code >= 400:
+            raise RuntimeError(f"Anthropic API error {response.status_code}: {redact_text(response.text[:240])}")
+        body = response.json()
+        segments = body.get("content", [])
+        text_parts: list[str] = []
+        if isinstance(segments, list):
+            for segment in segments:
+                if isinstance(segment, dict) and segment.get("type") == "text":
+                    txt = segment.get("text")
+                    if isinstance(txt, str) and txt.strip():
+                        text_parts.append(txt.strip())
+        if text_parts:
+            return "\n".join(text_parts)
+        completion = body.get("completion")
+        if isinstance(completion, str) and completion.strip():
+            return completion.strip()
+        raise RuntimeError("Anthropic API returned empty content.")
+
+
+class _GeminiInsightEngine:
+    """Native Google Gemini GenerateContent API engine."""
+
+    def __init__(
+        self,
+        api_key: str,
+        model_reasoning: str,
+        model_coder: str,
+        model_writing: str,
+        base_url: str = "https://generativelanguage.googleapis.com/v1beta",
+        timeout_seconds: float = 20.0,
+    ) -> None:
+        self._api_key = api_key.strip()
+        self._model_reasoning = model_reasoning.strip() or "gemini-1.5-flash"
+        self._model_coder = model_coder.strip() or self._model_reasoning
+        self._model_writing = model_writing.strip() or self._model_reasoning
+        self._base_url = base_url.rstrip("/")
+        self._timeout_seconds = max(3.0, float(timeout_seconds))
+
+    def _select_model(self, prompt: str) -> str:
+        return _select_model_by_task(
+            prompt,
+            coder=self._model_coder,
+            reasoning=self._model_reasoning,
+            writing=self._model_writing,
+        )
+
+    async def generate(self, prompt: str) -> str:
+        if not self._api_key:
+            raise RuntimeError("GEMINI_API_KEY is missing.")
+        model_name = self._select_model(prompt)
+        payload = {
+            "systemInstruction": {
+                "parts": [{"text": "You are a financial analysis assistant for Vietnam stocks."}],
+            },
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": prompt}],
+                },
+            ],
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 700,
+            },
+        }
+        url = f"{self._base_url}/models/{model_name}:generateContent"
+        async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+            response = await client.post(url, params={"key": self._api_key}, json=payload)
+        if response.status_code >= 400:
+            raise RuntimeError(f"Gemini API error {response.status_code}: {redact_text(response.text[:240])}")
+        body = response.json()
+        candidates = body.get("candidates", [])
+        if isinstance(candidates, list) and candidates:
+            content = candidates[0].get("content", {})
+            parts = content.get("parts", []) if isinstance(content, dict) else []
+            if isinstance(parts, list):
+                text_parts: list[str] = []
+                for part in parts:
+                    if isinstance(part, dict):
+                        txt = part.get("text")
+                        if isinstance(txt, str) and txt.strip():
+                            text_parts.append(txt.strip())
+                if text_parts:
+                    return "\n".join(text_parts)
+        raise RuntimeError("Gemini API returned empty content.")
+
+
+class _AlibabaTaskRouterInsightEngine:
+    """Alibaba-compatible adapter with task-based model routing.
+
+    Routing policy:
+    - code/refactor -> model_coder
+    - logic/plan/deep reasoning -> model_reasoning
+    - css/ui/docs writing -> model_writing
+    - default -> model_reasoning
+    """
+
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        model_coder: str,
+        model_reasoning: str,
+        model_writing: str,
+        timeout_seconds: float = 20.0,
+    ) -> None:
+        self._api_key = api_key.strip()
+        self._base_url = base_url.rstrip("/")
+        self._model_coder = model_coder.strip() or "qwen2.5-coder-32b-instruct"
+        self._model_reasoning = model_reasoning.strip() or "kimi-k2.5"
+        self._model_writing = model_writing.strip() or "minimax-m2.5"
+        self._timeout_seconds = max(3.0, float(timeout_seconds))
+
+    def _select_model(self, prompt: str) -> str:
+        return _select_model_by_task(
+            prompt,
+            coder=self._model_coder,
+            reasoning=self._model_reasoning,
+            writing=self._model_writing,
+        )
+
+    async def generate(self, prompt: str) -> str:
+        if not self._api_key:
+            raise RuntimeError("ALIBABA_API_KEY is missing.")
+        model_name = self._select_model(prompt)
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": "You are a financial analysis assistant for Vietnam stocks."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+            "max_tokens": 700,
+        }
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        url = f"{self._base_url}/chat/completions"
+        async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+            response = await client.post(url, headers=headers, json=payload)
+        if response.status_code >= 400:
+            raise RuntimeError(f"Alibaba-compatible API error {response.status_code}: {redact_text(response.text[:240])}")
+        body = response.json()
+        choices = body.get("choices", [])
+        if not choices:
+            raise RuntimeError("Alibaba-compatible API returned empty choices.")
+        content = choices[0].get("message", {}).get("content", "")
+        if not isinstance(content, str) or not content.strip():
+            raise RuntimeError("Alibaba-compatible API returned empty content.")
+        return content.strip()
+
+
+def _build_insight_engine_from_env() -> tuple[Any, str, bool, str]:
+    """Resolve AI provider and build insight engine.
+
+    Returns: (engine, provider_name, remote_enabled, model_name)
+    """
+    primary_provider = _normalize_provider(os.getenv("AGENT_AI_PROVIDER", "deterministic"))
+    fallback_raw = os.getenv("AGENT_AI_FALLBACK_ORDER", "")
+    fallback_enabled = bool(fallback_raw.strip())
+    provider_chain = _parse_fallback_order(primary_provider, fallback_raw) if fallback_enabled else [primary_provider]
+    if fallback_enabled and "deterministic" not in provider_chain:
+        provider_chain.append("deterministic")
+    timeout_seconds = float(os.getenv("AGENT_AI_TIMEOUT_SECONDS", "20"))
+    budget_usd_per_run = float(os.getenv("AGENT_AI_BUDGET_USD_PER_RUN", "0.25"))
+    max_remote_calls = int(os.getenv("AGENT_AI_MAX_REMOTE_CALLS", "40"))
+
+    candidates: list[_EngineCandidate] = []
+    warnings: list[str] = []
+
+    for provider in provider_chain:
+        if provider == "openai":
+            openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+            if not openai_key:
+                warnings.append("openai key missing")
+                continue
+            model_reasoning = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+            model_coder = os.getenv("OPENAI_MODEL_CODER", model_reasoning or "gpt-4o-mini").strip()
+            model_writing = os.getenv("OPENAI_MODEL_WRITING", model_reasoning or "gpt-4o-mini").strip()
+            base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").strip()
+            model_banner = f"router(coder={model_coder},reasoning={model_reasoning},writing={model_writing})"
+            candidates.append(
+                _EngineCandidate(
+                    provider="openai",
+                    model_banner=model_banner,
+                    remote=True,
+                    engine=_OpenAIInsightEngine(
+                        api_key=openai_key,
+                        model_reasoning=model_reasoning,
+                        model_coder=model_coder,
+                        model_writing=model_writing,
+                        base_url=base_url,
+                        timeout_seconds=timeout_seconds,
+                    ),
+                )
+            )
+            continue
+
+        if provider == "anthropic":
+            anthropic_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+            if not anthropic_key:
+                warnings.append("anthropic key missing")
+                continue
+            model_reasoning = os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest").strip()
+            model_coder = os.getenv("ANTHROPIC_MODEL_CODER", model_reasoning or "claude-3-5-haiku-latest").strip()
+            model_writing = os.getenv(
+                "ANTHROPIC_MODEL_WRITING",
+                model_reasoning or "claude-3-5-haiku-latest",
+            ).strip()
+            base_url = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1").strip()
+            model_banner = f"router(coder={model_coder},reasoning={model_reasoning},writing={model_writing})"
+            candidates.append(
+                _EngineCandidate(
+                    provider="anthropic",
+                    model_banner=model_banner,
+                    remote=True,
+                    engine=_AnthropicInsightEngine(
+                        api_key=anthropic_key,
+                        model_reasoning=model_reasoning,
+                        model_coder=model_coder,
+                        model_writing=model_writing,
+                        base_url=base_url,
+                        timeout_seconds=timeout_seconds,
+                    ),
+                )
+            )
+            continue
+
+        if provider == "gemini":
+            gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+            if not gemini_key:
+                warnings.append("gemini key missing")
+                continue
+            model_reasoning = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
+            model_coder = os.getenv("GEMINI_MODEL_CODER", model_reasoning or "gemini-1.5-flash").strip()
+            model_writing = os.getenv("GEMINI_MODEL_WRITING", model_reasoning or "gemini-1.5-flash").strip()
+            base_url = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta").strip()
+            model_banner = f"router(coder={model_coder},reasoning={model_reasoning},writing={model_writing})"
+            candidates.append(
+                _EngineCandidate(
+                    provider="gemini",
+                    model_banner=model_banner,
+                    remote=True,
+                    engine=_GeminiInsightEngine(
+                        api_key=gemini_key,
+                        model_reasoning=model_reasoning,
+                        model_coder=model_coder,
+                        model_writing=model_writing,
+                        base_url=base_url,
+                        timeout_seconds=timeout_seconds,
+                    ),
+                )
+            )
+            continue
+
+        if provider == "alibaba":
+            alibaba_key = os.getenv("ALIBABA_API_KEY", "").strip()
+            if not alibaba_key:
+                warnings.append("alibaba key missing")
+                continue
+            model_coder = os.getenv("ALIBABA_MODEL_CODER", "qwen2.5-coder-32b-instruct").strip()
+            model_reasoning = os.getenv("ALIBABA_MODEL_REASONING", "kimi-k2.5").strip()
+            model_writing = os.getenv("ALIBABA_MODEL_WRITING", "minimax-m2.5").strip()
+            base_url = os.getenv("ALIBABA_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1").strip()
+            model_banner = f"router(coder={model_coder},reasoning={model_reasoning},writing={model_writing})"
+            candidates.append(
+                _EngineCandidate(
+                    provider="alibaba",
+                    model_banner=model_banner,
+                    remote=True,
+                    engine=_AlibabaTaskRouterInsightEngine(
+                        api_key=alibaba_key,
+                        base_url=base_url,
+                        model_coder=model_coder,
+                        model_reasoning=model_reasoning,
+                        model_writing=model_writing,
+                        timeout_seconds=timeout_seconds,
+                    ),
+                )
+            )
+            continue
+
+        candidates.append(
+            _EngineCandidate(
+                provider="deterministic",
+                model_banner="deterministic-v1",
+                remote=False,
+                engine=_DeterministicInsightEngine(),
+            )
+        )
+
+    if not candidates:
+        logger.warning("No remote AI provider available (%s). Fallback to deterministic engine.", ", ".join(warnings))
+        return _DeterministicInsightEngine(), "deterministic", False, "deterministic-v1"
+
+    if len(candidates) == 1:
+        candidate = candidates[0]
+        return candidate.engine, candidate.provider, candidate.remote, candidate.model_banner
+
+    chain_banner = "->".join(candidate.provider for candidate in candidates)
+    model_banner = (
+        f"{candidates[0].model_banner}; failover={chain_banner}; "
+        f"timeout={timeout_seconds:.1f}s budget=${budget_usd_per_run:.2f}/run"
+    )
+    return (
+        _FailoverBudgetEngine(
+            candidates,
+            budget_usd_per_run=budget_usd_per_run,
+            max_remote_calls=max_remote_calls,
+        ),
+        candidates[0].provider,
+        any(candidate.remote for candidate in candidates),
+        model_banner,
+    )
 
 
 class _LocalNewsPort:
@@ -1138,22 +1728,9 @@ async def _generate_screener_progress(
     steps = _AGENT_STEPS_BASE
     ai_provider = "deterministic"
     ai_remote_enabled = False
+    ai_model_name = "deterministic-v1"
     try:
-        provider_raw = os.getenv("AGENT_AI_PROVIDER", "deterministic").strip().lower()
-        ai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
-        if provider_raw in {"openai", "llm"}:
-            openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-            openai_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").strip()
-            if openai_key:
-                engine: Any = _OpenAIInsightEngine(api_key=openai_key, model=ai_model, base_url=openai_base_url)
-                ai_provider = "openai"
-                ai_remote_enabled = True
-            else:
-                engine = _DeterministicInsightEngine()
-                ai_provider = "deterministic"
-                logger.warning("AGENT_AI_PROVIDER=openai but OPENAI_API_KEY is missing; fallback to deterministic engine.")
-        else:
-            engine = _DeterministicInsightEngine()
+        engine, ai_provider, ai_remote_enabled, ai_model_name = _build_insight_engine_from_env()
 
         prompts_dir = Path(os.getenv("PROMPTS_DIR", "data/prompts"))
         registry = PromptRegistry(prompts_dir)
@@ -1193,6 +1770,7 @@ async def _generate_screener_progress(
             "external_sources": use_external_sources,
             "ai_provider": ai_provider,
             "ai_remote_enabled": ai_remote_enabled,
+            "ai_model": ai_model_name,
         },
     )
 
@@ -1395,6 +1973,7 @@ async def _generate_screener_progress(
             "external_sources": use_external_sources,
             "ai_provider": ai_provider,
             "ai_remote_enabled": ai_remote_enabled,
+            "ai_model": ai_model_name,
             "executed_at": datetime.now(UTC).isoformat(),
         },
     )
@@ -1416,6 +1995,8 @@ async def _generate_screener_progress(
             "fundamental_coverage": fundamental_coverage,
             "news_coverage": news_coverage,
             "role_coverage": role_coverage,
+            "ai_provider": ai_provider,
+            "ai_model": ai_model_name,
             "results": results,
         },
     )
@@ -1423,7 +2004,9 @@ async def _generate_screener_progress(
 
 def _sse(event: str, data: dict[str, object]) -> str:
     """Format as Server-Sent Event."""
-    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+    payload = dict(data)
+    payload.setdefault("correlation_id", get_correlation_id())
+    return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
 
 
 async def _safe_sse_stream(
@@ -1437,12 +2020,19 @@ async def _safe_sse_stream(
     except asyncio.CancelledError:
         raise
     except Exception as exc:
-        logger.exception("%s stream failed: %s", mode, exc)
+        safe_error = redact_text(str(exc))
+        record_event(
+            flow=mode,
+            level="error",
+            message=f"{mode} stream failed: {safe_error}",
+            metadata={"kind": "sse_stream"},
+        )
+        logger.error("%s stream failed: %s", mode, safe_error)
         yield _sse(
             "error",
             {
                 "mode": mode,
-                "message": f"{mode.title()} failed: {exc}",
+                "message": f"{mode.title()} failed: {safe_error}",
             },
         )
 
@@ -1507,6 +2097,7 @@ async def get_cached_data(
                 "last_updated": None,
                 "symbol_count": 0,
                 "years": 0,
+                "correlation_id": get_correlation_id(),
             }
 
         last_updated, symbol_count, years = meta_rows[0]
@@ -1551,15 +2142,24 @@ async def get_cached_data(
             "last_updated": updated_str,
             "symbol_count": symbol_count,
             "years": years,
+            "correlation_id": get_correlation_id(),
         }
     except Exception as exc:
-        logger.exception("Failed to read cached data for preset=%s: %s", preset, exc)
+        safe_error = redact_text(str(exc))
+        record_event(
+            flow="load",
+            level="error",
+            message=f"cached-data failed for preset={preset}: {safe_error}",
+            metadata={"endpoint": "cached-data", "preset": preset},
+        )
+        logger.error("Failed to read cached data for preset=%s: %s", preset, safe_error)
         return {
             "ticks": [],
             "last_updated": None,
             "symbol_count": 0,
             "years": 0,
-            "error": str(exc),
+            "error": safe_error,
+            "correlation_id": get_correlation_id(),
         }
 
 
@@ -1598,14 +2198,23 @@ async def get_candles(
             "symbol": symbol,
             "candles": candles,
             "count": len(candles),
+            "correlation_id": get_correlation_id(),
         }
     except Exception as exc:
-        logger.exception("Failed to read candles for %s: %s", symbol, exc)
+        safe_error = redact_text(str(exc))
+        record_event(
+            flow="load",
+            level="error",
+            message=f"candles failed for symbol={symbol}: {safe_error}",
+            metadata={"endpoint": "candles", "symbol": symbol},
+        )
+        logger.error("Failed to read candles for %s: %s", symbol, safe_error)
         return {
             "symbol": symbol,
             "candles": [],
             "count": 0,
-            "error": str(exc),
+            "error": safe_error,
+            "correlation_id": get_correlation_id(),
         }
 
 
@@ -1626,6 +2235,7 @@ async def check_updates(
                 "needs_update": True,
                 "reason": "no_data",
                 "last_updated": None,
+                "correlation_id": get_correlation_id(),
             }
 
         last_updated = meta_rows[0][0]
@@ -1646,14 +2256,23 @@ async def check_updates(
             "age_hours": round(age_hours, 1),
             "symbol_count": meta_rows[0][1],
             "years": meta_rows[0][2],
+            "correlation_id": get_correlation_id(),
         }
     except Exception as exc:
-        logger.exception("Failed to check updates for preset=%s: %s", preset, exc)
+        safe_error = redact_text(str(exc))
+        record_event(
+            flow="update",
+            level="error",
+            message=f"check-updates failed for preset={preset}: {safe_error}",
+            metadata={"endpoint": "check-updates", "preset": preset},
+        )
+        logger.error("Failed to check updates for preset=%s: %s", preset, safe_error)
         return {
             "needs_update": True,
             "reason": "db_error",
             "last_updated": None,
-            "error": str(exc),
+            "error": safe_error,
+            "correlation_id": get_correlation_id(),
         }
 
 

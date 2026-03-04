@@ -23,6 +23,8 @@ def test_setup_status_returns_contract(client: TestClient, monkeypatch: pytest.M
     data = response.json()
     assert data["mode"] in {"dry-run", "live"}
     assert isinstance(data["checks"], list)
+    names = {item.get("name") for item in data["checks"]}
+    assert "cache_integrity" in names
     assert "data_path" in data
     assert "all_ready" in data
 
@@ -37,6 +39,10 @@ def test_setup_validate_returns_checks(client: TestClient, tmp_path: Path) -> No
         "ssi_account_no": "12345678",
         "ssi_private_key_b64": "dGVzdA==",
         "ai_provider": "deterministic",
+        "ai_fallback_order": "anthropic,gemini,deterministic",
+        "ai_timeout_seconds": 15,
+        "ai_budget_usd_per_run": 0.3,
+        "ai_max_remote_calls": 20,
         "openai_api_key": "",
         "openai_model": "gpt-4o-mini",
         "ai_model_path": str(tmp_path / "model"),
@@ -48,6 +54,83 @@ def test_setup_validate_returns_checks(client: TestClient, tmp_path: Path) -> No
     assert "recommended_env" in data
     assert "valid" in data
     assert "AGENT_AI_PROVIDER" in data["recommended_env"]
+    assert "ANTHROPIC_MODEL" in data["recommended_env"]
+    assert "GEMINI_MODEL" in data["recommended_env"]
+    assert "ALIBABA_MODEL_REASONING" in data["recommended_env"]
+    assert "OPENAI_MODEL_CODER" in data["recommended_env"]
+    assert "AGENT_AI_FALLBACK_ORDER" in data["recommended_env"]
+    assert "AGENT_AI_TIMEOUT_SECONDS" in data["recommended_env"]
+    assert "AGENT_AI_BUDGET_USD_PER_RUN" in data["recommended_env"]
+    assert "AGENT_AI_MAX_REMOTE_CALLS" in data["recommended_env"]
+
+
+def test_setup_validate_supports_anthropic_provider(client: TestClient, tmp_path: Path) -> None:
+    payload = {
+        "trading_mode": "dry-run",
+        "duckdb_path": str(tmp_path / "setup-test-anthropic.duckdb"),
+        "vnstock_api_key": "abc1234567890",
+        "ssi_consumer_id": "consumer-id",
+        "ssi_consumer_secret": "consumer-secret",
+        "ssi_account_no": "12345678",
+        "ssi_private_key_b64": "dGVzdA==",
+        "ai_provider": "anthropic",
+        "anthropic_api_key": "sk-ant-12345678901234567890",
+        "anthropic_model": "claude-3-5-haiku-latest",
+        "ai_model_path": str(tmp_path / "model"),
+    }
+    response = client.post("/api/setup/validate", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    checks = {item["name"]: item for item in data["checks"]}
+    assert checks["agent_ai_provider"]["status"] == "ok"
+    assert data["recommended_env"]["AGENT_AI_PROVIDER"] == "anthropic"
+
+
+def test_setup_validate_supports_gemini_provider(client: TestClient, tmp_path: Path) -> None:
+    payload = {
+        "trading_mode": "dry-run",
+        "duckdb_path": str(tmp_path / "setup-test-gemini.duckdb"),
+        "vnstock_api_key": "abc1234567890",
+        "ssi_consumer_id": "consumer-id",
+        "ssi_consumer_secret": "consumer-secret",
+        "ssi_account_no": "12345678",
+        "ssi_private_key_b64": "dGVzdA==",
+        "ai_provider": "gemini",
+        "gemini_api_key": "AIza12345678901234567890",
+        "gemini_model": "gemini-1.5-flash",
+        "ai_model_path": str(tmp_path / "model"),
+    }
+    response = client.post("/api/setup/validate", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    checks = {item["name"]: item for item in data["checks"]}
+    assert checks["agent_ai_provider"]["status"] == "ok"
+    assert data["recommended_env"]["AGENT_AI_PROVIDER"] == "gemini"
+
+
+def test_setup_validate_supports_alibaba_provider(client: TestClient, tmp_path: Path) -> None:
+    payload = {
+        "trading_mode": "dry-run",
+        "duckdb_path": str(tmp_path / "setup-test-alibaba.duckdb"),
+        "vnstock_api_key": "abc1234567890",
+        "ssi_consumer_id": "consumer-id",
+        "ssi_consumer_secret": "consumer-secret",
+        "ssi_account_no": "12345678",
+        "ssi_private_key_b64": "dGVzdA==",
+        "ai_provider": "alibaba",
+        "alibaba_api_key": "sk-alibaba-12345678901234567890",
+        "alibaba_base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "alibaba_model_coder": "qwen2.5-coder-32b-instruct",
+        "alibaba_model_reasoning": "kimi-k2.5",
+        "alibaba_model_writing": "minimax-m2.5",
+        "ai_model_path": str(tmp_path / "model"),
+    }
+    response = client.post("/api/setup/validate", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    checks = {item["name"]: item for item in data["checks"]}
+    assert checks["agent_ai_provider"]["status"] == "ok"
+    assert data["recommended_env"]["AGENT_AI_PROVIDER"] == "alibaba"
 
 
 def test_setup_init_local_creates_db(client: TestClient, tmp_path: Path) -> None:
@@ -111,3 +194,13 @@ def test_setup_probe_external_warns_when_sources_missing(
     data = response.json()
     assert data["all_ready"] is False
     assert any(item["status"] == "warn" for item in data["checks"])
+
+
+def test_setup_model_recommendations_contract(client: TestClient) -> None:
+    response = client.get("/api/setup/model-recommendations")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data.get("matrix"), list)
+    assert len(data["matrix"]) >= 4
+    first = data["matrix"][0]
+    assert {"task", "role", "goal", "openai", "anthropic", "gemini", "alibaba"} <= set(first.keys())

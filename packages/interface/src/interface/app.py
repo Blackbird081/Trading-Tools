@@ -8,11 +8,14 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from interface.redaction import redact_text
 from interface.middleware.auth import AuthMiddleware
+from interface.middleware.correlation_id import CorrelationIdMiddleware
 from interface.middleware.rate_limit import RateLimitMiddleware
 from interface.rest.company import router as company_router
-from interface.rest.data_loader import router as data_loader_router
+from interface.rest.data_loader import get_cache_runtime_health, router as data_loader_router
 from interface.rest.health import router as health_router
+from interface.rest.observability import router as observability_router
 from interface.rest.orders import router as orders_router
 from interface.rest.portfolio import router as portfolio_router
 from interface.rest.setup import router as setup_router
@@ -30,7 +33,15 @@ _DEFAULT_DEV_ORIGINS = [
 ]
 
 _ALLOWED_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-_ALLOWED_HEADERS = ["Content-Type", "Authorization", "X-Request-ID", "X-Consumer-ID", "X-Timestamp", "X-Signature"]
+_ALLOWED_HEADERS = [
+    "Content-Type",
+    "Authorization",
+    "X-Request-ID",
+    "X-Correlation-ID",
+    "X-Consumer-ID",
+    "X-Timestamp",
+    "X-Signature",
+]
 
 
 def _get_cors_origins() -> list[str]:
@@ -59,6 +70,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("DuckDB pool initialized: path=%s, max_connections=%d", db_path, max_conn)
     except Exception:
         logger.warning("DuckDB pool initialization failed — running without pool")
+
+    # Startup: data-loader cache integrity check (schema marker + required tables)
+    try:
+        cache_health = get_cache_runtime_health()
+        logger.info(
+            "Data-loader cache integrity ok: schema=%s marker=%s",
+            cache_health.get("schema_version"),
+            cache_health.get("migration_marker"),
+        )
+    except Exception as exc:
+        logger.warning("Data-loader cache integrity check failed: %s", redact_text(str(exc)))
 
     # Startup: DLQ retry worker for failed live orders
     try:
@@ -111,7 +133,9 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=_ALLOWED_METHODS,
         allow_headers=_ALLOWED_HEADERS,
+        expose_headers=["X-Correlation-ID"],
     )
+    app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(
         RateLimitMiddleware,
         requests_per_minute=int(os.getenv("RATE_LIMIT_REQUESTS_PER_MINUTE", "240")),
@@ -124,6 +148,7 @@ def create_app() -> FastAPI:
     app.include_router(orders_router, prefix="/api")
     app.include_router(portfolio_router, prefix="/api")
     app.include_router(setup_router, prefix="/api")
+    app.include_router(observability_router, prefix="/api")
     app.include_router(market_ws_router)
     return app
 

@@ -287,6 +287,7 @@ Execution order (locked):
 
 Release blocking rule:
 - Real API key onboarding and broad live rollout are blocked until AR-1/2/3 pass acceptance.
+- Public/beta expansion and unattended operation are blocked until AR-4 and AI reliability automation pass acceptance.
 
 Execution update (2026-03-04):
 - `AR-1` DONE (gated): runtime `AuthMiddleware` + `RateLimitMiddleware` are active in app bootstrap with integration tests for unauthorized/429 paths.
@@ -294,10 +295,124 @@ Execution update (2026-03-04):
 - `AR-3` DONE (gated): OMS risk-sensitive monetary checks migrated to `Decimal` with boundary precision regression coverage.
 - `AR-5` DONE (gated): `phase-gates.ps1` now defaults to local API base and requires explicit `-AllowProductionTarget` for production endpoints.
 - `AI-Orchestrator` DONE (gated): Fundamental analysis now uses a single-provider multi-role subagent pattern (contextual role routing + deterministic arbitration) to avoid cross-provider conflicts while preserving traceable role outputs.
+- `AI-Provider Native Runtime` DONE (baseline): setup/status/validate and screener runtime now support native `openai`, `anthropic`, `gemini`, and `alibaba` provider selection with provider-specific key/model configuration from Settings/profile draft; task-based model routing (`coder/reasoning/writing`) is applied across providers.
 - `AI-R1 Quant Benchmark` DONE (baseline): fixed historical benchmark now produces `Precision@K`, `Hit-rate`, `MDD` via `tests/evals/benchmark_fixed_dataset.py`.
 - `AI-R2 Provider A/B + Consensus` DONE (baseline): evaluator now reports `agreement_rate`, per-provider hit-rate, and `consensus_hit_rate` via `tests/evals/provider_ab_consensus.py`.
 - `AI-R3 Weekly Drift Monitor` DONE (baseline): weekly recommendation-vs-outcome report and drift alerts are generated via `tests/evals/weekly_drift_monitor.py`.
+- `AI-R4` DONE (baseline): weekly reliability automation is wired via `scripts/run-weekly-reliability-pack.ps1` and scheduled CI workflow `.github/workflows/reliability-weekly.yml`.
 - `AR-4` remains OPEN and is the next hardening priority (frontend global coverage uplift >= 80%).
+
+### 0.12 Re-Assessment Snapshot (2026-03-04)
+
+Status summary:
+- Core hardening readiness: `AR-1/AR-2/AR-3/AR-5` are complete and evidenced.
+- AI pipeline orchestration: single-provider multi-role flow is complete (`AI-Orchestrator`).
+- Native provider capability: runtime supports `OpenAI + Anthropic + Gemini + Alibaba` selection in setup/settings path.
+- AI reliability governance: baseline layer is complete (`AI-R1/AI-R2/AI-R3/AI-R4`) with reproducible artifacts and weekly automation.
+- Remaining release risk: `AR-4` is still open (frontend global regression coverage uplift).
+
+Current baseline metric snapshot (fixed dataset pack):
+- Quant benchmark: `Precision@K=0.60`, `Hit-rate=0.50`, `MDD=0.1554`.
+- Provider A/B: `agreement_rate=0.40`, `consensus_hit_rate=0.40`.
+- Drift monitor: weekly drift alerts are generated correctly; scheduler now publishes weekly artifacts.
+
+Risk interpretation:
+- Security, provider policy, and monetary precision gates are in place.
+- The largest remaining product risk is insufficient frontend regression coverage for safe release scaling.
+- AI reliability output is measurable, but still benchmark-style (offline/fixed dataset), not operationally automated.
+
+Locked next execution order:
+1. `AR-4` Frontend coverage uplift to >=80% statements with risk-critical flows.
+2. `AI-R4` Weekly reliability automation (scheduled runner + artifact publication + threshold alarm).
+3. `AI-R5` Provider parity calibration on rolling datasets (OpenAI/Claude/Gemini comparison harness).
+
+Next checkpoint acceptance:
+- Frontend global coverage gate passes (`>=80%` statements) and is enforced in release validation.
+- Reliability pack runs automatically each week and publishes traceable artifacts.
+- Drift alerts are reviewable in CVF trace and used as release/no-release input.
+
+### 0.13 Expert Completion Roadmap Update (2026-03-04, Pre-Live Local Product)
+
+Purpose:
+- Convert current baseline from "feature-complete" to "release-reliable" for local personal trading users before broad real API-key onboarding.
+- Lock execution order for the next implementation cycle under CVF governance.
+
+#### E1 - Release Quality + Setup UX Clarity (P0)
+- Items:
+  - `REL-01` Raise release gates for financial-safe rollout:
+    - backend critical modules coverage `>= 90%` (already gated, keep mandatory),
+    - frontend global statements `>= 80%` now, target `>= 90%` after test-pack expansion,
+    - release branch blocked when gate fails.
+  - `UX-01` Setup wizard save semantics:
+    - add explicit `Save/Apply` action and `Saved/Unsaved` status,
+    - remove ambiguity around draft auto-save behavior.
+- Acceptance:
+  - user can see explicit save state in Settings/profile flow,
+  - release validation script fails-fast when coverage gates are below threshold.
+
+#### E2 - Data + Security Hardening for Local Runtime (P0)
+- Items:
+  - `DATA-01` DuckDB operational hardening:
+    - schema version + migration marker,
+    - backup/restore scripts,
+    - cache integrity check at startup.
+  - `SEC-01` Local secret safety:
+    - ensure API keys are redacted from logs/error payloads,
+    - confirm no plaintext leak in setup diagnostics path.
+- Acceptance:
+  - database survives upgrade/rollback with migration evidence,
+  - secret redaction tests pass for setup/profile/runtime error paths.
+
+#### E3 - AI Reliability and Provider Governance (P1)
+- Items:
+  - `AI-11` Role-model recommendation matrix:
+    - map task types/agent subroles to provider/model guidance in Settings and docs.
+  - `AI-12` Provider failover + runtime cost controls:
+    - profile-level fallback policy,
+    - per-run budget/timeout guardrails.
+  - `AI-R4` Weekly reliability automation:
+    - scheduled run for benchmark + A/B + drift pack with artifact publication.
+- Acceptance:
+  - user sees clear model-selection guidance per role/task,
+  - reliability artifacts are generated on schedule and linked in CVF trace,
+  - fallback/cost limits are enforceable by configuration.
+
+#### E4 - Operational Observability + Runbook Closure (P1)
+- Items:
+  - `OBS-01` Correlation-id and pipeline observability:
+    - request/pipeline correlation id propagated end-to-end,
+    - dashboard/log query path for failed screener/order flows.
+  - `OPS-01` Local production runbook:
+    - incident triage, rollback, key rotation, recovery drill checklist.
+- Acceptance:
+  - each failed run can be traced by single correlation id,
+  - runbook is executable and referenced by release checklist.
+
+#### Locked execution order (updated)
+1. `E1` (REL-01 + UX-01)
+2. `E2` (DATA-01 + SEC-01)
+3. `E3` (AI-11 + AI-12 + AI-R4)
+4. `E4` (OBS-01 + OPS-01)
+
+Blocking policy:
+- Real API key broad onboarding remains blocked until `E1` and `E2` pass.
+- Wider local distribution/release promotion remains blocked until `E3` and `E4` pass.
+
+Execution update (2026-03-04):
+- `E1` is now `DONE (gated)`:
+  - `REL-01`: release validation now enforces backend critical coverage gate (`>=90%`) and frontend critical-flow gate (`>=80%` baseline, target `>=90%`).
+  - `UX-01`: Settings Setup Wizard now uses explicit `Save Draft` / `Apply Draft` / `Revert` with clear `Saved/Unsaved` state.
+- `E2` is now `DONE (gated)`:
+  - `DATA-01`: cache schema marker + migration metadata + startup integrity checks + backup/restore scripts.
+  - `SEC-01`: setup/runtime redaction policy applied and test-backed (no plaintext secret leak in diagnostics paths).
+- `E3` is now `DONE (baseline)`:
+  - `AI-11`: setup/settings model recommendation matrix by task/role.
+  - `AI-12`: provider failover order + timeout/budget/max-call guardrails are configurable and enforced.
+  - `AI-R4`: weekly reliability runner automation script + scheduled CI workflow artifact publication.
+- `E4` is now `DONE (baseline)`:
+  - `OBS-01`: correlation-id propagation across REST/SSE and observability events query API.
+  - `OPS-01`: consolidated local operator runbook linked into release checklist gate.
+- Next active phase: frontend coverage uplift (`Hardening-A4` / `AR-4`) from baseline threshold to release target.
 
 ---
 

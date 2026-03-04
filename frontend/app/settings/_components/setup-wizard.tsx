@@ -6,7 +6,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 const STORAGE_KEY = "tt.local.setup.draft.v1";
 
 type TradingMode = "dry-run" | "live";
-type AiProvider = "deterministic" | "openvino" | "openai";
+type AiProvider = "deterministic" | "openvino" | "openai" | "anthropic" | "gemini" | "alibaba";
 
 interface SetupDraft {
   tradingMode: TradingMode;
@@ -19,6 +19,25 @@ interface SetupDraft {
   aiProvider: AiProvider;
   openaiApiKey: string;
   openaiModel: string;
+  openaiModelCoder: string;
+  openaiModelWriting: string;
+  anthropicApiKey: string;
+  anthropicModel: string;
+  anthropicModelCoder: string;
+  anthropicModelWriting: string;
+  geminiApiKey: string;
+  geminiModel: string;
+  geminiModelCoder: string;
+  geminiModelWriting: string;
+  alibabaApiKey: string;
+  alibabaBaseUrl: string;
+  alibabaModelCoder: string;
+  alibabaModelReasoning: string;
+  alibabaModelWriting: string;
+  aiFallbackOrder: string;
+  aiTimeoutSeconds: number;
+  aiBudgetUsdPerRun: number;
+  aiMaxRemoteCalls: number;
   aiModelPath: string;
 }
 
@@ -47,8 +66,37 @@ const DEFAULT_DRAFT: SetupDraft = {
   aiProvider: "deterministic",
   openaiApiKey: "",
   openaiModel: "gpt-4o-mini",
+  openaiModelCoder: "gpt-4o-mini",
+  openaiModelWriting: "gpt-4o-mini",
+  anthropicApiKey: "",
+  anthropicModel: "claude-3-5-haiku-latest",
+  anthropicModelCoder: "claude-3-5-haiku-latest",
+  anthropicModelWriting: "claude-3-5-haiku-latest",
+  geminiApiKey: "",
+  geminiModel: "gemini-1.5-flash",
+  geminiModelCoder: "gemini-1.5-flash",
+  geminiModelWriting: "gemini-1.5-flash",
+  alibabaApiKey: "",
+  alibabaBaseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+  alibabaModelCoder: "qwen2.5-coder-32b-instruct",
+  alibabaModelReasoning: "kimi-k2.5",
+  alibabaModelWriting: "minimax-m2.5",
+  aiFallbackOrder: "anthropic,gemini,alibaba,deterministic",
+  aiTimeoutSeconds: 20,
+  aiBudgetUsdPerRun: 0.25,
+  aiMaxRemoteCalls: 40,
   aiModelPath: "data/models/phi-3-mini-int4",
 };
+
+interface ModelRecommendationRow {
+  task: string;
+  role: string;
+  goal: string;
+  openai: string;
+  anthropic: string;
+  gemini: string;
+  alibaba: string;
+}
 
 function statusClass(status: "ok" | "warn"): string {
   return status === "ok"
@@ -65,6 +113,14 @@ export function SetupWizard() {
   const [runtimeDataPath, setRuntimeDataPath] = useState<string>("-");
   const [runtimeAiProvider, setRuntimeAiProvider] = useState<AiProvider>("deterministic");
   const [runtimeOpenAiModel, setRuntimeOpenAiModel] = useState<string>("gpt-4o-mini");
+  const [runtimeAnthropicModel, setRuntimeAnthropicModel] = useState<string>("claude-3-5-haiku-latest");
+  const [runtimeGeminiModel, setRuntimeGeminiModel] = useState<string>("gemini-1.5-flash");
+  const [runtimeAlibabaModelReasoning, setRuntimeAlibabaModelReasoning] = useState<string>("kimi-k2.5");
+  const [runtimeFallbackOrder, setRuntimeFallbackOrder] = useState<string>("anthropic,gemini,alibaba,deterministic");
+  const [runtimeTimeoutSeconds, setRuntimeTimeoutSeconds] = useState<number>(20);
+  const [runtimeBudgetUsd, setRuntimeBudgetUsd] = useState<number>(0.25);
+  const [runtimeMaxRemoteCalls, setRuntimeMaxRemoteCalls] = useState<number>(40);
+  const [modelRecommendations, setModelRecommendations] = useState<ModelRecommendationRow[]>([]);
   const [busy, setBusy] = useState<"idle" | "runtime" | "validate" | "init" | "probe">("idle");
   const [message, setMessage] = useState<string>("");
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
@@ -75,21 +131,28 @@ export function SetupWizard() {
   const [importPayload, setImportPayload] = useState("");
   const [rotateOldPass, setRotateOldPass] = useState("");
   const [rotateNewPass, setRotateNewPass] = useState("");
+  const [savedDraftJson, setSavedDraftJson] = useState<string>(JSON.stringify(DEFAULT_DRAFT));
+  const [lastSavedAt, setLastSavedAt] = useState<string>("");
 
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
+    if (!raw) {
+      const fallback = JSON.stringify(DEFAULT_DRAFT);
+      setSavedDraftJson(fallback);
+      return;
+    }
     try {
       const parsed = JSON.parse(raw) as Partial<SetupDraft>;
-      setDraft((prev) => ({ ...prev, ...parsed }));
+      const merged = { ...DEFAULT_DRAFT, ...parsed };
+      const serialized = JSON.stringify(merged);
+      setDraft(merged);
+      setSavedDraftJson(serialized);
     } catch {
+      const fallback = JSON.stringify(DEFAULT_DRAFT);
+      setSavedDraftJson(fallback);
       // ignore corrupted local storage and keep defaults
     }
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-  }, [draft]);
 
   const fetchProfiles = async () => {
     try {
@@ -106,6 +169,19 @@ export function SetupWizard() {
     void fetchProfiles();
   }, []);
 
+  useEffect(() => {
+    const fetchModelRecommendations = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/setup/model-recommendations`);
+        const data = (await res.json()) as { matrix?: ModelRecommendationRow[] };
+        setModelRecommendations(Array.isArray(data.matrix) ? data.matrix : []);
+      } catch {
+        setModelRecommendations([]);
+      }
+    };
+    void fetchModelRecommendations();
+  }, []);
+
   const localReady = useMemo(
     () =>
       runtimeChecks.length > 0 &&
@@ -116,6 +192,53 @@ export function SetupWizard() {
   const updateDraft = <K extends keyof SetupDraft>(key: K, value: SetupDraft[K]) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
   };
+  const draftJson = useMemo(() => JSON.stringify(draft), [draft]);
+  const isDraftDirty = draftJson !== savedDraftJson;
+
+  const saveDraftLocal = () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, draftJson);
+      setSavedDraftJson(draftJson);
+      setLastSavedAt(new Date().toLocaleString());
+      setMessage("Draft saved locally.");
+    } catch {
+      setMessage("Cannot save draft to local storage.");
+    }
+  };
+
+  const resetToSavedDraft = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        const fallback = JSON.stringify(DEFAULT_DRAFT);
+        setDraft(DEFAULT_DRAFT);
+        setSavedDraftJson(fallback);
+        setMessage("No saved draft found. Reset to defaults.");
+        return;
+      }
+      const parsed = JSON.parse(raw) as Partial<SetupDraft>;
+      const merged = { ...DEFAULT_DRAFT, ...parsed };
+      const serialized = JSON.stringify(merged);
+      setDraft(merged);
+      setSavedDraftJson(serialized);
+      setMessage("Reverted to saved draft.");
+    } catch {
+      setMessage("Cannot restore saved draft.");
+    }
+  };
+
+  const runtimeAiModel =
+    runtimeAiProvider === "openai"
+      ? runtimeOpenAiModel
+      : runtimeAiProvider === "anthropic"
+        ? runtimeAnthropicModel
+        : runtimeAiProvider === "gemini"
+          ? runtimeGeminiModel
+          : runtimeAiProvider === "alibaba"
+            ? runtimeAlibabaModelReasoning
+          : runtimeAiProvider === "openvino"
+            ? draft.aiModelPath
+            : "deterministic-v1";
 
   const fetchRuntimeStatus = async () => {
     setBusy("runtime");
@@ -127,12 +250,26 @@ export function SetupWizard() {
         data_path?: string;
         ai_provider?: AiProvider;
         openai_model?: string;
+        anthropic_model?: string;
+        gemini_model?: string;
+        alibaba_model_reasoning?: string;
+        ai_fallback_order?: string;
+        ai_timeout_seconds?: number;
+        ai_budget_usd_per_run?: number;
+        ai_max_remote_calls?: number;
         checks?: CheckItem[];
       };
       setRuntimeMode(data.mode ?? "dry-run");
       setRuntimeDataPath(data.data_path ?? "-");
       setRuntimeAiProvider(data.ai_provider ?? "deterministic");
       setRuntimeOpenAiModel(data.openai_model ?? "gpt-4o-mini");
+      setRuntimeAnthropicModel(data.anthropic_model ?? "claude-3-5-haiku-latest");
+      setRuntimeGeminiModel(data.gemini_model ?? "gemini-1.5-flash");
+      setRuntimeAlibabaModelReasoning(data.alibaba_model_reasoning ?? "kimi-k2.5");
+      setRuntimeFallbackOrder(data.ai_fallback_order ?? "anthropic,gemini,alibaba,deterministic");
+      setRuntimeTimeoutSeconds(typeof data.ai_timeout_seconds === "number" ? data.ai_timeout_seconds : 20);
+      setRuntimeBudgetUsd(typeof data.ai_budget_usd_per_run === "number" ? data.ai_budget_usd_per_run : 0.25);
+      setRuntimeMaxRemoteCalls(typeof data.ai_max_remote_calls === "number" ? data.ai_max_remote_calls : 40);
       setRuntimeChecks(Array.isArray(data.checks) ? data.checks : []);
       setMessage("Runtime status refreshed.");
     } catch {
@@ -142,9 +279,8 @@ export function SetupWizard() {
     }
   };
 
-  const validateDraft = async () => {
+  const runValidateDraft = async (): Promise<"ok" | "warn" | "error"> => {
     setBusy("validate");
-    setMessage("");
     try {
       const res = await fetch(`${API_BASE}/setup/validate`, {
         method: "POST",
@@ -160,17 +296,65 @@ export function SetupWizard() {
           ai_provider: draft.aiProvider,
           openai_api_key: draft.openaiApiKey,
           openai_model: draft.openaiModel,
+          openai_model_coder: draft.openaiModelCoder,
+          openai_model_writing: draft.openaiModelWriting,
+          anthropic_api_key: draft.anthropicApiKey,
+          anthropic_model: draft.anthropicModel,
+          anthropic_model_coder: draft.anthropicModelCoder,
+          anthropic_model_writing: draft.anthropicModelWriting,
+          gemini_api_key: draft.geminiApiKey,
+          gemini_model: draft.geminiModel,
+          gemini_model_coder: draft.geminiModelCoder,
+          gemini_model_writing: draft.geminiModelWriting,
+          alibaba_api_key: draft.alibabaApiKey,
+          alibaba_base_url: draft.alibabaBaseUrl,
+          alibaba_model_coder: draft.alibabaModelCoder,
+          alibaba_model_reasoning: draft.alibabaModelReasoning,
+          alibaba_model_writing: draft.alibabaModelWriting,
+          ai_fallback_order: draft.aiFallbackOrder,
+          ai_timeout_seconds: draft.aiTimeoutSeconds,
+          ai_budget_usd_per_run: draft.aiBudgetUsdPerRun,
+          ai_max_remote_calls: draft.aiMaxRemoteCalls,
           ai_model_path: draft.aiModelPath,
         }),
       });
       const data = (await res.json()) as { checks?: CheckItem[]; valid?: boolean };
       setValidateChecks(Array.isArray(data.checks) ? data.checks : []);
-      setMessage(data.valid ? "Validation passed." : "Validation finished with warnings.");
+      return data.valid ? "ok" : "warn";
     } catch {
-      setMessage("Validation request failed.");
+      return "error";
     } finally {
       setBusy("idle");
     }
+  };
+
+  const validateDraft = async () => {
+    setMessage("");
+    const result = await runValidateDraft();
+    if (result === "ok") {
+      setMessage("Validation passed.");
+      return;
+    }
+    if (result === "warn") {
+      setMessage("Validation finished with warnings.");
+      return;
+    }
+    setMessage("Validation request failed.");
+  };
+
+  const applyDraft = async () => {
+    setMessage("");
+    saveDraftLocal();
+    const result = await runValidateDraft();
+    if (result === "ok") {
+      setMessage("Draft applied and validation passed.");
+      return;
+    }
+    if (result === "warn") {
+      setMessage("Draft applied with validation warnings.");
+      return;
+    }
+    setMessage("Draft saved, but validation request failed.");
   };
 
   const initLocalPath = async () => {
@@ -238,6 +422,25 @@ export function SetupWizard() {
             agent_ai_provider: draft.aiProvider,
             openai_api_key: draft.openaiApiKey,
             openai_model: draft.openaiModel,
+            openai_model_coder: draft.openaiModelCoder,
+            openai_model_writing: draft.openaiModelWriting,
+            anthropic_api_key: draft.anthropicApiKey,
+            anthropic_model: draft.anthropicModel,
+            anthropic_model_coder: draft.anthropicModelCoder,
+            anthropic_model_writing: draft.anthropicModelWriting,
+            gemini_api_key: draft.geminiApiKey,
+            gemini_model: draft.geminiModel,
+            gemini_model_coder: draft.geminiModelCoder,
+            gemini_model_writing: draft.geminiModelWriting,
+            alibaba_api_key: draft.alibabaApiKey,
+            alibaba_base_url: draft.alibabaBaseUrl,
+            alibaba_model_coder: draft.alibabaModelCoder,
+            alibaba_model_reasoning: draft.alibabaModelReasoning,
+            alibaba_model_writing: draft.alibabaModelWriting,
+            agent_ai_fallback_order: draft.aiFallbackOrder,
+            agent_ai_timeout_seconds: draft.aiTimeoutSeconds,
+            agent_ai_budget_usd_per_run: draft.aiBudgetUsdPerRun,
+            agent_ai_max_remote_calls: draft.aiMaxRemoteCalls,
             ai_model_path: draft.aiModelPath,
           },
         }),
@@ -371,10 +574,46 @@ export function SetupWizard() {
             />
           </label>
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded border px-2 py-1 text-[11px] font-semibold ${
+              isDraftDirty
+                ? "border-amber-800/60 bg-amber-900/20 text-amber-200"
+                : "border-emerald-800/60 bg-emerald-900/20 text-emerald-300"
+            }`}
+          >
+            {isDraftDirty ? "Unsaved changes" : "Saved"}
+          </span>
+          {lastSavedAt && <span className="text-[11px] text-zinc-500">Last saved: {lastSavedAt}</span>}
+          <button
+            onClick={saveDraftLocal}
+            disabled={busy !== "idle" || !isDraftDirty}
+            className="rounded bg-blue-700 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50"
+          >
+            Save Draft
+          </button>
+          <button
+            onClick={applyDraft}
+            disabled={busy !== "idle"}
+            className="rounded bg-emerald-700 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50"
+          >
+            {busy === "validate" ? "Applying..." : "Apply Draft"}
+          </button>
+          <button
+            onClick={resetToSavedDraft}
+            disabled={busy !== "idle" || !isDraftDirty}
+            className="rounded bg-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-100 disabled:opacity-50"
+          >
+            Revert
+          </button>
+        </div>
       </div>
 
       <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
         <h2 className="mb-3 text-sm font-medium text-zinc-300">Step 2 — Key Input (local draft)</h2>
+        <p className="mb-3 text-xs text-zinc-500">
+          Draft is edited locally first. Use `Save Draft`/`Apply Draft` above for explicit actions. For secure persistent save, use Step 4 (Create Encrypted Profile).
+        </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <input
             value={draft.vnstockApiKey}
@@ -414,17 +653,165 @@ export function SetupWizard() {
             <option value="deterministic">AGENT_AI_PROVIDER=deterministic</option>
             <option value="openvino">AGENT_AI_PROVIDER=openvino</option>
             <option value="openai">AGENT_AI_PROVIDER=openai</option>
+            <option value="anthropic">AGENT_AI_PROVIDER=anthropic</option>
+            <option value="gemini">AGENT_AI_PROVIDER=gemini</option>
+            <option value="alibaba">AGENT_AI_PROVIDER=alibaba</option>
           </select>
+          <div className="rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400 sm:col-span-2">
+            Task routing recommendation: `coder` for code/refactor, `reasoning` for analysis/plan/risk, `writing` for CSS/UI/docs.
+          </div>
+          {draft.aiProvider === "openai" && (
+            <>
+              <input
+                value={draft.openaiModel}
+                onChange={(e) => updateDraft("openaiModel", e.target.value)}
+                placeholder="OPENAI_MODEL_REASONING (e.g. gpt-4o-mini)"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+              />
+              <input
+                value={draft.openaiModelCoder}
+                onChange={(e) => updateDraft("openaiModelCoder", e.target.value)}
+                placeholder="OPENAI_MODEL_CODER"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+              />
+              <input
+                value={draft.openaiModelWriting}
+                onChange={(e) => updateDraft("openaiModelWriting", e.target.value)}
+                placeholder="OPENAI_MODEL_WRITING"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
+              />
+              <input
+                value={draft.openaiApiKey}
+                onChange={(e) => updateDraft("openaiApiKey", e.target.value)}
+                placeholder="OPENAI_API_KEY"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
+              />
+            </>
+          )}
+          {draft.aiProvider === "anthropic" && (
+            <>
+              <input
+                value={draft.anthropicModel}
+                onChange={(e) => updateDraft("anthropicModel", e.target.value)}
+                placeholder="ANTHROPIC_MODEL_REASONING"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+              />
+              <input
+                value={draft.anthropicModelCoder}
+                onChange={(e) => updateDraft("anthropicModelCoder", e.target.value)}
+                placeholder="ANTHROPIC_MODEL_CODER"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+              />
+              <input
+                value={draft.anthropicModelWriting}
+                onChange={(e) => updateDraft("anthropicModelWriting", e.target.value)}
+                placeholder="ANTHROPIC_MODEL_WRITING"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
+              />
+              <input
+                value={draft.anthropicApiKey}
+                onChange={(e) => updateDraft("anthropicApiKey", e.target.value)}
+                placeholder="ANTHROPIC_API_KEY"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
+              />
+            </>
+          )}
+          {draft.aiProvider === "gemini" && (
+            <>
+              <input
+                value={draft.geminiModel}
+                onChange={(e) => updateDraft("geminiModel", e.target.value)}
+                placeholder="GEMINI_MODEL_REASONING"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+              />
+              <input
+                value={draft.geminiModelCoder}
+                onChange={(e) => updateDraft("geminiModelCoder", e.target.value)}
+                placeholder="GEMINI_MODEL_CODER"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+              />
+              <input
+                value={draft.geminiModelWriting}
+                onChange={(e) => updateDraft("geminiModelWriting", e.target.value)}
+                placeholder="GEMINI_MODEL_WRITING"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
+              />
+              <input
+                value={draft.geminiApiKey}
+                onChange={(e) => updateDraft("geminiApiKey", e.target.value)}
+                placeholder="GEMINI_API_KEY"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
+              />
+            </>
+          )}
+          {draft.aiProvider === "alibaba" && (
+            <>
+              <input
+                value={draft.alibabaBaseUrl}
+                onChange={(e) => updateDraft("alibabaBaseUrl", e.target.value)}
+                placeholder="ALIBABA_BASE_URL"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
+              />
+              <input
+                value={draft.alibabaApiKey}
+                onChange={(e) => updateDraft("alibabaApiKey", e.target.value)}
+                placeholder="ALIBABA_API_KEY"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
+              />
+              <input
+                value={draft.alibabaModelCoder}
+                onChange={(e) => updateDraft("alibabaModelCoder", e.target.value)}
+                placeholder="ALIBABA_MODEL_CODER (qwen2.5-coder-32b-instruct)"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+              />
+              <input
+                value={draft.alibabaModelReasoning}
+                onChange={(e) => updateDraft("alibabaModelReasoning", e.target.value)}
+                placeholder="ALIBABA_MODEL_REASONING (kimi-k2.5)"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+              />
+              <input
+                value={draft.alibabaModelWriting}
+                onChange={(e) => updateDraft("alibabaModelWriting", e.target.value)}
+                placeholder="ALIBABA_MODEL_WRITING (minimax-m2.5)"
+                className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
+              />
+            </>
+          )}
           <input
-            value={draft.openaiModel}
-            onChange={(e) => updateDraft("openaiModel", e.target.value)}
-            placeholder="OPENAI_MODEL (e.g. gpt-4o-mini)"
+            value={draft.aiFallbackOrder}
+            onChange={(e) => updateDraft("aiFallbackOrder", e.target.value)}
+            placeholder="AGENT_AI_FALLBACK_ORDER (e.g. anthropic,gemini,deterministic)"
+            className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
+          />
+          <input
+            type="number"
+            min={3}
+            max={120}
+            step={1}
+            value={draft.aiTimeoutSeconds}
+            onChange={(e) => updateDraft("aiTimeoutSeconds", Number(e.target.value) || 20)}
+            placeholder="AGENT_AI_TIMEOUT_SECONDS"
             className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
           />
           <input
-            value={draft.openaiApiKey}
-            onChange={(e) => updateDraft("openaiApiKey", e.target.value)}
-            placeholder="OPENAI_API_KEY"
+            type="number"
+            min={0.01}
+            max={50}
+            step={0.01}
+            value={draft.aiBudgetUsdPerRun}
+            onChange={(e) => updateDraft("aiBudgetUsdPerRun", Number(e.target.value) || 0.25)}
+            placeholder="AGENT_AI_BUDGET_USD_PER_RUN"
+            className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+          />
+          <input
+            type="number"
+            min={1}
+            max={400}
+            step={1}
+            value={draft.aiMaxRemoteCalls}
+            onChange={(e) => updateDraft("aiMaxRemoteCalls", Number(e.target.value) || 40)}
+            placeholder="AGENT_AI_MAX_REMOTE_CALLS"
             className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
           />
           <input
@@ -433,6 +820,44 @@ export function SetupWizard() {
             placeholder="OPENVINO_MODEL_PATH"
             className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
           />
+          <div className="rounded border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400 sm:col-span-2">
+            <div className="mb-2 font-semibold uppercase tracking-wider text-zinc-500">Role-model recommendation matrix</div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] border-collapse">
+                <thead>
+                  <tr className="text-left text-[11px] text-zinc-500">
+                    <th className="border-b border-zinc-800 px-2 py-1">Task</th>
+                    <th className="border-b border-zinc-800 px-2 py-1">Role</th>
+                    <th className="border-b border-zinc-800 px-2 py-1">Goal</th>
+                    <th className="border-b border-zinc-800 px-2 py-1">OpenAI</th>
+                    <th className="border-b border-zinc-800 px-2 py-1">Anthropic</th>
+                    <th className="border-b border-zinc-800 px-2 py-1">Gemini</th>
+                    <th className="border-b border-zinc-800 px-2 py-1">Alibaba</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(modelRecommendations.length > 0 ? modelRecommendations : []).map((row) => (
+                    <tr key={`${row.role}-${row.task}`} className="text-[11px]">
+                      <td className="border-b border-zinc-900 px-2 py-1 text-zinc-300">{row.task}</td>
+                      <td className="border-b border-zinc-900 px-2 py-1 text-zinc-400">{row.role}</td>
+                      <td className="border-b border-zinc-900 px-2 py-1 text-zinc-500">{row.goal}</td>
+                      <td className="border-b border-zinc-900 px-2 py-1">{row.openai}</td>
+                      <td className="border-b border-zinc-900 px-2 py-1">{row.anthropic}</td>
+                      <td className="border-b border-zinc-900 px-2 py-1">{row.gemini}</td>
+                      <td className="border-b border-zinc-900 px-2 py-1">{row.alibaba}</td>
+                    </tr>
+                  ))}
+                  {modelRecommendations.length === 0 && (
+                    <tr>
+                      <td className="px-2 py-2 text-zinc-500" colSpan={7}>
+                        Recommendation matrix unavailable (backend offline). You can still configure models manually.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -495,7 +920,11 @@ export function SetupWizard() {
               <div>Mode: {runtimeMode}</div>
               <div>Data path: {runtimeDataPath}</div>
               <div>Agent AI provider: {runtimeAiProvider}</div>
-              <div>OpenAI model: {runtimeOpenAiModel}</div>
+              <div>AI model: {runtimeAiModel}</div>
+              <div>Failover order: {runtimeFallbackOrder}</div>
+              <div>Timeout: {runtimeTimeoutSeconds}s</div>
+              <div>Budget: ${runtimeBudgetUsd.toFixed(2)}/run</div>
+              <div>Max remote calls: {runtimeMaxRemoteCalls}</div>
               <div>Ready: {localReady ? "yes" : "no"}</div>
             </div>
             <div className="space-y-2">

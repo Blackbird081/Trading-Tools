@@ -42,6 +42,7 @@ def test_profile_vault_end_to_end(client: TestClient) -> None:
     )
     assert decrypt.status_code == 200
     assert decrypt.json()["config"]["trading_mode"] == "dry-run"
+    assert decrypt.json()["config"]["vnstock_api_key"] == "***REDACTED***"
 
     export = client.get("/api/setup/profiles/demo/export")
     assert export.status_code == 200
@@ -101,3 +102,25 @@ def test_profile_decrypt_wrong_passphrase_returns_400(client: TestClient) -> Non
         json={"profile_name": "wrong-pass", "passphrase": "incorrect-passphrase"},
     )
     assert decrypt.status_code == 400
+
+
+def test_profile_create_error_is_redacted(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from interface.rest import setup as setup_api
+
+    def _raise_secret(*_args: object, **_kwargs: object) -> dict[str, object]:
+        raise ValueError("api_key=sk-test-secret-123")
+
+    monkeypatch.setattr(setup_api.profile_vault, "create_profile", _raise_secret)
+    response = client.post(
+        "/api/setup/profiles/create",
+        json={
+            "profile_name": "demo2",
+            "passphrase": "very-strong-passphrase",
+            "config": {},
+            "set_active": False,
+        },
+    )
+    assert response.status_code == 400
+    detail = response.json().get("detail", "")
+    assert "***REDACTED***" in detail
+    assert "sk-test-secret-123" not in detail
