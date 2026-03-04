@@ -290,3 +290,21 @@ Notes:
 - Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` Phase 1/5/6/7, `IMPLEMENTATION_PLAN.md` Section 0.9
 - Owner: Codex + project owner
 - Notes: Real broker adapter is still intentionally guarded by `ENABLE_LIVE_BROKER`; emergency drill validates fallback-to-DLQ behavior in broker-disabled mode.
+
+### CVF-TT-20260304-018
+- Date-Time (UTC+7): 2026-03-04 10:08
+- Type: test
+- Scope: Execute roadmap regression coverage run (backend + frontend) and publish consolidated coverage report artifact.
+- Impact: Team now has one latest coverage snapshot file for current roadmap scope and stable frontend coverage provider setup (`@vitest/coverage-v8`) aligned with Vitest v3.
+- Root Cause: Coverage execution previously failed on frontend due missing coverage provider dependency.
+- Files Changed: `frontend/package.json`, `frontend/pnpm-lock.yaml`, `docs/reports/LOCAL_TEST_COVERAGE_LATEST.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `python -m pytest tests/integration/test_setup_api.py tests/integration/test_local_product_api.py tests/integration/test_order_safety_controls.py --cov=packages/interface/src/interface/rest --cov=packages/adapters/src/adapters/vnstock --cov-report=term --cov-report=json:coverage-backend.json` (pass, 12 tests)
+  - `pnpm -C frontend exec vitest run __tests__/integration/data-loader.test.tsx __tests__/stores/market-store.test.ts __tests__/stores/signal-store.test.ts __tests__/lib/market-sectors.test.ts --coverage --coverage.reporter=text-summary --coverage.reporter=json-summary --coverage.reportsDirectory=coverage` (pass, 16 tests)
+  - Coverage report published: `docs/reports/LOCAL_TEST_COVERAGE_LATEST.md`
+- Deployment Target: repository test/docs artifacts
+- Deployment Status: completed (local update)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` Phase 7 (quality and release evidence)
+- Owner: Codex + project owner
+- Notes: Frontend total coverage in this report reflects targeted regression suite only, not full project test universe.
