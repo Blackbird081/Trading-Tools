@@ -120,3 +120,11 @@ def test_screener_stream_returns_pipeline_complete(client: TestClient) -> None:
     completes = [p for p in payloads if isinstance(p, dict) and "run_id" in p and "results" in p]
     assert len(completes) >= 1
     assert isinstance(completes[-1]["results"], list)
+    final_payload = completes[-1]
+    assert "fundamental_coverage" in final_payload
+    assert "news_coverage" in final_payload
+    if final_payload["results"]:
+        first = final_payload["results"][0]
+        assert "fundamental_summary" in first
+        assert "news_headlines" in first
+        assert "data_sources" in first

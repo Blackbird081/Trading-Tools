@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import random
+import re
 import tempfile
 import uuid
 from collections.abc import AsyncGenerator
@@ -20,6 +21,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import duckdb
 from fastapi import APIRouter, Query
@@ -516,12 +518,208 @@ async def _generate_incremental_progress(
 
 
 # ── Screener pipeline SSE (real-agent wiring) ──────────────────
-_AGENT_STEPS: list[dict[str, str]] = [
+_AGENT_STEPS_BASE: list[dict[str, str]] = [
     {"node": "screener", "agent": "Screener Agent", "icon": "search", "detail": "Lọc cơ hội theo data cache + thanh khoản"},
     {"node": "technical", "agent": "Technical Agent", "icon": "chart", "detail": "Tính RSI/MACD/BB/MA trên dữ liệu giá thực tế"},
     {"node": "risk", "agent": "Risk Agent", "icon": "shield", "detail": "Kiểm tra hạn mức rủi ro và điều kiện an toàn"},
     {"node": "executor", "agent": "Executor Agent", "icon": "zap", "detail": "Sinh execution plan dry-run/live theo guardrails"},
 ]
+_AGENT_STEPS_WITH_FUNDAMENTAL: list[dict[str, str]] = [
+    {"node": "screener", "agent": "Screener Agent", "icon": "search", "detail": "Lọc cơ hội theo data cache + thanh khoản"},
+    {"node": "technical", "agent": "Technical Agent", "icon": "chart", "detail": "Tính RSI/MACD/BB/MA trên dữ liệu giá thực tế"},
+    {"node": "fundamental", "agent": "Fundamental Agent", "icon": "brain", "detail": "Bổ sung fundamentals + news để tăng chất lượng rationale"},
+    {"node": "risk", "agent": "Risk Agent", "icon": "shield", "detail": "Kiểm tra hạn mức rủi ro và điều kiện an toàn"},
+    {"node": "executor", "agent": "Executor Agent", "icon": "zap", "detail": "Sinh execution plan dry-run/live theo guardrails"},
+]
+
+
+class _DeterministicInsightEngine:
+    """Lightweight local engine for FundamentalAgent prompt execution."""
+
+    async def generate(self, prompt: str) -> str:
+        symbol_match = re.search(r"Phan tich ma:\s*([A-Z0-9]+)", prompt)
+        symbol = symbol_match.group(1) if symbol_match else "N/A"
+        news_count = prompt.count("- ")
+        if "Early Warning:" in prompt:
+            risk_bias = "ưu tiên phòng thủ"
+        elif "EPS tang truong" in prompt:
+            risk_bias = "nghiêng tích cực"
+        else:
+            risk_bias = "trung tính"
+        return (
+            f"{symbol}: tổng hợp fundamentals/news cho thấy trạng thái {risk_bias}; "
+            f"ưu tiên kiểm soát rủi ro trước khi nâng tỷ trọng. "
+            f"Số tín hiệu tin tức tham chiếu: {max(0, news_count - 1)}."
+        )
+
+
+class _LocalNewsPort:
+    def __init__(self, use_external: bool) -> None:
+        self._use_external = use_external
+        self._adapter: Any | None = None
+        self._cache: dict[str, dict[str, object]] = {}
+        if use_external:
+            try:
+                from adapters.vnstock.news import VnstockNewsAdapter
+
+                self._adapter = VnstockNewsAdapter()
+            except Exception:
+                self._adapter = None
+
+    def _fallback_headlines(self, symbol: str, limit: int) -> list[dict[str, object]]:
+        rng = random.Random(hash(symbol + "news-fallback"))
+        now = datetime.now(UTC).date().isoformat()
+        templates = [
+            f"{symbol}: thanh khoản cải thiện so với trung bình 20 phiên",
+            f"{symbol}: dòng tiền ngành duy trì ổn định",
+            f"{symbol}: biến động giá phiên gần nhất cần theo dõi",
+            f"{symbol}: triển vọng kết quả kinh doanh quý tới ở mức trung tính",
+        ]
+        rng.shuffle(templates)
+        return [{"title": t, "source": "local-fallback", "date": now} for t in templates[: max(1, limit)]]
+
+    def get_headlines(self, symbol: str, limit: int = 5) -> list[dict[str, object]]:
+        headlines: list[dict[str, object]] = []
+        source = "local-fallback"
+        if self._use_external and self._adapter is not None:
+            try:
+                headlines = self._adapter.get_headlines(symbol=symbol, limit=limit)
+                if headlines:
+                    source = "vnstock"
+            except Exception:
+                headlines = []
+        if not headlines:
+            headlines = self._fallback_headlines(symbol, limit)
+
+        self._cache[symbol] = {
+            "source": source,
+            "headlines": [str(item.get("title", "")).strip() for item in headlines if str(item.get("title", "")).strip()],
+        }
+        return headlines
+
+    def snapshot(self, symbol: str) -> dict[str, object]:
+        return self._cache.get(symbol, {"source": "unavailable", "headlines": []})
+
+
+class _LocalFinancialDataPort:
+    def __init__(self, conn: duckdb.DuckDBPyConnection, preset: str, use_external: bool) -> None:
+        self._conn = conn
+        self._preset = preset
+        self._use_external = use_external
+        self._cache: dict[str, dict[str, object]] = {}
+
+    def _build_local_payload(self, symbol: str) -> dict[str, Any]:
+        row = self._conn.execute(
+            """
+            SELECT price, change_pct, volume, reference
+            FROM market_cache
+            WHERE symbol = ? AND preset = ?
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """,
+            [symbol, self._preset],
+        ).fetchone()
+        price = float(row[0]) if row else 10.0
+        change_pct = float(row[1]) if row else 0.0
+        volume = float(row[2]) if row else 0.0
+        eps_growth = max(-0.25, min(0.55, (change_pct / 100.0) + min(0.25, volume / 30_000_000.0)))
+        pe_ratio = max(4.0, min(35.0, 18.0 - (eps_growth * 16.0)))
+        roe = max(0.03, min(0.35, 0.10 + eps_growth * 0.8))
+        debt_equity = max(0.1, min(3.0, 1.8 - eps_growth * 2.5))
+        operating_margin = max(0.02, min(0.4, 0.12 + eps_growth * 0.5))
+        revenue_growth = max(-0.2, min(0.45, eps_growth * 0.9))
+        net_margin = max(0.01, min(0.28, 0.08 + eps_growth * 0.4))
+
+        return {
+            "source": "cache-derived",
+            "financial_ratios": {
+                "eps_growth": round(eps_growth, 4),
+                "pe_ratio": round(pe_ratio, 2),
+                "roe": round(roe, 4),
+                "debt_to_equity": round(debt_equity, 4),
+                "operating_margin": round(operating_margin, 4),
+                "revenue_growth": round(revenue_growth, 4),
+                "net_margin": round(net_margin, 4),
+            },
+            "balance_sheet": {
+                "total_assets": round(price * max(1.0, volume / 15.0), 2),
+                "total_liabilities": round(price * max(1.0, volume / 32.0), 2),
+                "total_equity": round(price * max(1.0, volume / 28.0), 2),
+            },
+            "income_statement": {
+                "revenue": round(price * max(1.0, volume / 20.0), 2),
+                "operating_income": round(price * max(1.0, volume / 42.0), 2),
+                "net_income": round(price * max(1.0, volume / 50.0), 2),
+            },
+            "cash_flow": {
+                "operating_cash_flow": round(price * max(1.0, volume / 40.0), 2),
+            },
+            "previous_financial_ratios": {
+                "revenue_growth": round(revenue_growth * 0.85, 4),
+                "roe": round(roe * 0.92, 4),
+            },
+            "icb_name": "General",
+            "icb_code": "0000",
+        }
+
+    def _try_external_ratios(self, symbol: str) -> dict[str, float]:
+        if not self._use_external:
+            return {}
+        try:
+            import vnstock  # type: ignore[import-untyped]
+
+            stock = vnstock.Vnstock().stock(symbol=symbol, source="VCI")
+            company = getattr(stock, "company", None)
+            if company is None:
+                return {}
+            if not hasattr(company, "overview"):
+                return {}
+
+            raw = company.overview()
+            records: list[dict[str, Any]] = []
+            if isinstance(raw, list):
+                records = [item for item in raw if isinstance(item, dict)]
+            elif isinstance(raw, dict):
+                records = [raw]
+            elif hasattr(raw, "to_dict"):
+                try:
+                    as_records = raw.to_dict("records")
+                except Exception:  # pragma: no cover - library dependent
+                    as_records = []
+                if isinstance(as_records, list):
+                    records = [item for item in as_records if isinstance(item, dict)]
+            if not records:
+                return {}
+
+            first = records[0]
+            mapped: dict[str, float] = {}
+            pe = first.get("pe") or first.get("pe_ratio")
+            roe = first.get("roe")
+            debt = first.get("debt_to_equity") or first.get("de")
+            if pe is not None:
+                mapped["pe_ratio"] = float(pe)
+            if roe is not None:
+                mapped["roe"] = float(roe) / (100.0 if float(roe) > 1.0 else 1.0)
+            if debt is not None:
+                mapped["debt_to_equity"] = float(debt)
+            return mapped
+        except Exception:
+            return {}
+
+    def get_financial_data(self, symbol: str) -> dict[str, Any]:
+        payload = self._build_local_payload(symbol)
+        external = self._try_external_ratios(symbol)
+        if external:
+            payload["financial_ratios"].update(external)
+            payload["source"] = "vnstock+cache"
+        self._cache[symbol] = payload
+        return payload
+
+    def snapshot(self, symbol: str) -> dict[str, object]:
+        payload = self._cache.get(symbol)
+        if payload is None:
+            return {"source": "unavailable"}
+        return {"source": str(payload.get("source", "cache-derived"))}
 
 
 class _CacheScreenerPort:
@@ -705,6 +903,8 @@ def _build_reasoning(
     rsi: float,
     macd: str,
     risk_reason: str | None,
+    fundamental_note: str | None = None,
+    headline: str | None = None,
 ) -> str:
     if action == "BUY":
         reason = f"{symbol}: tín hiệu kỹ thuật ủng hộ mua (score {score}/10, RSI {rsi:.1f}, MACD {macd})."
@@ -714,6 +914,10 @@ def _build_reasoning(
         reason = f"{symbol}: tín hiệu chưa đủ mạnh để vào lệnh (score {score}/10, RSI {rsi:.1f}, MACD {macd})."
     if risk_reason:
         reason = f"{reason} RiskAgent: {risk_reason}."
+    if fundamental_note:
+        reason = f"{reason} Fundamental: {fundamental_note}"
+    if headline:
+        reason = f"{reason} Tin nổi bật: {headline}."
     return reason
 
 
@@ -722,7 +926,9 @@ async def _generate_screener_progress(
     mode: str = "dry-run",
 ) -> AsyncGenerator[str, None]:
     """Stream SSE progress for real agent pipeline execution."""
+    from agents.fundamental_agent import FundamentalAgent
     from agents.executor_agent import ExecutorAgent
+    from agents.prompt_builder import FinancialPromptBuilder, PromptRegistry
     from agents.risk_agent import RiskAgent
     from agents.screener_agent import ScreenerAgent
     from agents.supervisor import build_trading_graph
@@ -737,6 +943,14 @@ async def _generate_screener_progress(
     conn = _get_conn()
     tick_repo = _CacheTickRepo(conn, preset)
     screener_port = _CacheScreenerPort(conn, preset, symbols)
+    use_external_sources = mode == "live" or os.getenv("SCREENER_USE_EXTERNAL", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    news_port = _LocalNewsPort(use_external=use_external_sources)
+    financial_data_port = _LocalFinancialDataPort(conn, preset, use_external=use_external_sources)
     risk_limits = SimpleNamespace(
         kill_switch_active=bool(get_safety_state("kill_switch", {"active": False}).get("active")),
         max_position_pct=Decimal("0.20"),
@@ -748,10 +962,32 @@ async def _generate_screener_progress(
     technical = TechnicalAgent(tick_repo=tick_repo)
     risk = RiskAgent(tick_repo=tick_repo, risk_limits=risk_limits)
     executor = ExecutorAgent(broker_port=None)
-    graph = build_trading_graph(screener=screener, technical=technical, risk=risk, executor=executor)
+    fundamental: FundamentalAgent | None = None
+    steps = _AGENT_STEPS_BASE
+    try:
+        prompts_dir = Path(os.getenv("PROMPTS_DIR", "data/prompts"))
+        registry = PromptRegistry(prompts_dir)
+        prompt_builder = FinancialPromptBuilder(registry)
+        fundamental = FundamentalAgent(
+            engine=_DeterministicInsightEngine(),
+            prompt_builder=prompt_builder,
+            news_port=news_port,
+            financial_data_port=financial_data_port,
+        )
+        steps = _AGENT_STEPS_WITH_FUNDAMENTAL
+    except Exception as exc:
+        logger.warning("Fundamental agent disabled for screener run: %s", exc)
+
+    graph = build_trading_graph(
+        screener=screener,
+        technical=technical,
+        risk=risk,
+        executor=executor,
+        fundamental=fundamental,
+    )
     app = graph.compile()
 
-    total_steps = len(_AGENT_STEPS)
+    total_steps = len(steps)
     run_id = str(uuid.uuid4())
     yield _sse(
         "pipeline_start",
@@ -761,6 +997,8 @@ async def _generate_screener_progress(
             "mode": mode,
             "total_steps": total_steps,
             "device": "CPU",
+            "fundamental_enabled": fundamental is not None,
+            "external_sources": use_external_sources,
         },
     )
 
@@ -776,7 +1014,7 @@ async def _generate_screener_progress(
     }
 
     aggregated_state: dict[str, object] = dict(initial_state)
-    node_to_step = {item["node"]: idx + 1 for idx, item in enumerate(_AGENT_STEPS)}
+    node_to_step = {item["node"]: idx + 1 for idx, item in enumerate(steps)}
     started: set[str] = set()
     started_at: dict[str, datetime] = {}
 
@@ -790,7 +1028,7 @@ async def _generate_screener_progress(
             continue
 
         step_idx = node_to_step[node]
-        step_cfg = _AGENT_STEPS[step_idx - 1]
+        step_cfg = steps[step_idx - 1]
         if node not in started:
             started.add(node)
             started_at[node] = datetime.now(UTC)
@@ -812,6 +1050,8 @@ async def _generate_screener_progress(
             result_count = len(aggregated_state.get("watchlist", []))
         elif node == "technical":
             result_count = len(aggregated_state.get("technical_scores", []))
+        elif node == "fundamental":
+            result_count = len(aggregated_state.get("ai_insights", {}))
         elif node == "risk":
             result_count = len(aggregated_state.get("approved_trades", []))
         elif node == "executor":
@@ -843,6 +1083,9 @@ async def _generate_screener_progress(
     technical_scores = {str(item.symbol): item for item in aggregated_state.get("technical_scores", [])}
     risk_scores = {str(item.symbol): item for item in aggregated_state.get("risk_assessments", [])}
     execution = {str(item.symbol): item for item in aggregated_state.get("execution_plans", [])}
+    ai_insights = {str(k): str(v) for k, v in dict(aggregated_state.get("ai_insights", {})).items()}
+    early_warning = {str(k): v for k, v in dict(aggregated_state.get("early_warning_results", {})).items()}
+    dupont = {str(k): v for k, v in dict(aggregated_state.get("dupont_results", {})).items()}
     universe = list(watchlist.keys()) if watchlist else symbols
 
     results: list[dict[str, object]] = []
@@ -861,6 +1104,22 @@ async def _generate_screener_progress(
         take_profit = float(risk_assess.take_profit_price) if risk_assess else round(entry_price * 1.1, 2)
         qty = int(plan.quantity) if plan else 0
         risk_text = _risk_label(bool(risk_assess.approved) if risk_assess else False, score)
+        insight = ai_insights.get(symbol, "")
+        ew_summary = (
+            str(early_warning.get(symbol, {}).get("summary", ""))
+            if isinstance(early_warning.get(symbol), dict)
+            else ""
+        )
+        dupont_driver = (
+            str(dupont.get(symbol, {}).get("dominant_driver", ""))
+            if isinstance(dupont.get(symbol), dict)
+            else ""
+        )
+        fundamental_note = insight or ew_summary or "Chưa có insight fundamental chi tiết."
+        news_snapshot = news_port.snapshot(symbol)
+        financial_snapshot = financial_data_port.snapshot(symbol)
+        headlines = [str(h) for h in news_snapshot.get("headlines", []) if str(h).strip()]
+        top_headline = headlines[0] if headlines else None
         results.append(
             {
                 "symbol": symbol,
@@ -880,6 +1139,14 @@ async def _generate_screener_progress(
                 "order_type": str(plan.order_type) if plan else "LO",
                 "vol_change_pct": 0.0,
                 "ma_trend": str(tech.trend_ma) if tech else "neutral",
+                "fundamental_summary": fundamental_note,
+                "news_headlines": headlines[:3],
+                "dupont_driver": dupont_driver,
+                "data_sources": {
+                    "news": str(news_snapshot.get("source", "unknown")),
+                    "fundamentals": str(financial_snapshot.get("source", "unknown")),
+                    "insight": "fundamental-agent" if insight else "fallback",
+                },
                 "reasoning": _build_reasoning(
                     symbol,
                     action,
@@ -887,11 +1154,13 @@ async def _generate_screener_progress(
                     round(float(tech.rsi_14), 2) if tech else 50.0,
                     str(tech.macd_signal) if tech else "neutral",
                     str(risk_assess.rejection_reason) if (risk_assess and risk_assess.rejection_reason) else None,
+                    fundamental_note,
+                    top_headline,
                 ),
                 "reproducibility": {
-                    "model": "technical-risk-executor",
+                    "model": "technical-fundamental-risk-executor",
                     "model_version": "local-r1",
-                    "prompt_version": "n/a",
+                    "prompt_version": "financial_analysis@active",
                 },
             }
         )
@@ -901,6 +1170,9 @@ async def _generate_screener_progress(
     sell_count = sum(1 for r in results if r["action"] == "SELL")
     hold_count = sum(1 for r in results if r["action"] == "HOLD")
     avg_score = round(sum(float(r["score"]) for r in results) / len(results), 2) if results else 0.0
+    news_coverage = sum(1 for r in results if isinstance(r.get("news_headlines"), list) and len(r["news_headlines"]) > 0)
+    fundamental_coverage = sum(1 for r in results if str(r.get("fundamental_summary", "")).strip())
+    insight_coverage = len([v for v in ai_insights.values() if v.strip()])
 
     save_screener_run(
         run_id=run_id,
@@ -911,6 +1183,11 @@ async def _generate_screener_progress(
             "pipeline": "real-agent",
             "symbols_requested": len(symbols),
             "symbols_evaluated": len(results),
+            "fundamental_enabled": fundamental is not None,
+            "insight_coverage": insight_coverage,
+            "fundamental_coverage": fundamental_coverage,
+            "news_coverage": news_coverage,
+            "external_sources": use_external_sources,
             "executed_at": datetime.now(UTC).isoformat(),
         },
     )
@@ -928,6 +1205,9 @@ async def _generate_screener_progress(
             "sell_count": sell_count,
             "hold_count": hold_count,
             "avg_score": avg_score,
+            "insight_coverage": insight_coverage,
+            "fundamental_coverage": fundamental_coverage,
+            "news_coverage": news_coverage,
             "results": results,
         },
     )

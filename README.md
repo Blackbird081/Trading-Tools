@@ -160,6 +160,7 @@ Copy `.env.example` thành `.env`:
 | `GET /api/setup/status` | Runtime setup status + connection checks |
 | `POST /api/setup/validate` | Validate setup draft (no persistence) |
 | `POST /api/setup/init-local` | Initialize local DuckDB path for first run |
+| `POST /api/setup/probe-external` | Probe SSI/VNStock/model-path connectivity for setup wizard |
 | `ws://host/ws/market` | Real-time market data (WebSocket) |
 
 ## Kiến trúc

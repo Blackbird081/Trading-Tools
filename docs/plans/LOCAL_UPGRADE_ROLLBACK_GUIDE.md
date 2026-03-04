@@ -24,6 +24,9 @@
    - place dry-run order
    - portfolio refresh + reconcile
    - run screener once
+6. Run release validation bundle and store artifact:
+   - `powershell -ExecutionPolicy Bypass -File scripts/release-validation.ps1`
+   - Verify `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md` is `PASS`
 
 ## Rollback Procedure
 1. Stop app.
@@ -35,6 +38,9 @@
    - `/api/orders` can list historical orders
    - `/api/portfolio` returns non-error response
 5. Record rollback outcome in CVF trace log.
+6. Run emergency fallback drill to confirm safety controls are still effective:
+   - `powershell -ExecutionPolicy Bypass -File scripts/emergency-fallback-drill.ps1`
+   - Verify `docs/reports/LOCAL_EMERGENCY_DRILL_LATEST.md` is `PASS`
 
 ## Compatibility Notes
 - DuckDB schemas for orders/portfolio/screener run tables are additive and backward-friendly.

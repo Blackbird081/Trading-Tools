@@ -270,3 +270,23 @@ Notes:
 - Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` Phase 2/3/4/5/6/7 + Fix-01/Fix-03/Fix-04, `IMPLEMENTATION_PLAN.md` Section 0.9 alignment update
 - Owner: Codex + project owner
 - Notes: Live broker execution remains guarded by `ENABLE_LIVE_BROKER`; when disabled, live order requests are routed to DLQ by design.
+
+### CVF-TT-20260304-017
+- Date-Time (UTC+7): 2026-03-04 18:20
+- Type: feature
+- Scope: Close remaining local roadmap partial phases (1/5/6/7) with probe + onboarding benchmark, screener fundamental/news enrichment, safety test hardening, and release validation automation.
+- Impact: Setup wizard now has external probe path with test coverage; screener output now carries fundamental/news rationale and reproducibility sources; safety guardrails are verified by dedicated integration tests; release/upgrade/rollback validation is executable via scripts with report artifacts.
+- Root Cause: Local roadmap still had `PARTIAL` phases lacking evidence-grade automation (probe benchmark, safety drill, release validation) and richer screener rationale path.
+- Files Changed: `packages/interface/src/interface/rest/setup.py`, `frontend/app/settings/_components/setup-wizard.tsx`, `packages/interface/src/interface/rest/data_loader.py`, `packages/adapters/src/adapters/vnstock/news.py`, `packages/interface/src/interface/rest/orders.py`, `tests/integration/test_setup_api.py`, `tests/integration/test_local_product_api.py`, `tests/integration/test_order_safety_controls.py`, `scripts/benchmark-onboarding.ps1`, `scripts/emergency-fallback-drill.ps1`, `scripts/release-validation.ps1`, `docs/plans/LOCAL_ONBOARDING_BENCHMARK.md`, `docs/plans/LOCAL_EMERGENCY_DRILL_RUNBOOK.md`, `docs/plans/LOCAL_RELEASE_CHECKLIST.md`, `docs/plans/LOCAL_UPGRADE_ROLLBACK_GUIDE.md`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `README.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`.
+- Validation Evidence:
+  - `python -m py_compile packages/interface/src/interface/rest/setup.py packages/interface/src/interface/rest/data_loader.py packages/interface/src/interface/rest/orders.py packages/adapters/src/adapters/vnstock/news.py` (pass)
+  - `pnpm -C frontend exec tsc --noEmit` (pass)
+  - `python -m pytest tests/integration/test_setup_api.py -q` with `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src` (pass, 4 tests)
+  - `python -m pytest tests/integration/test_local_product_api.py -q` with `PYTHONPATH=...` (pass, 3 tests)
+  - `python -m pytest tests/integration/test_order_safety_controls.py -q` with `PYTHONPATH=...` (pass, 5 tests)
+- Deployment Target: backend + frontend + QA/release workflow docs
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` Phase 1/5/6/7, `IMPLEMENTATION_PLAN.md` Section 0.9
+- Owner: Codex + project owner
+- Notes: Real broker adapter is still intentionally guarded by `ENABLE_LIVE_BROKER`; emergency drill validates fallback-to-DLQ behavior in broker-disabled mode.

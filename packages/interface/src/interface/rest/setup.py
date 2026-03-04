@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import os
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -9,6 +10,7 @@ from typing import Literal
 
 import duckdb
 from fastapi import APIRouter, HTTPException
+import httpx
 from pydantic import BaseModel, Field
 
 from interface import profile_vault
@@ -111,6 +113,37 @@ class ProfileRotateRequest(BaseModel):
 
 class ProfileRevokeRequest(BaseModel):
     profile_name: str = Field(min_length=2, max_length=64)
+
+
+class ExternalProbeRequest(BaseModel):
+    ssi_ping_url: str = Field(default="https://fc-tradeapi.ssi.com.vn/api/v2/Trading/ping", max_length=256)
+    vnstock_ping_url: str = Field(default="https://api.vndirect.com.vn", max_length=256)
+    timeout_seconds: float = Field(default=5.0, ge=1.0, le=20.0)
+
+
+def _probe_line(name: str, ok: bool, detail: str, latency_ms: float | None = None) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "name": name,
+        "status": "ok" if ok else "warn",
+        "detail": detail,
+    }
+    if latency_ms is not None:
+        payload["latency_ms"] = round(latency_ms, 1)
+    return payload
+
+
+async def _probe_http(url: str, timeout_seconds: float) -> tuple[bool, str, float]:
+    start = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            response = await client.get(url, follow_redirects=True)
+        elapsed = (time.perf_counter() - start) * 1000
+        ok = response.status_code < 500
+        detail = f"HTTP {response.status_code} from {url}"
+        return ok, detail, elapsed
+    except Exception as exc:  # pragma: no cover - network-dependent
+        elapsed = (time.perf_counter() - start) * 1000
+        return False, f"Failed request to {url}: {exc}", elapsed
 
 
 @router.get("/setup/status")
@@ -315,3 +348,37 @@ async def revoke_profile(payload: ProfileRevokeRequest) -> dict[str, object]:
         return {"success": True, **result}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/setup/probe-external")
+async def probe_external_connections(payload: ExternalProbeRequest) -> dict[str, object]:
+    checks: list[dict[str, object]] = []
+
+    ssi_ok, ssi_detail, ssi_latency = await _probe_http(payload.ssi_ping_url, payload.timeout_seconds)
+    checks.append(_probe_line("ssi_api", ssi_ok, ssi_detail, ssi_latency))
+
+    vn_ok, vn_detail, vn_latency = await _probe_http(payload.vnstock_ping_url, payload.timeout_seconds)
+    checks.append(_probe_line("vnstock_network", vn_ok, vn_detail, vn_latency))
+
+    try:
+        import vnstock  # noqa: F401  # type: ignore[import-untyped]
+
+        checks.append(_probe_line("vnstock_sdk", True, "vnstock module import succeeded"))
+    except Exception as exc:
+        checks.append(_probe_line("vnstock_sdk", False, f"vnstock import failed: {exc}"))
+
+    model_path = Path(os.getenv("OPENVINO_MODEL_PATH", "data/models/phi-3-mini-int4")).expanduser()
+    model_ok = model_path.exists()
+    checks.append(
+        _probe_line(
+            "openvino_model_path",
+            model_ok,
+            f"{model_path} {'exists' if model_ok else 'missing'}",
+        ),
+    )
+
+    return {
+        "checks": checks,
+        "all_ready": all(c["status"] == "ok" for c in checks),
+        "timestamp": datetime.now(UTC).isoformat(),
+    }

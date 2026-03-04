@@ -296,15 +296,6 @@ async def get_open_orders(limit: int = Query(default=200, ge=1, le=2000)) -> dic
     rows = [o for o in list_orders(limit=limit) if str(o.get("status")) in statuses]
     return {"orders": rows, "count": len(rows)}
 
-
-@router.get("/orders/{order_id}")
-async def get_order_detail(order_id: str) -> dict[str, Any]:
-    order = get_order(order_id)
-    if order is None:
-        raise HTTPException(status_code=404, detail="Order not found.")
-    return order
-
-
 @router.get("/orders/dlq")
 async def get_order_dlq() -> dict[str, Any]:
     rows = list_dlq()
@@ -315,6 +306,14 @@ async def get_order_dlq() -> dict[str, Any]:
 async def replay_order_dlq(payload: DLQReplayRequest) -> dict[str, Any]:
     replayed = try_replay_dlq(payload.dlq_id)
     return {"replayed": replayed, "count": len(replayed)}
+
+
+@router.get("/orders/{order_id}")
+async def get_order_detail(order_id: str) -> dict[str, Any]:
+    order = get_order(order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found.")
+    return order
 
 
 @router.get("/safety/status")

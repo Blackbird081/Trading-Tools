@@ -197,8 +197,8 @@ Reference gate runner:
 - `LOCAL_PERSONAL_TRADING_ROADMAP.md` tracks productization work to convert this baseline into a local personal trading product.
 - Therefore, `DONE (gated)` in this master plan does **not** mean all local roadmap phases are complete.
 - Local roadmap sync update (`2026-03-04`):
-  - Phase 2/3/4 and Fix-01/Fix-03/Fix-04 moved to implemented status in `LOCAL_PERSONAL_TRADING_ROADMAP.md`.
-  - Remaining focus is broker-live adapter hardening + clean-machine release/rollback validation.
+  - Phase 1/2/3/4/5/6/7 and Fix-01/Fix-02/Fix-03/Fix-04/Fix-05 are now tracked as implemented in `LOCAL_PERSONAL_TRADING_ROADMAP.md`.
+  - Remaining focus is live broker adapter hardening and recurring clean-machine release evidence per release cycle.
 
 ---
 

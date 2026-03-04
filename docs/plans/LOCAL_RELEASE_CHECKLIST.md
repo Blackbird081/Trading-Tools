@@ -13,6 +13,9 @@
    - `python -m pytest tests/integration/test_fastapi.py tests/integration/test_setup_api.py tests/integration/test_local_product_api.py -q`
 4. `python -m py_compile` passes for changed backend files.
 5. `docs/reports/CVF_CHANGE_TRACE_LOG.md` updated with validation evidence.
+6. One-shot validation script passes:
+   - `powershell -ExecutionPolicy Bypass -File scripts/release-validation.ps1`
+   - Output artifact: `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md`
 
 ## 2. Local Packaging Validation (Clean Machine)
 1. Clone fresh repo on clean machine.
@@ -49,6 +52,9 @@
    - health endpoint available
    - read-only operations (`portfolio/orders/list`) still work
 4. Document rollback result in CVF trace entry.
+5. Run emergency fallback drill before final sign-off:
+   - `powershell -ExecutionPolicy Bypass -File scripts/emergency-fallback-drill.ps1`
+   - Output artifact: `docs/reports/LOCAL_EMERGENCY_DRILL_LATEST.md`
 
 ## 5. Release Output
 1. Release notes include:

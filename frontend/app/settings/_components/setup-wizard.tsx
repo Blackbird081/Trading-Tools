@@ -53,9 +53,10 @@ export function SetupWizard() {
   const [draft, setDraft] = useState<SetupDraft>(DEFAULT_DRAFT);
   const [runtimeChecks, setRuntimeChecks] = useState<CheckItem[]>([]);
   const [validateChecks, setValidateChecks] = useState<CheckItem[]>([]);
+  const [probeChecks, setProbeChecks] = useState<CheckItem[]>([]);
   const [runtimeMode, setRuntimeMode] = useState<TradingMode>("dry-run");
   const [runtimeDataPath, setRuntimeDataPath] = useState<string>("-");
-  const [busy, setBusy] = useState<"idle" | "runtime" | "validate" | "init">("idle");
+  const [busy, setBusy] = useState<"idle" | "runtime" | "validate" | "init" | "probe">("idle");
   const [message, setMessage] = useState<string>("");
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
@@ -173,6 +174,25 @@ export function SetupWizard() {
       setMessage("Local data path initialized.");
     } catch {
       setMessage("Initialization failed.");
+    } finally {
+      setBusy("idle");
+    }
+  };
+
+  const probeExternal = async () => {
+    setBusy("probe");
+    setMessage("");
+    try {
+      const res = await fetch(`${API_BASE}/setup/probe-external`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = (await res.json()) as { checks?: CheckItem[]; all_ready?: boolean };
+      setProbeChecks(Array.isArray(data.checks) ? data.checks : []);
+      setMessage(data.all_ready ? "External probe passed." : "External probe completed with warnings.");
+    } catch {
+      setMessage("External probe request failed.");
     } finally {
       setBusy("idle");
     }
@@ -400,6 +420,13 @@ export function SetupWizard() {
           >
             {busy === "init" ? "Initializing..." : "Initialize Local Data Path"}
           </button>
+          <button
+            onClick={probeExternal}
+            disabled={busy !== "idle"}
+            className="rounded bg-violet-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+          >
+            {busy === "probe" ? "Probing..." : "Probe External Connections"}
+          </button>
         </div>
 
         {message && <p className="mt-3 text-xs text-zinc-400">{message}</p>}
@@ -437,6 +464,22 @@ export function SetupWizard() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">External probe</div>
+          <div className="space-y-2">
+            {probeChecks.length === 0 && (
+              <div className="rounded border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-500">
+                Run Probe External Connections to test SSI/VNStock/AI runtime availability.
+              </div>
+            )}
+            {probeChecks.map((item) => (
+              <div key={`probe-${item.name}`} className={`rounded border px-3 py-2 text-xs ${statusClass(item.status)}`}>
+                <div className="font-semibold">{item.name}</div>
+                <div className="opacity-90">{item.detail}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
