@@ -1,54 +1,54 @@
 ---
 name: "risk_assessment"
-description: "Đánh giá rủi ro toàn diện: VaR, position sizing, stop-loss, kill switch"
+description: "Comprehensive risk assessment: VaR, position sizing, stop-loss, kill switch"
 ---
 
-# Quy Trình Đánh Giá Rủi Ro
+# Risk Assessment Process
 
-## Bước 1: Kill Switch Check
-- Kiểm tra kill_switch_active trước tiên
-- Nếu active: DỪNG NGAY, không phân tích tiếp
+## Step 1: Kill Switch Check
+- Check kill_switch_active first
+- If active: STOP IMMEDIATELY, do not analyze further
 
-## Bước 2: Price Band Validation
-- HOSE: ±7% từ giá tham chiếu
+## Step 2: Price Band Validation
+- HOSE: ±7% from reference price
 - HNX: ±10%
 - UPCOM: ±15%
-- Lệnh phải nằm trong band
+- The order must be within the band
 
-## Bước 3: Lot Size Check
-- Số lượng phải là bội số của 100
-- Ví dụ: 100, 200, 500, 1000 ✓
+## Step 3: Lot Size Check
+- Quantity must be a multiple of 100
+- For example: 100, 200, 500, 1000 ✓
 - 150, 250 ✗
 
-## Bước 4: Position Size Limit
-- Tính giá trị lệnh = giá × số lượng
-- Tính % NAV = giá trị lệnh / NAV
-- Giới hạn: ≤ 20% NAV mỗi lệnh
-- Nếu vượt: từ chối lệnh
+## Step 4: Position Size Limit
+- Calculate order value = price × quantity
+- Calculate % NAV = order value / NAV
+- Limit: ≤ 20% NAV per order
+- If exceeded: refuse the order
 
-## Bước 5: Buying Power (BUY orders)
-- Kiểm tra purchasing_power ≥ giá trị lệnh
-- Nếu không đủ: từ chối lệnh
+## Step 5: Buying Power (BUY orders)
+- Check purchasing_power ≥ command value
+- If not enough: refuse the command
 
-## Bước 6: Sellable Quantity (SELL orders)
-- Kiểm tra sellable_qty ≥ số lượng muốn bán
-- Lưu ý T+2.5: chỉ cổ phiếu đã settled mới bán được
-- Trừ pending_sell_qty nếu có lệnh bán đang chờ
+## Step 6: Sellable Quantity (SELL orders)
+- Check sellable_qty ≥ the quantity you want to sell
+- Note T+2.5: only settled shares can be sold
+- Subtract pending_sell_qty if there is a pending sell order
 
-## Bước 7: Daily Loss Limit
-- Kiểm tra daily_pnl < -max_daily_loss
-- Nếu vượt: DỪNG giao dịch hôm nay
+## Step 7: Daily Loss Limit
+- Check daily_pnl < -max_daily_loss
+- If exceeded: STOP trading today
 
-## Bước 8: VaR Calculation
-- Historical VaR 95% với 252 ngày dữ liệu
-- Nếu VaR > 5% NAV: cảnh báo rủi ro cao
+## Step 8: VaR Calculation
+- Historical VaR 95% with 252 days of data
+- If VaR > 5% NAV: high risk warning
 
-## Bước 9: Stop-Loss & Take-Profit
-- Stop-loss: -7% từ giá vào (tương đương giá sàn HOSE)
-- Take-profit: +10% từ giá vào
-- Trailing stop: 5% từ đỉnh
+## Step 9: Stop-Loss & Take-Profit
+- Stop-loss: -7% from entry price (equivalent to HOSE floor price)
+- Take-profit: +10% from entry price
+- Trailing stop: 5% from peak
 
-## Kết Luận
-Tổng hợp tất cả checks:
-- Tất cả pass: APPROVED
-- Bất kỳ fail: REJECTED + lý do cụ thể
+## Conclude
+Summary of all checks:
+- All passes: APPROVED
+- Any failure: REJECTED + specific reason
