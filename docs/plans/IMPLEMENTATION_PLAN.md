@@ -294,6 +294,9 @@ Execution update (2026-03-04):
 - `AR-3` DONE (gated): OMS risk-sensitive monetary checks migrated to `Decimal` with boundary precision regression coverage.
 - `AR-5` DONE (gated): `phase-gates.ps1` now defaults to local API base and requires explicit `-AllowProductionTarget` for production endpoints.
 - `AI-Orchestrator` DONE (gated): Fundamental analysis now uses a single-provider multi-role subagent pattern (contextual role routing + deterministic arbitration) to avoid cross-provider conflicts while preserving traceable role outputs.
+- `AI-R1 Quant Benchmark` DONE (baseline): fixed historical benchmark now produces `Precision@K`, `Hit-rate`, `MDD` via `tests/evals/benchmark_fixed_dataset.py`.
+- `AI-R2 Provider A/B + Consensus` DONE (baseline): evaluator now reports `agreement_rate`, per-provider hit-rate, and `consensus_hit_rate` via `tests/evals/provider_ab_consensus.py`.
+- `AI-R3 Weekly Drift Monitor` DONE (baseline): weekly recommendation-vs-outcome report and drift alerts are generated via `tests/evals/weekly_drift_monitor.py`.
 - `AR-4` remains OPEN and is the next hardening priority (frontend global coverage uplift >= 80%).
 
 ---

@@ -35,6 +35,9 @@ Status scale:
 | Hardening-A4 Frontend Coverage Expansion | `NOT STARTED (locked)` | Current frontend global statement coverage is low for release confidence. | Raise frontend global coverage to >= 80% with risk-based test expansion (orders, dashboard, screener, market board). |
 | Hardening-A5 Safe Gate Targeting | `DONE (gated)` | `scripts/phase-gates.ps1` default API base changed to local (`http://localhost:8000/api`) and production targets now require explicit `-AllowProductionTarget` override with fail-fast guard. | Add CI usage examples for guarded production smoke execution. |
 | AI-06 Single-Provider Multi-Role Subagent Orchestration | `DONE (gated)` | `FundamentalAgent` now runs contextual subroles (`thesis`, `valuation`, `news_catalyst`, `risk_challenge`) via a single AI engine/API key and applies deterministic arbitration (`risk_veto_then_consensus`); pipeline emits role metadata (`ai_role_outputs`, `ai_subroles`, `ai_final_action`). | Add strict JSON schema per role and provider-level benchmark calibration (OpenAI/Claude/Gemini parity). |
+| AI-07 Quant Benchmark Pack (`Precision@K`, `Hit-rate`, `MDD`) | `DONE (baseline)` | Added fixed-dataset benchmark artifacts (`tests/evals/data/recommendation_outcomes_fixed.csv`, `tests/evals/reliability_metrics.py`, `tests/evals/benchmark_fixed_dataset.py`) and unit coverage (`tests/unit/test_reliability_eval_pack.py`). | Promote fixed dataset to versioned rolling snapshots from production-like history. |
+| AI-08 Provider A/B + Consensus Check | `DONE (baseline)` | Added provider A/B dataset and evaluator (`tests/evals/data/provider_ab_consensus_fixed.csv`, `tests/evals/provider_ab_consensus.py`) with agreement/per-provider/consensus metrics and tests. | Extend from offline benchmark to runtime dual-provider experiment mode with strict cost controls. |
+| AI-09 Weekly Drift Monitoring (Recommendation vs Outcome) | `DONE (baseline)` | Added weekly drift evaluator (`tests/evals/weekly_drift_monitor.py`) and unified runner (`tests/evals/run_reliability_pack.py`) producing per-week summary + alerts. | Add scheduled weekly CI/job execution and threshold-based release gate integration. |
 
 ## Product Direction
 - User downloads and runs app locally on personal machine.
@@ -54,6 +57,7 @@ Status scale:
 - Frontend global coverage remains below release-grade target.
 - Native provider adapters for Anthropic/Gemini are not yet implemented (current remote LLM path is OpenAI-compatible).
 - Role outputs are currently narrative text; schema-locked role JSON contract is not yet enforced.
+- AI reliability pack currently uses fixed baseline datasets; scheduled weekly automation is not wired yet.
 
 ## Target State (To-Be)
 - One-command local bootstrap and setup wizard.
@@ -61,6 +65,7 @@ Status scale:
 - Real broker sync for portfolio/order status.
 - Real agent pipeline execution with explainable outputs.
 - Single active AI provider per run with contextual subroles and deterministic conflict arbitration.
+- Measurable reliability governance via benchmark metrics, A/B consensus validation, and weekly drift alerts.
 - Stable release process aligned with CVF controlled changes.
 
 ## Phase Plan

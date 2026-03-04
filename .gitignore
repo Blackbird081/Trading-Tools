@@ -44,6 +44,9 @@ coverage.xml
 data/
 *.duckdb
 *.duckdb.wal
+!tests/evals/data/
+!tests/evals/data/*.csv
+tests/evals/results/*.json
 
 # ── IDE ───────────────────────────────────────────────────────
 .vscode/

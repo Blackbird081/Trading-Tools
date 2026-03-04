@@ -415,3 +415,24 @@ Notes:
 - Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` AI-06 orchestration track + `IMPLEMENTATION_PLAN.md` Section `0.11` execution update
 - Owner: Codex + project owner
 - Notes: Arbitration policy is deterministic (`risk_veto_then_consensus`) and provider-agnostic; native Anthropic/Gemini adapters remain a separate follow-up.
+
+### CVF-TT-20260304-025
+- Date-Time (UTC+7): 2026-03-04 15:30
+- Type: feature
+- Scope: Add AI reliability eval pack with three layers required for serious local-product validation: fixed-dataset quant benchmark (`Precision@K`, `Hit-rate`, `MDD`), provider A/B + consensus check, and weekly drift monitoring (`recommendation vs realized outcome`).
+- Impact: Repository now has reproducible reliability artifacts and runners (`tests/evals/*`) that can generate auditable JSON reports for benchmark, provider consensus quality, and drift alerts before live API-key onboarding.
+- Root Cause: Reliability governance had no concrete implementation for the three user-requested validation layers; existing eval path measured only generic signal accuracy.
+- Files Changed: `tests/evals/reliability_metrics.py`, `tests/evals/benchmark_fixed_dataset.py`, `tests/evals/provider_ab_consensus.py`, `tests/evals/weekly_drift_monitor.py`, `tests/evals/run_reliability_pack.py`, `tests/evals/data/recommendation_outcomes_fixed.csv`, `tests/evals/data/provider_ab_consensus_fixed.csv`, `tests/unit/test_reliability_eval_pack.py`, `docs/plans/AI_RELIABILITY_EVAL_PACK.md`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `python -m py_compile tests/evals/reliability_metrics.py tests/evals/benchmark_fixed_dataset.py tests/evals/provider_ab_consensus.py tests/evals/weekly_drift_monitor.py tests/evals/run_reliability_pack.py` (pass)
+  - `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src;. python -m pytest tests/unit/test_reliability_eval_pack.py -q` (pass, 3 tests)
+  - `python tests/evals/benchmark_fixed_dataset.py --k 10` (pass; JSON report generated under `tests/evals/results/`)
+  - `python tests/evals/provider_ab_consensus.py` (pass; JSON report generated under `tests/evals/results/`)
+  - `python tests/evals/weekly_drift_monitor.py` (pass; JSON report generated under `tests/evals/results/`)
+  - `python tests/evals/run_reliability_pack.py` (pass; JSON report generated under `tests/evals/results/`)
+- Deployment Target: local reliability evaluation and CVF governance docs
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` AI-07/AI-08/AI-09 + `IMPLEMENTATION_PLAN.md` execution update (`AI-R1/AI-R2/AI-R3`)
+- Owner: Codex + project owner
+- Notes: Current implementation is baseline/offline and dataset-fixed by design; next step is scheduled weekly automation and production-snapshot dataset versioning.
