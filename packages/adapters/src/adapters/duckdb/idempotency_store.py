@@ -34,6 +34,16 @@ class DuckDBIdempotencyStore(IdempotencyPort):
         self._max_age_hours = max_age_hours
         self._conn.execute(_DDL)
 
+    @classmethod
+    async def create(
+        cls,
+        db_path: str,
+        max_age_hours: int = 24,
+    ) -> "DuckDBIdempotencyStore":
+        """Async factory for runtime wiring (non-breaking with existing constructor)."""
+        conn = await asyncio.to_thread(duckdb.connect, db_path)
+        return cls(conn=conn, max_age_hours=max_age_hours)
+
     async def check(self, key: str) -> dict[str, object] | None:
         return await asyncio.to_thread(self._check_sync, key)
 

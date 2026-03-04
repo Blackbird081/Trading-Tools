@@ -315,6 +315,7 @@ function MetricCard({
 export function PipelineRunner() {
   const [state, setState] = useState<PipelineState>(INITIAL_PIPELINE_STATE);
   const abortRef = useRef<AbortController | null>(null);
+  const [runMode, setRunMode] = useState<"dry-run" | "live">("dry-run");
 
   // Table state
   const [sortField, setSortField] = useState<SortField>("score");
@@ -471,6 +472,13 @@ export function PipelineRunner() {
           }));
           setShowAgentSteps(false);
           break;
+        case "error":
+          setState((s) => ({
+            ...s,
+            status: "error",
+            error: String(data.message ?? "Pipeline failed"),
+          }));
+          break;
       }
     },
     []
@@ -497,7 +505,7 @@ export function PipelineRunner() {
     });
 
     try {
-      const res = await fetch(`${API_BASE}/run-screener?preset=${preset}`, {
+      const res = await fetch(`${API_BASE}/run-screener?preset=${preset}&mode=${runMode}`, {
         signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
@@ -538,7 +546,7 @@ export function PipelineRunner() {
         }));
       }
     }
-  }, [state.status, preset, handleEvent]);
+  }, [state.status, preset, runMode, handleEvent]);
 
   const isRunning = state.status === "running";
   const isDone = state.status === "complete";
@@ -562,25 +570,35 @@ export function PipelineRunner() {
             )}
           </p>
         </div>
-        <button
-          onClick={handleRun}
-          className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all shadow-lg ${isRunning
-            ? "bg-red-600 hover:bg-red-500 text-white shadow-red-900/30"
-            : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30"
-            }`}
-        >
-          {isRunning ? (
-            <>
-              <Square className="h-4 w-4" />
-              Stop
-            </>
-          ) : (
-            <>
-              <Play className="h-4 w-4" />
-              Run Pipeline
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={runMode}
+            onChange={(e) => setRunMode(e.target.value as "dry-run" | "live")}
+            className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-200"
+          >
+            <option value="dry-run">dry-run</option>
+            <option value="live">live</option>
+          </select>
+          <button
+            onClick={handleRun}
+            className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all shadow-lg ${isRunning
+              ? "bg-red-600 hover:bg-red-500 text-white shadow-red-900/30"
+              : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30"
+              }`}
+          >
+            {isRunning ? (
+              <>
+                <Square className="h-4 w-4" />
+                Stop
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" />
+                Run Pipeline
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* ── Global progress bar ──────────────────────────────── */}

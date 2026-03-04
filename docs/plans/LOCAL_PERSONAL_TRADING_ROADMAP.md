@@ -3,11 +3,11 @@
 ## CVF Traceability
 - CVF-Doc-ID: CVF-TT-LOCAL-20260302-R1
 - Owner: Product + Engineering
-- Last-Updated: 2026-03-03
+- Last-Updated: 2026-03-04
 - Status: In execution
 - Scope: Turn Trading-Tools from demo/mixed-mock to local personal trading product.
 
-## Execution Mapping Snapshot (Updated, 2026-03-03)
+## Execution Mapping Snapshot (Updated, 2026-03-04)
 
 Status scale:
 - `DONE`: exit criteria completed and evidenced.
@@ -17,17 +17,17 @@ Status scale:
 | Roadmap Item | Status | Evidence (current repository) | Gap to close |
 |---|---|---|---|
 | Phase 0 - Baseline Freeze and Contract Lock | `DONE (artifacts)` | Local baseline tag `baseline-local-roadmap-r1` created; contract doc added (`docs/plans/LOCAL_API_CONTRACTS.md`); smoke checklist added (`docs/plans/LOCAL_SMOKE_CHECKLIST.md`); baseline UI snapshot log added (`docs/plans/LOCAL_UI_BASELINE_SNAPSHOTS.md`). | Push tag to remote and enforce smoke checklist in release workflow. |
-| Phase 1 - Local Runtime and Setup Wizard | `PARTIAL` | Added `scripts/local-run.ps1` profiles (`dev`, `local-prod`, `docker`), setup APIs (`/api/setup/status`, `/api/setup/validate`, `/api/setup/init-local`), and frontend setup wizard (`frontend/app/settings/_components/setup-wizard.tsx`). | Complete real external connection probe, and validate onboarding time <= 15 minutes on clean machine. |
-| Phase 2 - Secure Key and Profile Management | `NOT STARTED` | No profile vault, no encryption-at-rest flow, no profile switch/import/export policy in runtime. | Implement profile model, encryption, rotation/revoke workflow. |
-| Phase 3 - OMS and Broker Execution (Dry-Run First) | `PARTIAL` | Core order use case exists (`packages/core/src/core/use_cases/place_order.py`), but no REST order endpoints and frontend orders still local UI state (`frontend/stores/order-store.ts`). | Wire backend order APIs + frontend integration + persistent order history. |
-| Phase 4 - Real Portfolio Sync | `NOT STARTED` | Portfolio REST is still stub (`packages/interface/src/interface/rest/portfolio.py`), UI portfolio is placeholder (`frontend/app/portfolio/page.tsx`). | Implement portfolio/positions/pnl APIs + sync/reconciliation + UI binding. |
-| Phase 5 - Real Agent/AI Pipeline Integration | `PARTIAL` | Agent modules exist, but `/run-screener` still streams simulated pipeline and mock results (`packages/interface/src/interface/rest/data_loader.py`). | Wire real runner/supervisor execution and persist run metadata. |
-| Phase 6 - Guardrails and Trading Safety | `PARTIAL` | Guardrail module exists (`packages/agents/src/agents/guardrails.py`) and dry-run concept exists, but live-mode controls are not enforced end-to-end in UI/API. | Add live guardrails, kill-switch/cooldown checks, emergency fallback. |
-| Phase 7 - Quality, Packaging, and Release | `PARTIAL` | Phase gates and tests exist (`scripts/phase-gates.ps1`), but local distribution packaging + upgrade/rollback validation for personal users is incomplete. | Add release checklist for local product distribution and clean-machine validation. |
-| Fix-01 DLQ failed orders | `NOT STARTED` | No `failed_orders_dlq` schema/worker/admin API. | Implement DLQ persistence + retry worker + notifier. |
+| Phase 1 - Local Runtime and Setup Wizard | `PARTIAL` | `scripts/local-run.ps1` profiles + setup APIs + setup wizard UI are in place and tested (`tests/integration/test_setup_api.py`). | Complete real external API probe and timed clean-machine onboarding benchmark. |
+| Phase 2 - Secure Key and Profile Management | `DONE` | Added encrypted profile vault (`packages/interface/src/interface/profile_vault.py`) + setup profile APIs (create/list/activate/export/import/rotate/revoke) + settings UI section. | Monitor passphrase/key recovery policy and UX hardening. |
+| Phase 3 - OMS and Broker Execution (Dry-Run First) | `DONE` | Added backend OMS REST (`packages/interface/src/interface/rest/orders.py`), idempotency async wiring (`trading_store.py`, `DuckDBIdempotencyStore.create()`), frontend order API integration (`frontend/stores/order-store.ts`, `frontend/app/orders/_components/*`). | Wire real broker adapter for live execution (currently guarded/stubbed). |
+| Phase 4 - Real Portfolio Sync | `DONE` | Implemented `/api/portfolio`, `/positions`, `/pnl`, `/refresh`, `/reconcile` and connected Portfolio UI/store (`frontend/stores/portfolio-store.ts`, `frontend/app/portfolio/*`). | Add broker-source reconciliation against real account endpoint when live broker is enabled. |
+| Phase 5 - Real Agent/AI Pipeline Integration | `PARTIAL` | Replaced mock screener stream with real agent graph execution + persisted run history (`/api/run-screener`, `/api/screener/history`, `save_screener_run`). | Integrate real fundamental/news data path for richer AI rationale in live mode. |
+| Phase 6 - Guardrails and Trading Safety | `PARTIAL` | Live controls enforced in order API: two-step live confirm, kill-switch, session gate, max notional, daily loss, rejection cooldown + DLQ fallback. | Expand automated safety test suite and broker-level emergency fallback drill. |
+| Phase 7 - Quality, Packaging, and Release | `PARTIAL` | Added new integration tests for local product flows (`tests/integration/test_local_product_api.py`) and frontend type/test gates still passing. | Finalize clean-machine packaging validation + rollback rehearsal checklist. |
+| Fix-01 DLQ failed orders | `DONE` | Added DLQ schema + retry worker + admin/replay APIs (`failed_orders_dlq`, `DLQRetryWorker`, `/api/orders/dlq`, `/api/orders/dlq/replay`). | Optional notifier integration (Telegram/email) for permanent failures. |
 | Fix-02 Optional `pandas_ta` | `DONE` | Added optional extra `technical` with `pandas` + `pandas_ta` in `packages/agents/pyproject.toml`; fallback test added in `tests/unit/test_technical_agent.py` to verify graceful behavior when `pandas_ta` is unavailable. | Monitor package pin compatibility in CI matrix. |
-| Fix-03 OpenTelemetry for DuckDB calls | `NOT STARTED` | No span wrapper around DuckDB query paths. | Add tracing instrumentation and exporter wiring. |
-| Fix-04 Async factory for DuckDBIdempotencyStore | `NOT STARTED` | `DuckDBIdempotencyStore` only sync constructor (`packages/adapters/src/adapters/duckdb/idempotency_store.py`). | Add async factory + non-breaking migration path. |
+| Fix-03 OpenTelemetry for DuckDB calls | `DONE` | Added `execute_with_trace()` wrapper (`packages/adapters/src/adapters/duckdb/telemetry.py`) and applied to core DuckDB paths in `interface/trading_store.py`. | Add optional exporter configuration docs for external trace backends. |
+| Fix-04 Async factory for DuckDBIdempotencyStore | `DONE` | Added `DuckDBIdempotencyStore.create()` async factory and migrated runtime wiring to async path (`interface/trading_store.py`). | Monitor deprecation path for legacy sync-only initialization. |
 | Fix-05 Refine `bank_account` guardrail pattern | `DONE` | Replaced broad numeric regex with VN-context strategy (`packages/agents/src/agents/guardrails.py`) and added unit tests (`tests/unit/test_guardrails.py`). | Monitor false-positive/false-negative drift with real production text samples. |
 
 ## Product Direction
@@ -43,10 +43,9 @@ Status scale:
 - Completion of master gated phases does not close local personal trading phases automatically.
 
 ## Current Gaps (As-Is)
-- Portfolio API/UI is still stub/placeholder in multiple paths.
-- Order flow is mostly local UI state, not full backend OMS broker execution flow.
-- Screener `/run-screener` currently streams simulated pipeline events/results.
-- Local installer/setup flow for non-technical users is not complete.
+- Real broker execution path still uses guarded placeholder; live adapter integration remains.
+- Fundamental/news enrichment in screener pipeline is still limited in local default mode.
+- Release packaging for non-technical clean-machine install and rollback is not fully validated yet.
 
 ## Target State (To-Be)
 - One-command local bootstrap and setup wizard.

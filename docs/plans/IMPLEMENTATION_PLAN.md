@@ -196,6 +196,9 @@ Reference gate runner:
 - `IMPLEMENTATION_PLAN.md` status in Section `0.8` tracks gate completion of core technical phases (`P0/P1`, `Phase 1-5`) for the current architecture baseline.
 - `LOCAL_PERSONAL_TRADING_ROADMAP.md` tracks productization work to convert this baseline into a local personal trading product.
 - Therefore, `DONE (gated)` in this master plan does **not** mean all local roadmap phases are complete.
+- Local roadmap sync update (`2026-03-04`):
+  - Phase 2/3/4 and Fix-01/Fix-03/Fix-04 moved to implemented status in `LOCAL_PERSONAL_TRADING_ROADMAP.md`.
+  - Remaining focus is broker-live adapter hardening + clean-machine release/rollback validation.
 
 ---
 

@@ -1,20 +1,30 @@
 "use client";
 
+import { useEffect } from "react";
 import { useOrderStore } from "@/stores/order-store";
 
 export function OrderHistory() {
   const orders = useOrderStore((s) => s.orders);
+  const loading = useOrderStore((s) => s.loading);
+  const error = useOrderStore((s) => s.error);
+  const fetchOrders = useOrderStore((s) => s.fetchOrders);
+  const cancelOrder = useOrderStore((s) => s.cancelOrder);
+
+  useEffect(() => {
+    void fetchOrders();
+  }, [fetchOrders]);
 
   if (orders.length === 0) {
     return (
       <div className="p-8 text-center text-zinc-500">
-        Chưa có lệnh nào
+        {loading ? "Đang tải lịch sử lệnh..." : "Chưa có lệnh nào"}
       </div>
     );
   }
 
   return (
     <>
+      {error && <div className="mb-3 text-xs text-red-400">{error}</div>}
       <div className="space-y-2 md:hidden">
         {orders.map((order) => (
           <div key={order.id} className="rounded-md border border-zinc-800 bg-zinc-950/60 p-3">
@@ -46,6 +56,15 @@ export function OrderHistory() {
               <span className="text-zinc-500">Thời gian</span>
               <span className="text-right text-zinc-500">{new Date(order.createdAt).toLocaleTimeString("vi-VN")}</span>
             </div>
+            {order.status === "PENDING" && (
+              <button
+                type="button"
+                className="mt-2 rounded border border-red-700 px-2 py-1 text-xs text-red-400"
+                onClick={() => void cancelOrder(order.id)}
+              >
+                Hủy lệnh
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -60,6 +79,7 @@ export function OrderHistory() {
               <th className="px-4 py-2 text-right">Giá</th>
               <th className="px-4 py-2 text-center">Trạng thái</th>
               <th className="px-4 py-2 text-right">Thời gian</th>
+              <th className="px-4 py-2 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -101,6 +121,17 @@ export function OrderHistory() {
                 </td>
                 <td className="px-4 py-2 text-right text-zinc-500 text-xs">
                   {new Date(order.createdAt).toLocaleTimeString("vi-VN")}
+                </td>
+                <td className="px-4 py-2 text-right">
+                  {order.status === "PENDING" && (
+                    <button
+                      type="button"
+                      className="rounded border border-red-700 px-2 py-1 text-xs text-red-400"
+                      onClick={() => void cancelOrder(order.id)}
+                    >
+                      Hủy
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from interface.rest.company import router as company_router
 from interface.rest.data_loader import router as data_loader_router
 from interface.rest.health import router as health_router
+from interface.rest.orders import router as orders_router
 from interface.rest.portfolio import router as portfolio_router
 from interface.rest.setup import router as setup_router
 from interface.ws.market_ws import router as market_ws_router
@@ -57,6 +58,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception:
         logger.warning("DuckDB pool initialization failed — running without pool")
 
+    # Startup: DLQ retry worker for failed live orders
+    try:
+        from interface.trading_store import DLQRetryWorker
+
+        worker = DLQRetryWorker(interval_seconds=int(os.getenv("DLQ_RETRY_INTERVAL_SECONDS", "20")))
+        await worker.start()
+        app.state.dlq_worker = worker
+        logger.info("DLQ retry worker started")
+    except Exception:
+        logger.warning("DLQ retry worker failed to start")
+
     logger.info("Application startup complete")
     yield
 
@@ -67,6 +79,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     pool = getattr(app.state, "db_pool", None)
     if pool is not None:
         await pool.shutdown()
+
+    # Stop DLQ retry worker
+    worker = getattr(app.state, "dlq_worker", None)
+    if worker is not None:
+        await worker.stop()
 
     # Close WebSocket connections
     try:
@@ -96,6 +113,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router, prefix="/api")
     app.include_router(data_loader_router, prefix="/api")
     app.include_router(company_router, prefix="/api")
+    app.include_router(orders_router, prefix="/api")
     app.include_router(portfolio_router, prefix="/api")
     app.include_router(setup_router, prefix="/api")
     app.include_router(market_ws_router)

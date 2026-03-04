@@ -14,18 +14,7 @@ It distinguishes:
 
 ## 1) Portfolio Contract
 
-### Current
-- `GET /api/portfolio`
-  - Status: stub
-  - Current response:
-    ```json
-    {
-      "status": "stub",
-      "message": "Portfolio endpoint pending Phase 5 integration"
-    }
-    ```
-
-### Target
+### Current (Implemented 2026-03-04)
 - `GET /api/portfolio`
   - Response:
     ```json
@@ -70,11 +59,7 @@ It distinguishes:
 
 ## 2) Orders Contract
 
-### Current
-- No public REST order API is exposed in `interface.rest`.
-- Frontend order flow currently runs local UI state only.
-
-### Target
+### Current (Implemented 2026-03-04)
 - `POST /api/orders`
   - Request:
     ```json
@@ -119,11 +104,7 @@ It distinguishes:
 
 ## 3) Screener Contract
 
-### Current
-- `GET /api/run-screener?preset=VN30|TOP100`
-  - SSE stream is simulated (mock progression + mock recommendations).
-
-### Target
+### Current (Implemented 2026-03-04)
 - `GET /api/run-screener?preset=VN30|TOP100&mode=dry-run|live`
   - SSE event contracts:
     - `pipeline_start`
@@ -159,6 +140,17 @@ It distinguishes:
       ]
     }
     ```
+ - `GET /api/screener/history?limit=20`
+   - Response:
+    ```json
+    {
+      "runs": [],
+      "count": 0
+    }
+    ```
+
+### Target
+- Add richer fundamental/news-backed reproducibility metadata when live AI enrichment is available.
 
 ## 4) Compatibility Rules
 - New target endpoints must remain backward-compatible with current UI until integration is switched.
@@ -166,4 +158,36 @@ It distinguishes:
   - roadmap update,
   - CVF trace entry,
   - migration note for frontend consumers.
+ - `POST /api/portfolio/refresh`
+   - Response:
+    ```json
+    {
+      "success": true,
+      "mode": "dry-run|live",
+      "cash": 0,
+      "nav": 0,
+      "purchasing_power": 0,
+      "last_sync_at": "ISO-8601"
+    }
+    ```
+ - `POST /api/portfolio/reconcile`
+   - Response:
+    ```json
+    {
+      "success": true,
+      "matched": true,
+      "mismatches": []
+    }
+    ```
 
+### Target
+- keep backward compatibility; add broker reconciliation detail once live adapter is enabled.
+ - `GET /api/orders/open`
+ - `GET /api/orders/{order_id}`
+ - `GET /api/orders/dlq`
+ - `POST /api/orders/dlq/replay`
+ - `GET /api/safety/status`
+ - `POST /api/safety/kill-switch`
+
+### Target
+- Integrate real broker order submission while keeping current dry-run + guardrail behavior.

@@ -251,3 +251,22 @@ Notes:
 - Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` -> Fix-02
 - Owner: Codex + project owner
 - Notes: Optional profile documented as install-on-demand; base runtime continues to support no-`pandas_ta` mode.
+
+### CVF-TT-20260304-016
+- Date-Time (UTC+7): 2026-03-04 16:30
+- Type: feature
+- Scope: Complete major local roadmap execution batch: encrypted profile vault, OMS REST + DLQ, portfolio real sync APIs/UI, screener real pipeline stream, and phase-7 release artifacts.
+- Impact: Local product now has end-to-end API-backed order/portfolio flows, live-mode safety controls, persisted screener run history, and documented release/upgrade/rollback procedure under CVF traceability.
+- Root Cause: Roadmap still showed multiple `NOT STARTED/PARTIAL` items (Phase 2/3/4/5/6 and Fix-01/03/04) despite available foundational modules.
+- Files Changed: `packages/interface/src/interface/rest/orders.py`, `packages/interface/src/interface/trading_store.py`, `packages/interface/src/interface/rest/portfolio.py`, `packages/interface/src/interface/rest/data_loader.py`, `packages/interface/src/interface/profile_vault.py`, `packages/interface/src/interface/rest/setup.py`, `packages/interface/src/interface/app.py`, `packages/adapters/src/adapters/duckdb/telemetry.py`, `packages/adapters/src/adapters/duckdb/idempotency_store.py`, `frontend/stores/order-store.ts`, `frontend/stores/portfolio-store.ts`, `frontend/app/orders/_components/order-form.tsx`, `frontend/app/orders/_components/order-history.tsx`, `frontend/app/portfolio/page.tsx`, `frontend/app/portfolio/_components/pnl-chart.tsx`, `frontend/app/settings/_components/setup-wizard.tsx`, `frontend/app/screener/_components/pipeline-runner.tsx`, `tests/integration/test_local_product_api.py`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/LOCAL_RELEASE_CHECKLIST.md`, `docs/plans/LOCAL_UPGRADE_ROLLBACK_GUIDE.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`.
+- Validation Evidence:
+  - `python -m py_compile packages/interface/src/interface/rest/orders.py packages/interface/src/interface/rest/portfolio.py packages/interface/src/interface/rest/setup.py packages/interface/src/interface/profile_vault.py packages/interface/src/interface/rest/data_loader.py packages/interface/src/interface/rest/health.py packages/interface/src/interface/app.py packages/interface/src/interface/trading_store.py packages/adapters/src/adapters/duckdb/telemetry.py packages/adapters/src/adapters/duckdb/idempotency_store.py` (pass)
+  - `pnpm -C frontend exec tsc --noEmit` (pass)
+  - `pnpm -C frontend exec vitest run __tests__/integration/data-loader.test.tsx __tests__/stores/market-store.test.ts __tests__/stores/signal-store.test.ts __tests__/lib/market-sectors.test.ts` (pass, 16 tests)
+  - `python -m pytest tests/integration/test_fastapi.py tests/integration/test_setup_api.py tests/integration/test_local_product_api.py -q` with `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src` (pass, 9 tests)
+- Deployment Target: backend + frontend + docs (local/railway via GitHub deploy)
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` Phase 2/3/4/5/6/7 + Fix-01/Fix-03/Fix-04, `IMPLEMENTATION_PLAN.md` Section 0.9 alignment update
+- Owner: Codex + project owner
+- Notes: Live broker execution remains guarded by `ENABLE_LIVE_BROKER`; when disabled, live order requests are routed to DLQ by design.

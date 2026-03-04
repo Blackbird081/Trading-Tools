@@ -8,8 +8,10 @@ from tempfile import NamedTemporaryFile
 from typing import Literal
 
 import duckdb
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+
+from interface import profile_vault
 
 router = APIRouter(tags=["setup"])
 
@@ -77,6 +79,38 @@ class SetupValidateRequest(BaseModel):
 
 class SetupInitRequest(BaseModel):
     duckdb_path: str | None = Field(default=None, max_length=256)
+
+
+class ProfileCreateRequest(BaseModel):
+    profile_name: str = Field(min_length=2, max_length=64)
+    passphrase: str = Field(min_length=8, max_length=256)
+    config: dict[str, object] = Field(default_factory=dict)
+    set_active: bool = True
+
+
+class ProfileDecryptRequest(BaseModel):
+    profile_name: str = Field(min_length=2, max_length=64)
+    passphrase: str = Field(min_length=8, max_length=256)
+
+
+class ProfileActivateRequest(BaseModel):
+    profile_name: str = Field(min_length=2, max_length=64)
+
+
+class ProfileImportRequest(BaseModel):
+    profile_name: str = Field(min_length=2, max_length=64)
+    payload_b64: str = Field(min_length=10)
+    set_active: bool = False
+
+
+class ProfileRotateRequest(BaseModel):
+    profile_name: str = Field(min_length=2, max_length=64)
+    old_passphrase: str = Field(min_length=8, max_length=256)
+    new_passphrase: str = Field(min_length=8, max_length=256)
+
+
+class ProfileRevokeRequest(BaseModel):
+    profile_name: str = Field(min_length=2, max_length=64)
 
 
 @router.get("/setup/status")
@@ -206,3 +240,78 @@ async def init_local_runtime(payload: SetupInitRequest) -> dict[str, object]:
         "duckdb_path": str(db_path),
         "timestamp": datetime.now(UTC).isoformat(),
     }
+
+
+@router.get("/setup/profiles")
+async def get_profiles() -> dict[str, object]:
+    return profile_vault.list_profiles()
+
+
+@router.post("/setup/profiles/create")
+async def create_profile(payload: ProfileCreateRequest) -> dict[str, object]:
+    try:
+        created = profile_vault.create_profile(payload.profile_name, payload.passphrase, payload.config)
+        if payload.set_active:
+            profile_vault.activate_profile(payload.profile_name)
+        profiles = profile_vault.list_profiles()
+        return {"success": True, "created": created, "active_profile": profiles.get("active_profile")}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/setup/profiles/decrypt")
+async def decrypt_profile(payload: ProfileDecryptRequest) -> dict[str, object]:
+    try:
+        config = profile_vault.decrypt_profile(payload.profile_name, payload.passphrase)
+        return {"success": True, "profile_name": payload.profile_name, "config": config}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/setup/profiles/activate")
+async def activate_profile(payload: ProfileActivateRequest) -> dict[str, object]:
+    try:
+        result = profile_vault.activate_profile(payload.profile_name)
+        return {"success": True, **result}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/setup/profiles/{profile_name}/export")
+async def export_profile(profile_name: str) -> dict[str, object]:
+    try:
+        payload_b64 = profile_vault.export_profile(profile_name)
+        return {"success": True, "profile_name": profile_name, "payload_b64": payload_b64}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/setup/profiles/import")
+async def import_profile(payload: ProfileImportRequest) -> dict[str, object]:
+    try:
+        result = profile_vault.import_profile(payload.profile_name, payload.payload_b64, set_active=payload.set_active)
+        return {"success": True, **result}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/setup/profiles/rotate")
+async def rotate_profile(payload: ProfileRotateRequest) -> dict[str, object]:
+    try:
+        result = profile_vault.rotate_profile_passphrase(
+            payload.profile_name,
+            payload.old_passphrase,
+            payload.new_passphrase,
+        )
+        return {"success": True, **result}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/setup/profiles/revoke")
+async def revoke_profile(payload: ProfileRevokeRequest) -> dict[str, object]:
+    try:
+        result = profile_vault.revoke_profile(payload.profile_name)
+        return {"success": True, **result}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

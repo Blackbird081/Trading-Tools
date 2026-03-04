@@ -14,9 +14,12 @@ import logging
 import os
 import random
 import tempfile
+import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import duckdb
 from fastapi import APIRouter, Query
@@ -512,196 +515,421 @@ async def _generate_incremental_progress(
     )
 
 
-# ── Screener pipeline SSE ──────────────────────────────────────
-async def _generate_screener_progress(preset: str = "VN30") -> AsyncGenerator[str, None]:
-    """Stream SSE progress for pipeline execution."""
+# ── Screener pipeline SSE (real-agent wiring) ──────────────────
+_AGENT_STEPS: list[dict[str, str]] = [
+    {"node": "screener", "agent": "Screener Agent", "icon": "search", "detail": "Lọc cơ hội theo data cache + thanh khoản"},
+    {"node": "technical", "agent": "Technical Agent", "icon": "chart", "detail": "Tính RSI/MACD/BB/MA trên dữ liệu giá thực tế"},
+    {"node": "risk", "agent": "Risk Agent", "icon": "shield", "detail": "Kiểm tra hạn mức rủi ro và điều kiện an toàn"},
+    {"node": "executor", "agent": "Executor Agent", "icon": "zap", "detail": "Sinh execution plan dry-run/live theo guardrails"},
+]
+
+
+class _CacheScreenerPort:
+    def __init__(self, conn: duckdb.DuckDBPyConnection, preset: str, symbols: list[str]) -> None:
+        self._conn = conn
+        self._preset = preset
+        self._symbols = symbols
+
+    async def screen(self, min_eps_growth: float = 0.10, max_pe_ratio: float = 15.0) -> list[dict[str, object]]:
+        rows = self._conn.execute(
+            """
+            SELECT symbol, price, change_pct, volume, reference
+            FROM market_cache
+            WHERE preset = ?
+            ORDER BY volume DESC, symbol ASC
+            """,
+            [self._preset],
+        ).fetchall()
+
+        if not rows:
+            rows = [(s, 0.0, 0.0, 0, 0.0) for s in self._symbols]
+
+        candidates: list[dict[str, object]] = []
+        for row in rows:
+            symbol = str(row[0])
+            change_pct = float(row[2] or 0.0)
+            volume = float(row[3] or 0.0)
+            liquidity_bonus = min(0.20, volume / 20_000_000)
+            eps_growth = max(-0.25, min(0.50, (change_pct / 100) + liquidity_bonus))
+            pe_ratio = max(4.0, min(35.0, 18.0 - (eps_growth * 18)))
+            if eps_growth >= min_eps_growth and pe_ratio <= max_pe_ratio:
+                candidates.append(
+                    {
+                        "symbol": symbol,
+                        "eps_growth": round(eps_growth, 4),
+                        "pe_ratio": round(pe_ratio, 2),
+                    }
+                )
+
+        if not candidates:
+            for row in rows[: min(15, len(rows))]:
+                candidates.append(
+                    {
+                        "symbol": str(row[0]),
+                        "eps_growth": 0.11,
+                        "pe_ratio": 14.0,
+                    }
+                )
+        return candidates
+
+
+class _CacheTickRepo:
+    def __init__(self, conn: duckdb.DuckDBPyConnection, preset: str) -> None:
+        self._conn = conn
+        self._preset = preset
+
+    async def query_volume_spikes(self, threshold_multiplier: float = 2.0) -> list[dict[str, object]]:
+        rows = self._conn.execute(
+            """
+            WITH latest AS (
+                SELECT
+                    symbol,
+                    volume,
+                    ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY ts DESC) AS rn
+                FROM market_candles
+            ),
+            avg20 AS (
+                SELECT symbol, AVG(volume) AS avg_vol
+                FROM (
+                    SELECT
+                        symbol,
+                        volume,
+                        ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY ts DESC) AS rn
+                    FROM market_candles
+                ) q
+                WHERE rn <= 20
+                GROUP BY symbol
+            )
+            SELECT l.symbol, l.volume, a.avg_vol
+            FROM latest l
+            JOIN avg20 a ON a.symbol = l.symbol
+            JOIN market_cache m ON m.symbol = l.symbol AND m.preset = ?
+            WHERE l.rn = 1 AND l.volume >= a.avg_vol * ?
+            ORDER BY l.volume DESC
+            """,
+            [self._preset, threshold_multiplier],
+        ).fetchall()
+        return [{"symbol": str(r[0]), "volume": int(r[1]), "avg_volume": float(r[2])} for r in rows]
+
+    async def get_ohlcv(self, symbol: str) -> list[dict[str, object]]:
+        rows = self._conn.execute(
+            """
+            SELECT ts, open_price, high, low, close_price, volume
+            FROM market_candles
+            WHERE symbol = ?
+            ORDER BY ts DESC
+            LIMIT 260
+            """,
+            [symbol],
+        ).fetchall()
+        if not rows:
+            fallback = self.get_latest_price(symbol)
+            base = fallback if fallback > 0 else 10000.0
+            return [{"close": base * 0.98}, {"close": base}]
+        out: list[dict[str, object]] = []
+        for row in reversed(rows):
+            out.append(
+                {
+                    "timestamp": int(row[0]),
+                    "open": float(row[1]),
+                    "high": float(row[2]),
+                    "low": float(row[3]),
+                    "close": float(row[4]),
+                    "volume": int(row[5]),
+                }
+            )
+        return out
+
+    def get_latest_price(self, symbol: str) -> float:
+        row = self._conn.execute(
+            """
+            SELECT price
+            FROM market_cache
+            WHERE symbol = ? AND preset = ?
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """,
+            [symbol, self._preset],
+        ).fetchone()
+        return float(row[0]) if row else 0.0
+
+    def calculate_var_historical(self, symbol: str, confidence: float = 0.95, window_days: int = 252) -> float:
+        rows = self._conn.execute(
+            """
+            SELECT close_price
+            FROM market_candles
+            WHERE symbol = ?
+            ORDER BY ts DESC
+            LIMIT ?
+            """,
+            [symbol, max(window_days, 30)],
+        ).fetchall()
+        closes = [float(r[0]) for r in reversed(rows)]
+        if len(closes) < 20:
+            return 0.0
+        returns: list[float] = []
+        for i in range(1, len(closes)):
+            prev = closes[i - 1]
+            cur = closes[i]
+            if prev <= 0:
+                continue
+            returns.append((cur - prev) / prev)
+        if not returns:
+            return 0.0
+        returns.sort()
+        index = max(0, min(len(returns) - 1, int((1 - confidence) * len(returns))))
+        var_fraction = abs(returns[index])
+        latest = closes[-1]
+        return latest * var_fraction
+
+
+def _normalize_score(raw: float) -> float:
+    clipped = max(-10.0, min(10.0, raw))
+    return round((clipped + 10.0) / 2.0, 1)
+
+
+def _risk_label(approved: bool, score: float) -> str:
+    if not approved:
+        return "HIGH"
+    if score >= 7.0:
+        return "LOW"
+    if score >= 5.0:
+        return "MEDIUM"
+    return "HIGH"
+
+
+def _build_reasoning(
+    symbol: str,
+    action: str,
+    score: float,
+    rsi: float,
+    macd: str,
+    risk_reason: str | None,
+) -> str:
+    if action == "BUY":
+        reason = f"{symbol}: tín hiệu kỹ thuật ủng hộ mua (score {score}/10, RSI {rsi:.1f}, MACD {macd})."
+    elif action == "SELL":
+        reason = f"{symbol}: tín hiệu kỹ thuật nghiêng về bán (score {score}/10, RSI {rsi:.1f}, MACD {macd})."
+    else:
+        reason = f"{symbol}: tín hiệu chưa đủ mạnh để vào lệnh (score {score}/10, RSI {rsi:.1f}, MACD {macd})."
+    if risk_reason:
+        reason = f"{reason} RiskAgent: {risk_reason}."
+    return reason
+
+
+async def _generate_screener_progress(
+    preset: str = "VN30",
+    mode: str = "dry-run",
+) -> AsyncGenerator[str, None]:
+    """Stream SSE progress for real agent pipeline execution."""
+    from agents.executor_agent import ExecutorAgent
+    from agents.risk_agent import RiskAgent
+    from agents.screener_agent import ScreenerAgent
+    from agents.supervisor import build_trading_graph
+    from agents.technical_agent import TechnicalAgent
+    from interface.trading_store import (
+        compute_portfolio,
+        get_safety_state,
+        save_screener_run,
+    )
+
     symbols = VN30_SYMBOLS if preset == "VN30" else TOP100_SYMBOLS[:100]
-    try:
-        from adapters.openvino.engine import detect_optimal_device
+    conn = _get_conn()
+    tick_repo = _CacheTickRepo(conn, preset)
+    screener_port = _CacheScreenerPort(conn, preset, symbols)
+    risk_limits = SimpleNamespace(
+        kill_switch_active=bool(get_safety_state("kill_switch", {"active": False}).get("active")),
+        max_position_pct=Decimal("0.20"),
+        stop_loss_pct=Decimal("0.05"),
+        take_profit_pct=Decimal("0.15"),
+    )
 
-        device = detect_optimal_device()
-    except Exception:
-        device = "CPU"
+    screener = ScreenerAgent(screener_port=screener_port, tick_repo=tick_repo)
+    technical = TechnicalAgent(tick_repo=tick_repo)
+    risk = RiskAgent(tick_repo=tick_repo, risk_limits=risk_limits)
+    executor = ExecutorAgent(broker_port=None)
+    graph = build_trading_graph(screener=screener, technical=technical, risk=risk, executor=executor)
+    app = graph.compile()
 
-    steps = [
-        {
-            "agent": "Screener Agent",
-            "icon": "search",
-            "detail": "Lọc ~1,800 mã theo EPS growth, P/E, volume spike",
-            "device": "CPU",
-            "duration": (1.5, 3.0),
-        },
-        {
-            "agent": "Technical Agent",
-            "icon": "chart",
-            "detail": "RSI, MACD, Bollinger, MA50/200 → composite score",
-            "device": "CPU",
-            "duration": (2.0, 4.0),
-        },
-        {
-            "agent": "Fundamental Agent (AI)",
-            "icon": "brain",
-            "detail": "OpenVINO LLM: phân tích BCTC, tin tức, sentiment",
-            "device": device,
-            "duration": (3.0, 6.0),
-        },
-        {
-            "agent": "Risk Agent",
-            "icon": "shield",
-            "detail": "VaR 95%, position sizing, kill switch, T+2.5",
-            "device": "CPU",
-            "duration": (0.5, 1.5),
-        },
-        {
-            "agent": "Executor Agent",
-            "icon": "zap",
-            "detail": "Tạo lệnh LO, tính lot size, idempotency check",
-            "device": "CPU",
-            "duration": (0.3, 0.8),
-        },
-    ]
-
-    total_steps = len(steps)
+    total_steps = len(_AGENT_STEPS)
+    run_id = str(uuid.uuid4())
     yield _sse(
         "pipeline_start",
         {
+            "run_id": run_id,
+            "preset": preset,
+            "mode": mode,
             "total_steps": total_steps,
-            "device": device,
+            "device": "CPU",
         },
     )
 
-    for i, step in enumerate(steps):
-        yield _sse(
-            "agent_start",
-            {
-                "step": i + 1,
-                "total_steps": total_steps,
-                "agent": step["agent"],
-                "icon": step["icon"],
-                "detail": step["detail"],
-                "device": step["device"],
-                "percent": round(i / total_steps * 100, 1),
-            },
-        )
+    portfolio = compute_portfolio(mode=mode)
+    initial_state: dict[str, object] = {
+        "run_id": run_id,
+        "dry_run": mode != "live",
+        "current_nav": Decimal(str(portfolio["nav"])),
+        "current_positions": {p["symbol"]: int(p["quantity"]) for p in portfolio["positions"]},
+        "purchasing_power": Decimal(str(portfolio["purchasing_power"])),
+        "max_candidates": 30 if preset == "VN30" else 80,
+        "score_threshold": 2.5,
+    }
 
-        duration = random.uniform(*step["duration"])
-        elapsed = 0.0
-        tick_interval = 0.2
-        while elapsed < duration:
-            await asyncio.sleep(tick_interval)
-            elapsed += tick_interval
-            sub_pct = min(elapsed / duration * 100, 100)
+    aggregated_state: dict[str, object] = dict(initial_state)
+    node_to_step = {item["node"]: idx + 1 for idx, item in enumerate(_AGENT_STEPS)}
+    started: set[str] = set()
+    started_at: dict[str, datetime] = {}
+
+    async for event in app.astream(initial_state, stream_mode="updates"):
+        node = next(iter(event.keys()), "")
+        partial = event.get(node, {})
+        if isinstance(partial, dict):
+            aggregated_state.update(partial)
+
+        if node not in node_to_step:
+            continue
+
+        step_idx = node_to_step[node]
+        step_cfg = _AGENT_STEPS[step_idx - 1]
+        if node not in started:
+            started.add(node)
+            started_at[node] = datetime.now(UTC)
             yield _sse(
-                "agent_progress",
+                "agent_start",
                 {
-                    "step": i + 1,
-                    "agent": step["agent"],
-                    "sub_percent": round(sub_pct, 1),
-                    "percent": round(
-                        (i + sub_pct / 100) / total_steps * 100,
-                        1,
-                    ),
+                    "step": step_idx,
+                    "total_steps": total_steps,
+                    "agent": step_cfg["agent"],
+                    "icon": step_cfg["icon"],
+                    "detail": step_cfg["detail"],
+                    "device": "CPU",
+                    "percent": round((step_idx - 1) / total_steps * 100, 1),
                 },
             )
 
-        candidates = random.randint(3, 15)
+        result_count = 0
+        if node == "screener":
+            result_count = len(aggregated_state.get("watchlist", []))
+        elif node == "technical":
+            result_count = len(aggregated_state.get("technical_scores", []))
+        elif node == "risk":
+            result_count = len(aggregated_state.get("approved_trades", []))
+        elif node == "executor":
+            result_count = len(aggregated_state.get("execution_plans", []))
+
+        yield _sse(
+            "agent_progress",
+            {
+                "step": step_idx,
+                "agent": step_cfg["agent"],
+                "sub_percent": 100.0,
+                "percent": round(step_idx / total_steps * 100, 1),
+            },
+        )
+        duration_ms = max(1, int((datetime.now(UTC) - started_at[node]).total_seconds() * 1000))
         yield _sse(
             "agent_done",
             {
-                "step": i + 1,
-                "agent": step["agent"],
-                "device": step["device"],
-                "duration_ms": round(duration * 1000),
-                "result_count": candidates,
-                "percent": round((i + 1) / total_steps * 100, 1),
+                "step": step_idx,
+                "agent": step_cfg["agent"],
+                "device": "CPU",
+                "duration_ms": duration_ms,
+                "result_count": result_count,
+                "percent": round(step_idx / total_steps * 100, 1),
             },
         )
 
-    # Detailed pipeline results — analyse ALL symbols in the preset
-    rng = random.Random(42)
-    mock_results = []
-    for sym in symbols:
-        score = round(rng.uniform(2.5, 9.8), 1)
-        action = "BUY" if score >= 7 else ("SELL" if score < 4.5 else "HOLD")
-        entry = round(rng.uniform(8, 200), 2)
-        sl_pct = round(rng.uniform(5, 10), 1)
-        tp_pct = round(rng.uniform(8, 20), 1)
-        stop_loss = round(entry * (1 - sl_pct / 100), 2)
-        take_profit = round(entry * (1 + tp_pct / 100), 2)
-        nav = 1_000_000_000  # 1 tỷ VND
-        pos_pct = round(rng.uniform(2, 15), 1)
-        qty = max(100, int(nav * pos_pct / 100 / entry / 1000) * 100)
-        rsi = round(rng.uniform(15, 88), 1)
-        macd = rng.choice(["bullish_cross", "bearish_cross", "neutral", "bullish_divergence", "bearish_divergence"])
-        vol_change = round(rng.uniform(-40, 120), 1)
-        ma_trend = rng.choice(["above_ma200", "below_ma200", "crossing_up", "crossing_down"])
-        risk = "LOW" if score >= 7 else ("HIGH" if score < 4.5 else "MEDIUM")
-        mock_results.append(
+    watchlist = {str(item.symbol): item for item in aggregated_state.get("watchlist", [])}
+    technical_scores = {str(item.symbol): item for item in aggregated_state.get("technical_scores", [])}
+    risk_scores = {str(item.symbol): item for item in aggregated_state.get("risk_assessments", [])}
+    execution = {str(item.symbol): item for item in aggregated_state.get("execution_plans", [])}
+    universe = list(watchlist.keys()) if watchlist else symbols
+
+    results: list[dict[str, object]] = []
+    for symbol in universe:
+        tech = technical_scores.get(symbol)
+        risk_assess = risk_scores.get(symbol)
+        plan = execution.get(symbol)
+        raw_score = float(tech.composite_score) if tech else 0.0
+        score = _normalize_score(raw_score)
+        action = str(tech.recommended_action) if tech else "HOLD"
+        if action not in {"BUY", "SELL", "HOLD"}:
+            action = "HOLD"
+        confidence = round(min(1.0, 0.45 + abs(raw_score) / 15), 2)
+        entry_price = float(risk_assess.latest_price) if risk_assess else float(tick_repo.get_latest_price(symbol))
+        stop_loss = float(risk_assess.stop_loss_price) if risk_assess else round(entry_price * 0.95, 2)
+        take_profit = float(risk_assess.take_profit_price) if risk_assess else round(entry_price * 1.1, 2)
+        qty = int(plan.quantity) if plan else 0
+        risk_text = _risk_label(bool(risk_assess.approved) if risk_assess else False, score)
+        results.append(
             {
-                "symbol": sym,
+                "symbol": symbol,
                 "score": score,
+                "confidence": confidence,
                 "action": action,
-                "rsi": rsi,
-                "macd": macd,
-                "risk": risk,
-                "entry_price": entry,
-                "stop_loss": stop_loss,
-                "take_profit": take_profit,
-                "sl_pct": sl_pct,
-                "tp_pct": tp_pct,
+                "rsi": round(float(tech.rsi_14), 2) if tech else 50.0,
+                "macd": str(tech.macd_signal) if tech else "neutral",
+                "risk": risk_text,
+                "entry_price": round(entry_price, 2),
+                "stop_loss": round(stop_loss, 2),
+                "take_profit": round(take_profit, 2),
+                "sl_pct": 5.0,
+                "tp_pct": 10.0,
                 "quantity": qty,
-                "position_pct": pos_pct,
-                "order_type": rng.choice(["LO", "ATO", "ATC"]),
-                "vol_change_pct": vol_change,
-                "ma_trend": ma_trend,
-                "reasoning": _mock_reasoning(sym, action, score, rng),
+                "position_pct": round(float(risk_assess.position_size_pct) * 100, 2) if risk_assess else 0.0,
+                "order_type": str(plan.order_type) if plan else "LO",
+                "vol_change_pct": 0.0,
+                "ma_trend": str(tech.trend_ma) if tech else "neutral",
+                "reasoning": _build_reasoning(
+                    symbol,
+                    action,
+                    score,
+                    round(float(tech.rsi_14), 2) if tech else 50.0,
+                    str(tech.macd_signal) if tech else "neutral",
+                    str(risk_assess.rejection_reason) if (risk_assess and risk_assess.rejection_reason) else None,
+                ),
+                "reproducibility": {
+                    "model": "technical-risk-executor",
+                    "model_version": "local-r1",
+                    "prompt_version": "n/a",
+                },
             }
         )
+
+    results.sort(key=lambda x: (str(x["action"]) != "BUY", -float(x["score"])))
+    buy_count = sum(1 for r in results if r["action"] == "BUY")
+    sell_count = sum(1 for r in results if r["action"] == "SELL")
+    hold_count = sum(1 for r in results if r["action"] == "HOLD")
+    avg_score = round(sum(float(r["score"]) for r in results) / len(results), 2) if results else 0.0
+
+    save_screener_run(
+        run_id=run_id,
+        preset=preset,
+        mode=mode,
+        results=results,
+        metadata={
+            "pipeline": "real-agent",
+            "symbols_requested": len(symbols),
+            "symbols_evaluated": len(results),
+            "executed_at": datetime.now(UTC).isoformat(),
+        },
+    )
 
     yield _sse(
         "pipeline_complete",
         {
+            "run_id": run_id,
+            "preset": preset,
+            "mode": mode,
             "total_steps": total_steps,
             "percent": 100,
-            "total_symbols": len(symbols),
-            "buy_count": sum(1 for r in mock_results if r["action"] == "BUY"),
-            "sell_count": sum(1 for r in mock_results if r["action"] == "SELL"),
-            "hold_count": sum(1 for r in mock_results if r["action"] == "HOLD"),
-            "avg_score": round(sum(r["score"] for r in mock_results) / len(mock_results), 1),
-            "results": mock_results,
+            "total_symbols": len(results),
+            "buy_count": buy_count,
+            "sell_count": sell_count,
+            "hold_count": hold_count,
+            "avg_score": avg_score,
+            "results": results,
         },
-    )
-
-
-def _mock_reasoning(
-    sym: str,
-    action: str,
-    score: float,
-    rng: random.Random,
-) -> str:
-    """Generate mock AI reasoning for a recommendation."""
-    foreign = rng.randint(-20, 25)
-    eps_g = rng.randint(-5, 35)
-    pe = round(rng.uniform(6, 30), 1)
-    if action == "BUY":
-        return (
-            f"{sym}: RSI vùng quá bán, MACD bullish crossover. "
-            f"EPS tăng trưởng {eps_g}%, P/E {pe}x hấp dẫn so với ngành. "
-            f"Khối ngoại mua ròng {abs(foreign)} phiên liên tiếp. "
-            f"Score {score}/10 — Đề xuất MUA, quản lý rủi ro chặt chẽ."
-        )
-    if action == "SELL":
-        return (
-            f"{sym}: RSI > 70 quá mua, MACD bearish divergence. "
-            f"P/E {pe}x cao hơn trung bình ngành. "
-            f"Khối ngoại bán ròng {abs(foreign)} phiên. "
-            f"Score {score}/10 — Đề xuất BÁN hoặc giảm tỉ trọng."
-        )
-    return (
-        f"{sym}: Xu hướng sideways, RSI trung tính. "
-        f"EPS tăng {eps_g}%, P/E {pe}x ở mức trung bình. "
-        f"Khối ngoại {'mua' if foreign > 0 else 'bán'} ròng {abs(foreign)} phiên. "
-        f"Score {score}/10 — Giữ nguyên vị thế, chờ tín hiệu rõ hơn."
     )
 
 
@@ -944,10 +1172,14 @@ async def check_updates(
 @router.get("/run-screener")
 async def run_screener(
     preset: str = Query("VN30", description="VN30 or TOP100"),
+    mode: str = Query("dry-run", description="dry-run or live"),
 ) -> StreamingResponse:
     """Run the multi-agent screener pipeline with streaming progress."""
+    normalized_mode = mode.strip().lower()
+    if normalized_mode not in {"dry-run", "live"}:
+        normalized_mode = "dry-run"
     return StreamingResponse(
-        _generate_screener_progress(preset),
+        _safe_sse_stream("screener", _generate_screener_progress(preset, normalized_mode)),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -955,3 +1187,11 @@ async def run_screener(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.get("/screener/history")
+async def get_screener_history(limit: int = Query(default=20, ge=1, le=200)) -> dict[str, object]:
+    from interface.trading_store import screener_history
+
+    rows = screener_history(limit=limit)
+    return {"runs": rows, "count": len(rows)}

@@ -78,6 +78,7 @@ async def detailed_health(response: Response) -> dict[str, Any]:
 
     return {
         "status": "healthy" if not critical_failed else "degraded",
+        "version": "0.1.0",
         "timestamp": datetime.now(UTC).isoformat(),
         "startup_time": _startup_datetime,
         "uptime_seconds": round(uptime_seconds, 1),

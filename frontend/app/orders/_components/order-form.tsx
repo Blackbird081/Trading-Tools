@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useOrderStore } from "@/stores/order-store";
 import { useUIStore } from "@/stores/ui-store";
 
 // ★ VN Market: lot size must be multiple of 100
@@ -15,10 +16,15 @@ function validateLotSize(qty: string): string | null {
 
 export function OrderForm() {
   const activeSymbol = useUIStore((s) => s.activeSymbol);
+  const placeOrder = useOrderStore((s) => s.placeOrder);
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
+  const [mode, setMode] = useState<"dry-run" | "live">("dry-run");
   const [quantityError, setQuantityError] = useState<string | null>(null);
+  const [submitMsg, setSubmitMsg] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [confirmToken, setConfirmToken] = useState<string | undefined>(undefined);
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -41,8 +47,30 @@ export function OrderForm() {
       return;
     }
 
-    // Will be connected to OMS in production
-    console.log("Order:", { symbol: activeSymbol, side, quantity: parseInt(quantity, 10), price });
+    setLoading(true);
+    setSubmitMsg("");
+    void placeOrder({
+      symbol: activeSymbol,
+      side,
+      orderType: "LO",
+      quantity: parseInt(quantity, 10),
+      price: Number(price),
+      mode,
+      confirmToken,
+    }).then((res) => {
+      if (res.confirmToken) {
+        setConfirmToken(res.confirmToken);
+        setSubmitMsg("Live order cần xác nhận lần 2. Bấm Submit lại để xác nhận.");
+      } else if (res.ok) {
+        setConfirmToken(undefined);
+        setSubmitMsg("Đặt lệnh thành công.");
+        setQuantity("");
+        setPrice("");
+      } else {
+        setSubmitMsg(res.message || "Đặt lệnh thất bại.");
+      }
+      setLoading(false);
+    });
   };
 
   const isValid = !quantityError && quantity !== "" && price !== "";
@@ -112,6 +140,18 @@ export function OrderForm() {
       </div>
 
       <div>
+        <label className="text-xs text-zinc-500">Mode</label>
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value as "dry-run" | "live")}
+          className="w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-white"
+        >
+          <option value="dry-run">dry-run (recommended)</option>
+          <option value="live">live</option>
+        </select>
+      </div>
+
+      <div>
         <label className="text-xs text-zinc-500">Giá</label>
         <input
           type="number"
@@ -125,15 +165,21 @@ export function OrderForm() {
 
       <button
         type="submit"
-        disabled={!isValid}
+        disabled={!isValid || loading}
         className={`w-full rounded py-2.5 text-sm font-bold ${
           side === "BUY"
             ? "bg-green-600 hover:bg-green-700 disabled:bg-green-900"
             : "bg-red-600 hover:bg-red-700 disabled:bg-red-900"
         } text-white disabled:cursor-not-allowed disabled:opacity-50`}
       >
-        {side === "BUY" ? "MUA" : "BÁN"} {activeSymbol}
+        {loading ? "Đang gửi..." : `${side === "BUY" ? "MUA" : "BÁN"} ${activeSymbol}`}
       </button>
+
+      {submitMsg && (
+        <p className={`text-xs ${submitMsg.includes("thành công") ? "text-emerald-400" : "text-amber-400"}`}>
+          {submitMsg}
+        </p>
+      )}
     </form>
   );
 }

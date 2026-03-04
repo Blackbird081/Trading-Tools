@@ -34,6 +34,7 @@ export interface AgentSignal {
 export interface Position {
   symbol: string;
   quantity: number;
+  sellableQty?: number;
   avgPrice: number;
   marketPrice: number;
   pnl: number;
@@ -50,4 +51,7 @@ export interface OrderData {
   filledQty: number;
   status: "PENDING" | "MATCHED" | "PARTIAL" | "CANCELLED" | "REJECTED";
   createdAt: number;
+  brokerOrderId?: string | null;
+  rejectionReason?: string | null;
+  mode?: "dry-run" | "live";
 }

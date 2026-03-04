@@ -5,6 +5,7 @@ import { usePortfolioStore } from "@/stores/portfolio-store";
 export function PnlChart() {
   const nav = usePortfolioStore((s) => s.nav);
   const cash = usePortfolioStore((s) => s.cash);
+  const series = usePortfolioStore((s) => s.pnlSeries);
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 sm:p-6">
@@ -29,8 +30,26 @@ export function PnlChart() {
           </p>
         </div>
       </div>
-      <div className="mt-6 flex h-32 items-center justify-center rounded border border-dashed border-zinc-700 text-zinc-500">
-        Chart placeholder — sẽ dùng Lightweight Charts
+      <div className="mt-6 rounded border border-zinc-800 bg-zinc-950 p-3">
+        <div className="mb-2 text-xs text-zinc-500">PnL 30 ngày gần nhất</div>
+        {series.length === 0 ? (
+          <div className="flex h-24 items-center justify-center text-xs text-zinc-600">Chưa có dữ liệu PnL.</div>
+        ) : (
+          <div className="space-y-1">
+            {series.slice(-8).map((point) => (
+              <div key={point.date} className="flex items-center justify-between text-xs">
+                <span className="text-zinc-500">{point.date}</span>
+                <span className={point.pnl >= 0 ? "text-emerald-400" : "text-red-400"}>
+                  {point.pnl >= 0 ? "+" : ""}
+                  {point.pnl.toLocaleString("vi-VN", { maximumFractionDigits: 0 })} ₫
+                </span>
+                <span className="text-zinc-400">
+                  NAV {point.nav.toLocaleString("vi-VN", { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
