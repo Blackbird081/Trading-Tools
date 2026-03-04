@@ -1,6 +1,6 @@
 # 06 — DEVELOPMENT STANDARDS & RULES
 
-**Project:** Hệ thống Giao dịch Thuật toán Đa Tác vụ (Enterprise Edition)
+**Project:** Multi-Task Algorithmic Trading System (Enterprise Edition)
 **Role:** Tech Lead — Final Authority on Code Quality
 **Version:** 1.0 | February 2026
 **Status:** MANDATORY — Every line of code in this repo MUST comply.

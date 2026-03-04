@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -107,7 +107,7 @@ def list_profiles() -> dict[str, Any]:
                 updated_at=str(info.get("updated_at", "")),
             )
         )
-    return {"active_profile": idx.get("active_profile"), "profiles": [r.__dict__ for r in records]}
+    return {"active_profile": idx.get("active_profile"), "profiles": [asdict(r) for r in records]}
 
 
 def create_profile(name: str, passphrase: str, config: dict[str, Any]) -> dict[str, Any]:

@@ -4,21 +4,21 @@
 
 [![CI](https://github.com/Blackbird081/Trading-Tools/actions/workflows/ci.yml/badge.svg)](https://github.com/Blackbird081/Trading-Tools/actions/workflows/ci.yml)
 
-## Tổng quan
+## Overview
 
-Hệ thống giao dịch thuật toán doanh nghiệp với AI lai (Hybrid AI) cho thị trường chứng khoán Việt Nam:
+Enterprise algorithmic trading system with hybrid AI (Hybrid AI) for Vietnam stock market:
 
-- **Backend**: Python 3.12+ monorepo với Hexagonal Architecture (Ports & Adapters)
-- **Database**: DuckDB (in-process OLAP) với Parquet partitioning + Connection Pool
+- **Backend**: Python 3.12+ monorepo with Hexagonal Architecture (Ports & Adapters)
+- **Database**: DuckDB (in-process OLAP) with Parquet partitioning + Connection Pool
 - **AI/ML**: LangGraph multi-agent + OpenVINO NPU (Intel Core Ultra)
 - **Frontend**: Next.js 15 + React 19 + AG Grid + Zustand + Error Boundaries
 - **Brokers**: SSI FastConnect API v2 (HMAC-signed) + DNSE Entrade X (fallback)
 - **DevOps**: Docker + GitHub Actions CI/CD + Health Checks + Graceful Shutdown
-- **Features**: 
-  - Symbol Popup: Click vào mã CP để xem popup chart + chỉ báo kỹ thuật (style fireant.vn)
-  - User Settings Persistence: Lưu preset, years vào localStorage
+- **Features**:
+- Symbol Popup: Click on the stock code to see popup chart + technical indicators (style fireant.vn)
+- User Settings Persistence: Save preset, years to localStorage
 
-## Cấu trúc dự án
+## Project structure
 
 ```
 algo-trading/
@@ -77,7 +77,7 @@ algo-trading/
 └── .github/workflows/ # CI/CD pipeline
 ```
 
-## Cài đặt nhanh
+## Quick installation
 
 ### Backend
 
@@ -127,35 +127,35 @@ Run with strict warning policy (recommended for release gates):
 powershell -ExecutionPolicy Bypass -File scripts/phase-gates.ps1 -Phase all -StrictWarnings
 ```
 
-## Cấu hình
+## Configuration
 
-Copy `.env.example` thành `.env`:
+Copy `.env.example` to `.env`:
 
-| Biến | Mô tả |
+| Variable | Description |
 |------|--------|
 | `SSI_CONSUMER_ID` | SSI FastConnect Consumer ID |
-| `SSI_CONSUMER_SECRET` | SSI Consumer Secret (dùng cho HMAC signing) |
+| `SSI_CONSUMER_SECRET` |SSI Consumer Secret (used for HMAC signing)|
 | `SSI_PRIVATE_KEY_B64` | RSA private key (base64) |
-| `SSI_ACCOUNT_NO` | Số tài khoản SSI |
-| `DRY_RUN` | `true` = không đặt lệnh thật (mặc định) |
+| `SSI_ACCOUNT_NO` |SSI account number|
+| `DRY_RUN` |`true` = do not place actual orders (default)|
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token |
 | `TELEGRAM_CHAT_ID` | Telegram chat ID |
-| `AUTH_ENABLED` | `false` cho dev, `true` cho production |
-| `DUCKDB_PATH` | Đường dẫn file DuckDB (mặc định: `/app/data/trading.duckdb` trên Railway, local fallback `data/db/trading.duckdb`) |
-| `DUCKDB_MAX_CONNECTIONS` | Số kết nối tối đa (mặc định: 5) |
-| `CORS_ORIGINS` | Danh sách origins cho CORS (phân cách bằng dấu phẩy) |
-| `TRADING_AUDIT_LOG_DIR` | Thư mục audit log (mặc định: `.trading/audit`) |
-| `TRADING_SCRATCHPAD_DIR` | Thư mục scratchpad (mặc định: `.trading/scratchpad`) |
+| `AUTH_ENABLED` | `false` for dev, `true` for production |
+| `DUCKDB_PATH` |DuckDB file path (default: `/app/data/trading.duckdb` on Railway, local fallback `data/db/trading.duckdb`)|
+| `DUCKDB_MAX_CONNECTIONS` |Maximum number of connections (default: 5)|
+| `CORS_ORIGINS` |List of origins for CORS (comma separated)|
+| `TRADING_AUDIT_LOG_DIR` |Audit log directory (default: `.trading/audit`)|
+| `TRADING_SCRATCHPAD_DIR` |scratchpad folder (default: `.trading/scratchpad`)|
 
 ## API Endpoints
 
-| Endpoint | Mô tả |
+| Endpoint | Description |
 |----------|--------|
 | `GET /api/health` | Detailed health check (DuckDB, SSI, AI engine) |
 | `GET /api/health/live` | Liveness probe (Kubernetes) |
 | `GET /api/health/ready` | Readiness probe (Kubernetes) |
 | `GET /api/portfolio` | Portfolio state |
-| `GET /api/portfolio/positions` | Positions với T+2.5 settlement |
+| `GET /api/portfolio/positions` |Positions with T+2.5 settlement|
 | `GET /api/portfolio/pnl?days=30` | P&L history |
 | `GET /api/setup/status` | Runtime setup status + connection checks |
 | `POST /api/setup/validate` | Validate setup draft (no persistence) |
@@ -163,7 +163,7 @@ Copy `.env.example` thành `.env`:
 | `POST /api/setup/probe-external` | Probe SSI/VNStock/model-path connectivity for setup wizard |
 | `ws://host/ws/market` | Real-time market data (WebSocket) |
 
-## Kiến trúc
+## Architecture
 
 ### Multi-Agent Pipeline
 
@@ -179,30 +179,30 @@ START → screener → technical → [fundamental] → risk → executor → END
 
 ### Risk Checks (8 layers)
 
-1. **Kill Switch** — dừng toàn bộ giao dịch
-2. **Early Warning** — block nếu risk_level == "critical" (Altman Z-Score, Piotroski, ROE, D/E, OCF, Liquidity, Margin)
+1. **Kill Switch** — stops all transactions
+2. **Early Warning** — block when `risk_level == "critical"` (Altman Z-Score, Piotroski, ROE, D/E, OCF, Liquidity, Margin)
 3. **Price Band** — HOSE ±7%, HNX ±10%, UPCOM ±15%
-4. **Lot Size** — bội số 100 (VN market rule)
+4. **Lot Size** — multiple of 100 (VN market rule)
 5. **Position Size** — max % NAV
-6. **Buying Power** — kiểm tra sức mua
+6. **Buying Power** — check purchasing power
 7. **Sellable Qty** — T+2.5 settlement awareness
-8. **Daily Loss Limit** — giới hạn lỗ ngày
+8. **Daily Loss Limit** — daily loss limit
 
-### Financial Analysis (baocaotaichinh-inspired)
+### Financial Analysis
 
-- **Financial Taxonomy**: 35+ chỉ số với metadata VN (label_vi, unit, higher_is_better)
+- **Financial Taxonomy**: 35+ metrics with VN metadata (label_vi, unit, higher_is_better)
 - **Industry Analysis**: Banking (NIM/NPL/CAR/LDR/CIR), RealEstate, Technology (Rule of 40)
 - **Early Warning System**: Risk Score 0-100, 7 checks, 4 levels (low/medium/high/critical)
 - **Extended DuPont**: ROE = Tax Burden × Interest Burden × Operating Margin × Asset Turnover × Financial Leverage
 - **Factor Backtest**: IC/IR (Spearman rank correlation), VN-Index benchmark, alpha calculation
 
-### Investor Personas (FinceptTerminal-inspired)
+### Investor Personas
 
-- **Nhà Đầu Tư Giá Trị VN** — Buffett style: ROE ≥15%, P/E ≤20x
-- **Nhà Đầu Tư Tăng Trưởng VN** — Revenue growth ≥20%/năm
+- **VN Value Investor** — Buffett style: ROE ≥15%, P/E ≤20x
+- **VN Growth Investor** — Revenue growth ≥20%/year
 - **Momentum Trader HOSE** — RSI, MACD, Volume spike ≥2x
-- **Nhà Đầu Tư Cổ Tức VN** — Dividend yield ≥4%
-- **Nhà Đầu Tư Ngược Chiều VN** — P/B ≤1.0, RSI <25
+- **VN Dividend Investor** — Dividend yield ≥4%
+- **Vietnam Contrarian Investor** — P/B ≤1.0, RSI <25
 
 ### Backtesting Metrics
 
@@ -210,15 +210,15 @@ Sharpe ratio, Sortino ratio, Calmar ratio, Max Drawdown, CAGR, SQN, Profit Facto
 
 ## Security (9.5/10)
 
-- **HMAC-SHA256 Request Signing** — tất cả SSI API calls được ký với timestamp validation (±30s)
+- **HMAC-SHA256 Request Signing** — all SSI API calls are signed with timestamp validation (±30s)
 - **JWT Bearer + API Key** authentication
-- **Rate limiting**: 60 req/min (10 req/min cho orders) — token bucket algorithm
-- **CORS**: explicit origins/methods/headers (không dùng `*`)
+- **Rate limiting**: 60 req/min (10 req/min for orders) — token bucket algorithm
+- **CORS**: explicit origins/methods/headers (do not use `*`)
 - **AI Guardrails**: PII detection (CMND/CCCD, phone VN), prompt injection protection
 - **Credentials**: AES-GCM + scrypt KDF, RSA 2048+ bit
-- **Input Validation**: Pydantic models cho tất cả API requests (lot size, symbol format, price)
-- **Audit Log**: Append-only JSONL audit trail cho tất cả order operations (daily rotation)
-- **Tool Approval Flow**: confirm trước khi đặt lệnh thật (allow-once/session/deny)
+- **Input Validation**: Pydantic models for all API requests (lot size, symbol format, price)
+- **Audit Log**: Append-only JSONL audit trail for all order operations (daily rotation)
+- **Tool Approval Flow**: confirm before placing the actual order (allow-once/session/deny)
 
 ## Resilience (9.5/10)
 
@@ -229,15 +229,15 @@ Sharpe ratio, Sortino ratio, Calmar ratio, Max Drawdown, CAGR, SQN, Profit Facto
 - **Health Checks**: `/api/health/live`, `/api/health/ready`, `/api/health/detailed`
 - **Graceful Shutdown**: FastAPI lifespan, drain in-flight requests, close all connections
 - **WebSocket Reconnection**: exponential backoff (1s→30s cap, ±500ms jitter)
-- **asyncio.to_thread()**: tất cả DuckDB calls non-blocking
+- **asyncio.to_thread()**: all DuckDB calls non-blocking
 
 ## Observability (9/10)
 
 - **PipelineMetrics**: p50/p95/p99 latency per agent, error rate tracking
 - **Structured Error Logging**: error_type, stack_trace, context dict
 - **Agent Health Check**: healthy/degraded/unhealthy/unknown per agent
-- **Pipeline Dashboard**: overall health summary cho monitoring
-- **JSONL Scratchpad**: append-only audit trail cho agent pipeline
+- **Pipeline Dashboard**: overall health summary for monitoring
+- **JSONL Scratchpad**: append-only audit trail for the agent pipeline
 - **Token Counter**: input/output tokens, cost estimation (USD)
 - **OpenTelemetry**: spans cho distributed tracing
 
@@ -249,7 +249,7 @@ Sharpe ratio, Sortino ratio, Calmar ratio, Max Drawdown, CAGR, SQN, Profit Facto
 - **LLM-as-judge**: eval suite cho agent quality
 - **Integration Tests**: RiskAgent + EarlyWarning, PaperTrading VN rules, SSI broker
 
-## Tài liệu
+## Document
 
 - [USER_MANUAL.md](docs/USER_MANUAL.md)
 - [IMPLEMENTATION_PLAN.md](docs/plans/IMPLEMENTATION_PLAN.md)

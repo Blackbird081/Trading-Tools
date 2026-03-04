@@ -21,13 +21,13 @@ Suggested layout:
   - `D:\UNG DUNG AI\TOOL AI 2026\CVF-Workspace\Trading-Tools`
 
 ## Workspace Isolation Rule (Locked)
-- Khi clone CVF, bắt buộc dùng thư mục có tiền tố dấu chấm:
+- When cloning CVF, you must use a directory with a dot prefix:
   - `D:\Work\.Controlled-Vibe-Framework-CVF`
-- Mục đích: tách biệt vận hành với `Trading-Tools`, giảm rủi ro thao tác nhầm.
-- Đây là quy ước **cách ly workspace**, không nhằm mục tiêu ẩn thư mục.
-- Khi phát triển Trading-Tools, luôn mở terminal/IDE root tại:
+- Purpose: separate operations from `Trading-Tools`, reducing the risk of incorrect operations.
+- This is a **workspace isolation** convention, not intended to hide folders.
+- When developing Trading-Tools, always open the root terminal/IDE at:
   - `D:\Work\Trading-Tools`
-- Không chạy lệnh build/test/patch của Trading-Tools khi cwd đang ở CVF repo.
+- Do not run the Trading-Tools build/test/patch command when cwd is in the CVF repo.
 
 ## Why clone is better
 - Keeps independent git history and release flow.

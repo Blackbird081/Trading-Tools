@@ -1,6 +1,6 @@
 # 03 — FRONTEND ARCHITECTURE
 
-**Project:** Hệ thống Giao dịch Thuật toán Đa Tác vụ (Enterprise Edition)
+**Project:** Multi-Task Algorithmic Trading System (Enterprise Edition)
 **Role:** Senior Frontend Engineer (React / Next.js Expert)
 **Version:** 1.0 | February 2026
 **Stack:** Next.js 15 (App Router) | React 19 | TypeScript 5.6 (strict) | Tailwind CSS 4
@@ -9,14 +9,14 @@
 
 ## 1. NEXT.JS APP ROUTER STRATEGY
 
-### 1.1. Server Components vs Client Components — Ranh giới kiến trúc
+### 1.1. Server Components vs Client Components — Architectural Boundaries
 
-Trong một trading terminal, **phần lớn UI là real-time** — nhưng không phải tất cả. App Router cho phép phân tách chính xác:
+In a trading terminal, **most of the UI is real-time** — but not all of it. App Router allows precise separation:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    SERVER COMPONENTS (RSC)                       │
-│  Render 1 lần trên server → stream HTML → không ship JS         │
+│ Render once on the server → stream HTML → do not ship JS │
 │                                                                 │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐       │
 │  │  Root    │  │ Sidebar  │  │ Top Nav  │  │ Settings │       │
@@ -24,10 +24,10 @@ Trong một trading terminal, **phần lớn UI là real-time** — nhưng khôn
 │  │          │  │          │  │  info)   │  │          │       │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘       │
 │                                                                 │
-│  Payload: 0 KB JavaScript cho các component này                 │
+│ Payload: 0 KB JavaScript for these components │
 ├─────────────────────────────────────────────────────────────────┤
 │                    CLIENT COMPONENTS ("use client")              │
-│  Hydrate trên browser → maintain state → WebSocket connection   │
+│ Hydrate on browser → maintain state → WebSocket connection │
 │                                                                 │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐       │
 │  │ Price    │  │ Trading  │  │ Order    │  │ Command  │       │
@@ -39,15 +39,15 @@ Trong một trading terminal, **phần lớn UI là real-time** — nhưng khôn
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-#### Quy tắc phân loại
+#### Classification rules
 
-| Tiêu chí | Server Component | Client Component |
+|Criteria| Server Component | Client Component |
 |:---|:---|:---|
-| Cần WebSocket / real-time data? | ❌ | ✅ |
-| Cần browser API (Canvas, DOM events)? | ❌ | ✅ |
-| Cần `useState`, `useEffect`? | ❌ | ✅ |
-| Thay đổi < 1 lần/phút? | ✅ | ❌ |
-| Chứa sensitive logic (API keys)? | ✅ | ❌ |
+|Need WebSocket / real-time data?| ❌ | ✅ |
+|Need browser API (Canvas, DOM events)?| ❌ | ✅ |
+|Need `useState`, `useEffect`?| ❌ | ✅ |
+|Change < 1 time/minute?| ✅ | ❌ |
+|Contains sensitive logic (API keys)?| ✅ | ❌ |
 
 ### 1.2. Route Structure
 
@@ -87,7 +87,7 @@ frontend/
         └── page.tsx            # ★ Fully Server Component — no JS shipped
 ```
 
-### 1.3. Persistent Layouts — Tại sao critical cho Trading Terminal
+### 1.3. Persistent Layouts — Why Trading Terminal is critical
 
 ```tsx
 // app/layout.tsx — Server Component (ROOT)
@@ -123,10 +123,10 @@ export default function RootLayout({
 }
 ```
 
-**Tại sao Persistent Layout quan trọng:**
-- Khi user chuyển từ `/dashboard` sang `/portfolio`, React **không unmount** `RootLayout`. WebSocket connection trong `WebSocketProvider` **không bị ngắt**.
-- Sidebar watchlist widget tiếp tục nhận ticks mà không cần reconnect.
-- Trên Pages Router cũ, mỗi lần navigate = full remount = mất WebSocket = flicker.
+**Why Persistent Layout is important:**
+- When the user switches from `/dashboard` to `/portfolio`, React **does not unmount** `RootLayout`. WebSocket connection in `WebSocketProvider` **not broken**.
+- Sidebar watchlist widget continues to receive ticks without needing to reconnect.
+- On old Pages Router, each time navigate = full remount = lost WebSocket = flicker.
 
 ### 1.4. Suspense & Streaming — Progressive Loading
 
@@ -191,15 +191,15 @@ Total Time to Interactive: ~80ms (chart visible)
 Total Time to Complete: ~200ms (all widgets loaded)
 ```
 
-**Lợi ích:** User thấy chart gần như ngay lập tức. AI Insights (chậm nhất do NPU) không block các widget khác. Mỗi `<Suspense>` boundary là một independent streaming unit.
+**Benefits:** Users see the chart almost immediately. AI Insights (slowest due to NPU) does not block other widgets. Each `<Suspense>` boundary is an independent streaming unit.
 
 ---
 
 ## 2. AG GRID & RENDERING PERFORMANCE
 
-### 2.1. Vấn đề: Render 1,800 mã chứng khoán real-time
+### 2.1. Problem: Render 1,800 real-time stock codes
 
-Thị trường Việt Nam có ~1,800 mã (HOSE + HNX + UPCOM). Mỗi mã có ~15 cột dữ liệu (giá, KL, +/-, trần, sàn, ...). Tổng: **~27,000 cells** cập nhật liên tục. Nếu render naive:
+The Vietnamese market has ~1,800 codes (HOSE + HNX + UPCOM). Each code has ~15 data columns (price, volume, +/-, ceiling, floor, ...). Total: **~27,000 cells** updated continuously. If rendering naive:
 
 ```
 1,800 rows × 15 cols = 27,000 DOM nodes
@@ -207,9 +207,9 @@ Thị trường Việt Nam có ~1,800 mã (HOSE + HNX + UPCOM). Mỗi mã có ~1
 → Browser: 💀 (jank, dropped frames, unresponsive)
 ```
 
-### 2.2. Giải pháp 1: DOM Virtualization
+### 2.2. Solution 1: DOM Virtualization
 
-AG Grid chỉ render các rows **đang visible trong viewport**:
+AG Grid only renders rows **visible in the viewport**:
 
 ```
 ┌─────────────────────────────────────────┐
@@ -226,7 +226,7 @@ AG Grid chỉ render các rows **đang visible trong viewport**:
 │ Represented by total scroll height only │    Just a tall empty <div>
 └─────────────────────────────────────────┘
 
-DOM nodes created: ~40 rows × 15 cols = 600 (thay vì 27,000)
+DOM nodes created: ~40 rows × 15 cols = 600 (instead of 27,000)
 → 97.8% reduction in DOM nodes
 ```
 
@@ -281,11 +281,11 @@ export function PriceBoard() {
 }
 ```
 
-### 2.3. Giải pháp 2: Transaction-based Batch Updating
+### 2.3. Solution 2: Transaction-based Batch Updating
 
-**Vấn đề:** Nếu gọi `setRowData()` mỗi khi nhận 1 tick → React re-render toàn bộ grid → jank.
+**Problem:** If you call `setRowData()` every time you receive 1 tick → React re-render the entire grid → jank.
 
-**Giải pháp:** AG Grid Transaction API cập nhật **chỉ các cells thay đổi**, không re-render grid.
+**Solution:** AG Grid Transaction API updates **only cells change**, does not re-render the grid.
 
 ```tsx
 // hooks/use-market-stream.ts
@@ -340,7 +340,7 @@ export function useMarketStream(gridApi: GridApi | null) {
 }
 ```
 
-### 2.4. `requestAnimationFrame` — Tại sao không dùng `setInterval`
+### 2.4. `requestAnimationFrame` — Why not use `setInterval`
 
 ```
 setInterval(update, 16ms):
@@ -364,11 +364,11 @@ requestAnimationFrame(update):
   Benefit: Zero wasted work. Automatically throttles on background tabs.
 ```
 
-**Kết hợp với batching:**
-- Giữa 2 frames (~16.6ms ở 60fps), có thể nhận 50-200 ticks qua WebSocket.
-- Tất cả được accumulate vào `pendingUpdates` Map (latest-wins per symbol).
-- `requestAnimationFrame` callback flush **1 lần** → AG Grid `applyTransactionAsync` diff **1 lần** → Browser paint **1 lần**.
-- Kết quả: **1 DOM update per frame**, bất kể số lượng ticks.
+**Combined with batching:**
+- Between 2 frames (~16.6ms at 60fps), can receive 50-200 ticks via WebSocket.
+- All are accumulated into `pendingUpdates` Map (latest-wins per symbol).
+- `requestAnimationFrame` callback flush **1 time** → AG Grid `applyTransactionAsync` diff **1 time** → Browser paint **1 time**.
+- Result: **1 DOM update per frame**, regardless of the number of ticks.
 
 ### 2.5. Performance Budget
 
@@ -384,7 +384,7 @@ requestAnimationFrame(update):
 
 ## 3. CANVAS vs SVG — CHARTING ENGINE ANALYSIS
 
-### 3.1. Rendering Pipeline So sánh
+### 3.1. Rendering Pipeline Comparison
 
 ```
 SVG Pipeline (D3.js, Recharts):
@@ -419,14 +419,14 @@ Canvas Pipeline (TradingView Lightweight Charts):
 | **Scroll/Zoom** | Reflow all elements → jank | Redraw bitmap → smooth | **No contest** |
 | **10,000 candles** | Unusable (>5s render, scroll freezes) | Smooth (~50ms render) | **∞** |
 
-### 3.3. Tại sao SVG vẫn tốt cho một số use case (nhưng không phải trading)
+### 3.3. Why SVG is still good for some use cases (but not trading)
 
 | Use case | SVG ✅ | Canvas ✅ |
 |:---|:---|:---|
-| Dashboard pie/bar charts (< 100 elements) | Tốt — CSS styling, accessibility | Overkill |
-| Interactive tooltips, hover effects | Native DOM events | Phải tự implement hit-testing |
+| Dashboard pie/bar charts (< 100 elements) |Good — CSS styling, accessibility| Overkill |
+| Interactive tooltips, hover effects | Native DOM events |Must implement hit-testing yourself|
 | Print/Export to PDF | Vector — sharp at any resolution | Rasterized — fixed resolution |
-| **Real-time candlestick (500+ candles, 2-5 updates/s)** | ❌ Không khả thi | ✅ **Duy nhất khả thi** |
+| **Real-time candlestick (500+ candles, 2-5 updates/s)** |❌ Not feasible|✅ **Only feasible**|
 | **Tick chart (thousands of points/minute)** | ❌ DOM explosion | ✅ **Trivial** |
 
 ### 3.4. TradingView Lightweight Charts — Integration Pattern
@@ -509,7 +509,7 @@ export function TradingChart({ symbol }: { symbol: string }) {
 }
 ```
 
-### 3.5. Custom Overlays — Agent Markers trên Chart
+### 3.5. Custom Overlays — Agent Markers on Chart
 
 ```tsx
 // _components/chart-overlays/signal-markers.ts
@@ -546,7 +546,7 @@ export function applySignalMarkers(
 
 ## 4. STATE MANAGEMENT
 
-### 4.1. Tại sao KHÔNG dùng React Context cho real-time data
+### 4.1. Why NOT use React Context for real-time data
 
 ```tsx
 // ❌ ANTI-PATTERN: Context for high-frequency data
@@ -573,9 +573,9 @@ function MarketProvider({ children }: { children: React.ReactNode }) {
 }
 ```
 
-**Vấn đề cốt lõi:** Context API không hỗ trợ **selector-based subscription**. Khi value thay đổi, **mọi** component dùng `useContext(MarketContext)` đều re-render, bất kể component đó có dùng phần data thay đổi hay không.
+**Core issue:** Context API does not support **selector-based subscription**. When the value changes, **every** component that uses `useContext(MarketContext)` re-renders, regardless of whether that component uses the changed data or not.
 
-Với 200 ticks/giây → 200 re-renders/giây cho **mỗi** consumer component → UI freeze.
+At 200 ticks/sec → 200 re-renders/sec for **each** consumer component → UI freeze.
 
 ### 4.2. Zustand — Selector-based, Minimal Re-renders
 
@@ -646,27 +646,27 @@ export const useMarketStore = create<MarketState>()(
 ### 4.3. Selector Pattern — Surgical Re-renders
 
 ```tsx
-// ★ Component CHỈ re-render khi giá FPT thay đổi
-// Không re-render khi VNM, MWG, hay bất kỳ symbol nào khác thay đổi
+// ★ Component ONLY re-renders when FPT price changes
+// Do not re-render when VNM, MWG, or any other symbol changes
 
 function FPTPrice() {
   const price = useMarketStore((state) => state.ticks["FPT"]?.price);
   //                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  //                           Selector: Zustand so sánh bằng Object.is()
-  //                           Chỉ re-render khi return value thay đổi
+// Selector: Zustand compares with Object.is()
+// Only re-render when return value changes
   return <span>{price?.toFixed(2) ?? "—"}</span>;
 }
 
-// ★ Component re-render khi BẤT KỲ tick nào thay đổi (cho AG Grid)
+Error 500 (Server Error)!!1500.That’s an error.There was an error. Please try again later.That’s all we know.
 function AllTicksGrid() {
   const ticks = useMarketStore((state) => state.ticks);
-  // Ticks object reference thay đổi mỗi update → re-render
-  // Nhưng AG Grid Transaction API xử lý diff internally (Section 2.3)
+// Ticks object reference changes every update → re-render
+// But AG Grid Transaction API handles diff internally (Section 2.3)
   return <AgGridReact rowData={Object.values(ticks)} />;
 }
 ```
 
-### 4.4. Store Architecture — Phân tách theo domain
+### 4.4. Store Architecture — Separation by domain
 
 ```
 stores/
@@ -691,9 +691,9 @@ stores/
                            # Subscribers: everywhere (but rarely changes)
 ```
 
-**Tại sao tách store?**
-- `market-store` thay đổi 100-500 lần/giây. Nếu gộp chung với `ui-store`, mỗi tick sẽ trigger re-render cho **tất cả** UI components (theme toggle, layout panels, ...).
-- Tách store = tách subscription scope = **chỉ components liên quan mới re-render**.
+**Why split the store?**
+- `market-store` changes 100-500 times/second. If combined with `ui-store`, each tick will trigger re-render for **all** UI components (theme toggle, layout panels, ...).
+- Separate store = separate subscription scope = **only related components can re-render**.
 
 ### 4.5. WebSocket → Store Bridge
 
@@ -763,22 +763,22 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 }
 ```
 
-**Lưu ý kiến trúc:**
-- `WebSocketProvider` là Client Component duy nhất ở root level.
-- Gọi `getState()` thay vì hook → **không trigger React re-render** trong provider. Store subscribers tự re-render khi selector value thay đổi.
-- Message routing bằng `switch` — O(1), không cần event emitter phức tạp.
+**Architectural note:**
+- `WebSocketProvider` is the only Client Component at the root level.
+- Call `getState()` instead of hook → **does not trigger React re-render** in provider. Store subscribers automatically re-render when the selector value changes.
+- Message routing using `switch` — O(1), no need for complicated event emitters.
 
-### 4.6. Context API — Khi nào vẫn dùng được
+### 4.6. Context API — When is it still available?
 
 | Data type | Update frequency | Solution |
 |:---|:---|:---|
-| Theme (dark/light) | ~0/s (user toggle) | Context ✅ hoặc Zustand |
+| Theme (dark/light) | ~0/s (user toggle) |Context ✅ or Zustand|
 | User session / auth | ~0/s (login/logout) | Context ✅ |
 | Active symbol selection | ~0.1/s (user click) | Zustand (shared across widgets) |
 | Market ticks | 100-500/s | Zustand ✅ — Context ❌ |
 | Agent signals | 0.1-1/s | Zustand ✅ — Context ❌ |
 
-**Rule of thumb:** Nếu data thay đổi > 1 lần/giây → **Zustand**. Nếu data gần như static → Context OK.
+**Rule of thumb:** If data changes > 1 time/second → **Zustand**. If data is almost static → Context OK.
 
 ---
 

@@ -86,3 +86,24 @@ def test_setup_probe_external_contract(
     names = {item.get("name") for item in data["checks"]}
     assert {"ssi_api", "vnstock_network", "vnstock_sdk", "openvino_model_path"}.issubset(names)
     assert data.get("all_ready") is True
+
+
+def test_setup_probe_external_warns_when_sources_missing(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from interface.rest import setup as setup_api
+
+    async def _fake_probe_http(url: str, timeout_seconds: float) -> tuple[bool, str, float]:
+        return False, f"HTTP 503 from {url} (timeout={timeout_seconds})", 44.0
+
+    monkeypatch.setattr(setup_api, "_probe_http", _fake_probe_http)
+    monkeypatch.delitem(sys.modules, "vnstock", raising=False)
+    monkeypatch.setenv("OPENVINO_MODEL_PATH", str(tmp_path / "missing-model"))
+
+    response = client.post("/api/setup/probe-external", json={"timeout_seconds": 1.0})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["all_ready"] is False
+    assert any(item["status"] == "warn" for item in data["checks"])

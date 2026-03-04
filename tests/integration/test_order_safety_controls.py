@@ -101,3 +101,136 @@ def test_max_notional_blocks_live_orders(client: TestClient, monkeypatch: pytest
     response = client.post("/api/orders", json=oversized)
     assert response.status_code == 409
     assert "Order notional exceeds limit" in response.json()["detail"]
+
+
+def test_order_request_validators_and_not_found_paths(client: TestClient) -> None:
+    bad_symbol = client.post(
+        "/api/orders",
+        json={
+            "symbol": "FPT@",
+            "side": "BUY",
+            "order_type": "LO",
+            "quantity": 100,
+            "price": 90.0,
+            "idempotency_key": "it-order-validator-01",
+            "mode": "dry-run",
+        },
+    )
+    assert bad_symbol.status_code == 422
+
+    bad_lot = client.post(
+        "/api/orders",
+        json={
+            "symbol": "FPT",
+            "side": "BUY",
+            "order_type": "LO",
+            "quantity": 150,
+            "price": 90.0,
+            "idempotency_key": "it-order-validator-02",
+            "mode": "dry-run",
+        },
+    )
+    assert bad_lot.status_code == 422
+
+    cancel_missing = client.post("/api/orders/not-found/cancel")
+    assert cancel_missing.status_code == 404
+
+    detail_missing = client.get("/api/orders/not-found")
+    assert detail_missing.status_code == 404
+
+
+def test_live_session_closed_and_buying_power_blocks(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("interface.rest.orders.market_session_open", lambda: False)
+    session_closed = client.post("/api/orders", json=_live_payload("it-live-session-closed-01"))
+    assert session_closed.status_code == 409
+    assert "market session" in session_closed.json()["detail"]
+
+    monkeypatch.setattr("interface.rest.orders.market_session_open", lambda: True)
+    monkeypatch.setattr(
+        "interface.rest.orders.compute_portfolio",
+        lambda mode=None: {
+            "mode": "live",
+            "realized_pnl": 0,
+            "unrealized_pnl": 0,
+            "purchasing_power": 1_000,
+        },
+    )
+    buying_power = client.post("/api/orders", json=_live_payload("it-live-buying-power-01"))
+    assert buying_power.status_code == 409
+    assert "Insufficient purchasing power" in buying_power.json()["detail"]
+
+
+def test_live_confirm_token_error_paths(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    first = client.post("/api/orders", json=_live_payload("it-live-confirm-error-01"))
+    assert first.status_code == 200
+    confirm_token = first.json()["confirm_token"]
+
+    invalid = client.post("/api/orders", json=_live_payload("it-live-confirm-error-02", confirm_token="invalid-token"))
+    assert invalid.status_code == 400
+
+    mismatch_payload = _live_payload("it-live-confirm-error-01", confirm_token=confirm_token)
+    mismatch_payload["quantity"] = 200
+    mismatch = client.post("/api/orders", json=mismatch_payload)
+    assert mismatch.status_code == 400
+    assert "payload mismatch" in mismatch.json()["detail"]
+
+    expired_payload = _live_payload("it-live-confirm-error-03", confirm_token="expired-token")
+    set_safety_state(
+        "live_confirm:expired-token",
+        {
+            "hash": "abc",
+            "expires_at": "2000-01-01T00:00:00+00:00",
+        },
+    )
+    monkeypatch.setattr("interface.rest.orders._payload_hash", lambda payload, mode: "abc")
+    expired = client.post("/api/orders", json=expired_payload)
+    assert expired.status_code == 400
+    assert "expired" in expired.json()["detail"]
+
+
+def test_idempotency_duplicate_open_orders_replay_and_safety_status(client: TestClient) -> None:
+    create = client.post(
+        "/api/orders",
+        json={
+            "symbol": "FPT",
+            "side": "BUY",
+            "order_type": "LO",
+            "quantity": 100,
+            "price": 91.0,
+            "idempotency_key": "it-dry-idempotent-01",
+            "mode": "dry-run",
+        },
+    )
+    assert create.status_code == 200
+    order_id = create.json()["order_id"]
+
+    duplicate = client.post(
+        "/api/orders",
+        json={
+            "symbol": "FPT",
+            "side": "BUY",
+            "order_type": "LO",
+            "quantity": 100,
+            "price": 91.0,
+            "idempotency_key": "it-dry-idempotent-01",
+            "mode": "dry-run",
+        },
+    )
+    assert duplicate.status_code == 200
+    assert duplicate.json()["was_duplicate"] is True
+
+    opened = client.get("/api/orders/open")
+    assert opened.status_code == 200
+    assert "orders" in opened.json()
+
+    detail = client.get(f"/api/orders/{order_id}")
+    assert detail.status_code == 200
+    assert detail.json()["order_id"] == order_id
+
+    replay = client.post("/api/orders/dlq/replay", json={})
+    assert replay.status_code == 200
+    assert "count" in replay.json()
+
+    safety = client.get("/api/safety/status")
+    assert safety.status_code == 200
+    assert "kill_switch" in safety.json()

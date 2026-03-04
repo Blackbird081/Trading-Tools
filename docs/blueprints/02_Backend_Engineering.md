@@ -1,6 +1,6 @@
 # 02 — BACKEND ENGINEERING: CORE ENGINE
 
-**Project:** Hệ thống Giao dịch Thuật toán Đa Tác vụ (Enterprise Edition)
+**Project:** Multi-Task Algorithmic Trading System (Enterprise Edition)
 **Role:** Senior Python Backend Engineer
 **Version:** 1.0 | February 2026
 **Python:** 3.12+ | **Type Checking:** Strict (`mypy --strict`) | **Formatter:** `ruff`
@@ -14,7 +14,7 @@
 ```
 algo-trading/                          # Root — uv workspace
 ├── pyproject.toml                     # Workspace root config
-├── uv.lock                           # Single lockfile cho toàn bộ monorepo
+├── uv.lock # Single lockfile for entire monorepo
 ├── .python-version                   # Pin Python 3.12.x
 ├── ruff.toml                         # Lint + format config (shared)
 ├── mypy.ini                          # Type checking strict mode (shared)
@@ -174,7 +174,7 @@ dev-dependencies = [
 ]
 ```
 
-### 1.3. Package `pyproject.toml` — Ví dụ `packages/core`
+### 1.3. Package `pyproject.toml` — Example `packages/core`
 
 ```toml
 [project]
@@ -188,7 +188,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 ```
 
-### 1.4. Package `pyproject.toml` — Ví dụ `packages/adapters`
+### 1.4. Package `pyproject.toml` — Example `packages/adapters`
 
 ```toml
 [project]
@@ -231,15 +231,15 @@ interface ──► agents ──► adapters ──► core
 
 ## 2. CLEAN ARCHITECTURE IMPLEMENTATION
 
-### 2.1. Nguyên tắc cốt lõi
+### 2.1. Core principles
 
-Hệ thống tuân thủ **Dependency Inversion Principle (DIP)**: business logic (`core`) định nghĩa interfaces (Ports), infrastructure code (`adapters`) implement chúng. Framework (FastAPI) chỉ là delivery mechanism ở layer ngoài cùng.
+The system complies with **Dependency Inversion Principle (DIP)**: business logic (`core`) defines interfaces (Ports), infrastructure code (`adapters`) implements them. Framework (FastAPI) is just a delivery mechanism at the outermost layer.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    INTERFACE LAYER                       │
 │  FastAPI, WebSocket handlers, CLI                       │
-│  ► Nhận request, gọi Use Case, trả response            │
+│ ► Receive request, call Use Case, return response │
 ├─────────────────────────────────────────────────────────┤
 │                    AGENT LAYER                           │
 │  LangGraph, Supervisor, Agent loops                     │
@@ -303,11 +303,11 @@ Price = NewType("Price", Decimal)        # Decimal for financial precision
 Quantity = NewType("Quantity", int)       # Always integer (lot size = 100)
 ```
 
-**Quy tắc:**
-- `frozen=True` — entities bất biến sau khi tạo, thread-safe by default.
-- `slots=True` — giảm memory footprint ~30-40% so với `__dict__`.
-- `Decimal` cho `Price` — **không bao giờ dùng `float`** cho dữ liệu tài chính (IEEE 754 rounding errors).
-- `NewType` cho value objects — type checker bắt lỗi khi truyền nhầm `Symbol` vào chỗ cần `Price`.
+**Rules:**
+- `frozen=True` — entities are immutable after creation, thread-safe by default.
+- `slots=True` — reduces memory footprint by ~30-40% compared to `__dict__`.
+- `Decimal` for `Price` — **never use `float`** for financial data (IEEE 754 rounding errors).
+- `NewType` for value objects — type checker catches errors when mistakenly passing `Symbol` where `Price` is needed.
 
 ### 2.3. Ports — Abstract Interfaces (Protocol Classes)
 
@@ -374,9 +374,9 @@ class OrderRepository(Protocol):
     async def get_open_orders(self) -> list[Order]: ...
 ```
 
-**Tại sao `Protocol` thay vì `ABC`?**
-- `Protocol` hỗ trợ **structural subtyping** (duck typing có type safety). Adapter không cần `class SSIMarketData(MarketDataPort)` — chỉ cần implement đúng method signatures, `mypy` tự verify.
-- Không tạo coupling qua inheritance chain. Core package không cần biết adapter tồn tại.
+**Why `Protocol` instead of `ABC`?**
+- `Protocol` supports **structural subtyping** (duck typing has type safety). Adapter does not need `class SSIMarketData(MarketDataPort)` — just needs to implement method signatures correctly, `mypy` self-verifies.
+- Do not create coupling through inheritance chain. The core package does not need to know that the adapter exists.
 
 ### 2.4. Use Cases — Pure Business Logic
 
@@ -441,12 +441,12 @@ def validate_order(
     return RiskCheckResult(approved=True, reason="All checks passed")
 ```
 
-**Đặc điểm:**
-- **Pure function** — input in, output out. Không gọi DB, không gọi API, không `await`.
-- **Dễ test** — chỉ cần construct entities, gọi function, assert result.
-- **Framework-agnostic** — không import FastAPI, không import DuckDB.
+**Characteristic:**
+- **Pure function** — input in, output out. No DB calls, no API calls, no `await`.
+- **Easy to test** — just construct entities, call function, assert result.
+- **Framework-agnostic** — do not import FastAPI, do not import DuckDB.
 
-### 2.5. Adapter Implementation — Ví dụ DuckDB TickRepository
+### 2.5. Adapter Implementation — DuckDB TickRepository example
 
 ```python
 # packages/adapters/src/adapters/duckdb/tick_repo.py
@@ -493,9 +493,9 @@ class DuckDBTickRepository:
         ).fetchall()
 ```
 
-**Lưu ý:** Adapter class không kế thừa `TickRepository` (Protocol). `mypy` verify structural compatibility tại compile time. Nếu thiếu method hoặc sai signature → type error.
+**Note:** Adapter class does not inherit `TickRepository` (Protocol). `mypy` verify structural compatibility at compile time. If there is a missing method or wrong signature → type error.
 
-### 2.6. Dependency Injection — Wiring tại Interface Layer
+### 2.6. Dependency Injection — Wiring at Interface Layer
 
 ```python
 # packages/interface/src/interface/dependencies.py
@@ -543,31 +543,31 @@ app = FastAPI(title="AlgoTrading API")
 
 @app.get("/api/portfolio/pnl")
 async def get_pnl(repo: TickRepository = Depends(get_tick_repository)):
-    # FastAPI chỉ là delivery mechanism
-    # Business logic nằm trong core.use_cases
+# FastAPI is just a delivery mechanism
+# Business logic resides in core.use_cases
     ...
 ```
 
-**Nguyên tắc DI:**
-- `core` định nghĩa **what** (Protocol).
-- `adapters` định nghĩa **how** (implementation).
-- `interface` quyết định **which** (wiring).
-- Swap adapter bằng cách thay 1 dòng trong `dependencies.py` (ví dụ: `SSIMarketDataClient` → `DNSEMarketDataClient`).
+**DI principles:**
+- `core` defines **what** (Protocol).
+- `adapters` defines **how** (implementation).
+- `interface` decides **which** (wiring).
+- Swap the adapter by replacing one line in `dependencies.py` (for example: `SSIMarketDataClient` → `DNSEMarketDataClient`).
 
 ---
 
 ## 3. DUCKDB INTEGRATION PATTERN
 
-### 3.1. ASOF JOIN — Khớp lệnh với giá thị trường
+### 3.1. ASOF JOIN — Match orders at market price
 
-#### Bài toán
+#### Math problem
 
-Khi tính PnL (Profit & Loss) hoặc chạy Backtesting, cần tìm **giá thị trường chính xác tại thời điểm lệnh được gửi**. Đây là bài toán time-series join kinh điển trong tài chính.
+When calculating PnL (Profit & Loss) or running Backtesting, it is necessary to find **the exact market price at the time the order was sent**. This is a classic time-series join problem in finance.
 
 #### Schema
 
 ```sql
--- Bảng ticks: giá thị trường liên tục (hàng triệu rows/ngày)
+-- Ticks table: continuous market price (millions of rows/day)
 CREATE TABLE ticks (
     symbol   VARCHAR NOT NULL,
     price    DOUBLE  NOT NULL,
@@ -576,13 +576,13 @@ CREATE TABLE ticks (
     ts       TIMESTAMP NOT NULL
 );
 
--- Bảng orders: lệnh giao dịch (hàng trăm rows/ngày)
+-- Orders table: transaction orders (hundreds of rows/day)
 CREATE TABLE orders (
     order_id   VARCHAR   NOT NULL,
     symbol     VARCHAR   NOT NULL,
     side       VARCHAR   NOT NULL,  -- 'BUY' | 'SELL'
     quantity   INTEGER   NOT NULL,
-    req_price  DOUBLE    NOT NULL,  -- Giá đặt
+req_price DOUBLE NOT NULL, -- Set price
     status     VARCHAR   NOT NULL,
     created_at TIMESTAMP NOT NULL
 );
@@ -593,7 +593,7 @@ CREATE TABLE orders (
 ```sql
 -- packages/adapters/src/adapters/duckdb/queries/asof_join_pnl.sql
 
--- Tìm giá thị trường gần nhất TRƯỚC hoặc TẠI thời điểm đặt lệnh
+-- Find the nearest market price BEFORE or AT the time of placing the order
 SELECT
     o.order_id,
     o.symbol,
@@ -603,9 +603,9 @@ SELECT
     o.created_at   AS order_time,
     t.price        AS market_price_at_order,
     t.ts           AS tick_time,
-    -- Slippage: chênh lệch giữa giá đặt và giá thị trường thực tế
+-- Slippage: difference between bid price and actual market price
     ABS(o.req_price - t.price) AS slippage,
-    -- PnL estimation (cho lệnh SELL)
+-- PnL estimation (for SELL order)
     CASE
         WHEN o.side = 'SELL'
         THEN (o.req_price - t.price) * o.quantity
@@ -613,12 +613,12 @@ SELECT
     END AS estimated_pnl
 FROM orders o
 ASOF JOIN ticks t
-    ON  o.symbol = t.symbol        -- Match cùng mã chứng khoán
-    AND o.created_at >= t.ts       -- Tick phải xảy ra TRƯỚC hoặc ĐÚNG lúc đặt lệnh
+ON o.symbol = t.symbol -- Match the same stock code
+AND o.created_at >= t.ts -- Tick must occur BEFORE or RIGHT TIME when the order is placed
 ORDER BY o.created_at DESC;
 ```
 
-#### Giải thích cơ chế ASOF JOIN
+#### Explain the ASOF JOIN mechanism
 
 ```
 Timeline:
@@ -626,14 +626,14 @@ Timeline:
   orders:  ────────────O1──────────O2──────────►
 
 ASOF JOIN logic:
-  O1 matched with T3  (tick gần nhất ≤ O1.created_at)
-  O2 matched with T5  (tick gần nhất ≤ O2.created_at)
+O1 matched with T3 (most recent tick ≤ O1.created_at)
+O2 matched with T5 (closest tick ≤ O2.created_at)
 
-★ Không cần exact timestamp match — DuckDB tự tìm nearest predecessor.
-★ Nếu dùng PostgreSQL: phải viết LATERAL JOIN + ORDER BY + LIMIT 1 per order → O(N*M) thay vì O(N+M).
+★ No need for exact timestamp match — DuckDB automatically finds the nearest predecessor.
+★ If using PostgreSQL: must write LATERAL JOIN + ORDER BY + LIMIT 1 per order → O(N*M) instead of O(N+M).
 ```
 
-#### Performance so sánh
+#### Performance comparison
 
 | Approach | Complexity | 100K orders × 10M ticks |
 |:---|:---|:---|
@@ -643,7 +643,7 @@ ASOF JOIN logic:
 
 ### 3.2. Parquet Partitioning Strategy
 
-#### Cấu trúc thư mục
+#### Directory structure
 
 ```
 data/parquet/
@@ -734,20 +734,20 @@ class ParquetPartitionManager:
         """)
 ```
 
-#### Partition Pruning — Tại sao quan trọng
+#### Partition Pruning — Why it's important
 
 ```sql
--- Query này CHỈ đọc 1 file Parquet (~3MB) thay vì toàn bộ dataset (~500MB+)
+-- This query ONLY reads 1 Parquet file (~3MB) instead of the entire dataset (~500MB+)
 SELECT symbol, AVG(price), SUM(volume)
 FROM ticks_historical
 WHERE year = 2026 AND month = 2 AND day = 10
 GROUP BY symbol;
 
--- DuckDB tự động skip tất cả partitions không match WHERE clause.
--- Không cần index. Không cần manual filter. Hive-style path = implicit index.
+-- DuckDB automatically skips all partitions that do not match the WHERE clause.
+-- No index needed. No need for manual filter. Hive-style path = implicit index.
 ```
 
-#### Compression Benchmark (Ước tính cho HOSE full-day)
+#### Compression Benchmark (Estimated for HOSE full-day)
 
 | Metric | Raw CSV | Parquet (zstd) | Ratio |
 |:---|:---|:---|:---|
@@ -759,14 +759,14 @@ GROUP BY symbol;
 
 ## 4. ASYNC/CONCURRENCY MODEL
 
-### 4.1. Nguyên tắc vàng: KHÔNG BAO GIỜ block event loop
+### 4.1. Golden rule: NEVER block event loop
 
 ```
-★ RULE #1: Mọi I/O operation phải là async (await).
-★ RULE #2: CPU-bound work > 1ms phải offload sang thread/process pool.
-★ RULE #3: DuckDB calls (blocking C library) LUÔN chạy trong thread pool.
-★ RULE #4: Không dùng time.sleep() — dùng asyncio.sleep().
-★ RULE #5: Không dùng requests — dùng httpx.AsyncClient.
+★ RULE #1: All I/O operations must be async (await).
+★ RULE #2: CPU-bound work > 1ms must be offloaded to thread/process pool.
+★ RULE #3: DuckDB calls (blocking C library) ALWAYS run in the thread pool.
+★ RULE #4: Don't use time.sleep() — use asyncio.sleep().
+★ RULE #5: Don't use requests — use httpx.AsyncClient.
 ```
 
 ### 4.2. Architecture Overview
@@ -936,7 +936,7 @@ async def analyze_symbol(symbol: Symbol) -> float:
 
 ### 4.5. Concurrency Rules — Cheat Sheet
 
-| Tác vụ | Blocking? | Giải pháp | Ví dụ |
+|Task| Blocking? |Solution|For example|
 |:---|:---|:---|:---|
 | WebSocket recv/send | No | `await ws.recv()` | SSI tick stream |
 | HTTP request | No | `await httpx_client.get()` | Vnstock REST API |
@@ -949,18 +949,18 @@ async def analyze_symbol(symbol: Symbol) -> float:
 | `time.sleep()` | **YES — BAN** | ❌ Never use | — |
 | `requests.get()` | **YES — BAN** | ❌ Use `httpx` instead | — |
 
-### 4.6. Backpressure — Xử lý khi buffer đầy
+### 4.6. Backpressure — Handles when the buffer is full
 
 ```python
-# Trong DataAgent, nếu DuckDB flush chậm hơn tick ingestion:
+# In DataAgent, if DuckDB flush is slower than tick ingestion:
 
-# Option 1: deque(maxlen=N) — tự động drop oldest ticks (acceptable for real-time)
+# Option 1: deque(maxlen=N) — automatically drop oldest ticks (acceptable for real-time)
 self._buffer: deque[Tick] = deque(maxlen=100_000)
 
-# Option 2: asyncio.Queue với bounded size — producer blocks khi full
+# Option 2: asyncio.Queue with bounded size — produces blocks when full
 self._queue: asyncio.Queue[Tick] = asyncio.Queue(maxsize=50_000)
 
-# Option 3: Sampling — chỉ giữ latest tick per symbol (cho display, không cho storage)
+# Option 3: Sampling — only keep latest tick per symbol (for display, not for storage)
 self._latest: dict[Symbol, Tick] = {}  # Overwrite on each tick
 ```
 
@@ -968,13 +968,13 @@ self._latest: dict[Symbol, Tick] = {}  # Overwrite on each tick
 
 ## 5. UNIT TESTING STRATEGY
 
-### 5.1. Nguyên tắc
+### 5.1. Principle
 
 ```
-★ RULE: Test business logic (core) KHÔNG CẦN infrastructure.
-★ RULE: Test adapters với DuckDB in-memory (`:memory:`) — không file I/O.
-★ RULE: Test agents với mock ports — không network calls.
-★ RULE: Mọi test phải chạy < 100ms. Nếu chậm hơn → sai layer.
+★ RULE: Test business logic (core) WITHOUT infrastructure.
+★ RULE: Test adapters with DuckDB in-memory (`:memory:`) — no file I/O.
+★ RULE: Test agents with mock ports — no network calls.
+★ RULE: All tests must run < 100ms. If slower → wrong layer.
 ★ TOOL: pytest + pytest-asyncio + pytest-cov
 ★ TARGET: Coverage ≥ 90% cho core, ≥ 80% cho adapters.
 ```
@@ -1353,7 +1353,7 @@ Stage 3: Integration Tests     (~10s)  pytest tests/integration/ -x
 Stage 4: Coverage Gate         (~15s)  pytest --cov --cov-fail-under=85
 ```
 
-Tổng thời gian CI: **< 35 giây** (nhờ `uv` install nhanh + DuckDB in-memory + no external services).
+Total CI time: **< 35 seconds** (thanks to fast `uv` install + DuckDB in-memory + no external services).
 
 ---
 

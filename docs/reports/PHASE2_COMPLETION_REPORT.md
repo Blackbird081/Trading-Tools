@@ -1,35 +1,35 @@
 # PHASE 2 — MARKET CONNECTIVITY & DATA PIPELINE — Completion Report
 
-**Ngày hoàn thành:** 2026-02-10
-**Thời gian:** Phase 2 (Weeks 3-5 theo kế hoạch)
+**Completion date:** 2026-02-10
+**Time:** Phase 2 (Weeks 3-5 as planned)
 
 ---
 
-## 1. Tóm tắt
+## 1. Summary
 
-Phase 2 triển khai **kết nối thị trường và data pipeline** cho nền tảng algo-trading. Hệ thống hiện có khả năng:
+Phase 2 deploys **market connection and data pipeline** for the algo-trading platform. The system is currently capable of:
 
-- Xác thực RSA-SHA256 với SSI FastConnect
-- Quản lý credentials 3 tier (env, encrypted file, OS keyring)
-- WebSocket client resilient với auto-reconnect + exponential backoff
+- RSA-SHA256 authentication with SSI FastConnect
+- Manage 3-tier credentials (env, encrypted file, OS keyring)
+- WebSocket client resilient with auto-reconnect + exponential backoff
 - Circuit breaker pattern cho broker API calls
-- Data Agent async ingestion loop với buffer + batch flush
+- Data Agent async ingestion loop with buffer + batch flush
 - FastAPI REST API + WebSocket server
-- Vnstock adapter cho dữ liệu lịch sử OHLCV
+- Vnstock adapter for OHLCV historical data
 - DNSE auth adapter (stub cho Phase 5)
 
 ---
 
 ## 2. Quality Metrics
 
-| Metric | Kết quả |
+| Metric |Result|
 |:---|:---|
 | **Tests** | 140 passed, 0 failed |
-| **Coverage** | 61% tổng thể (core tested components 95%+) |
+| **Coverage** |61% overall (core tested components 95%+)|
 | **Ruff** | 0 linting errors |
 | **Ruff format** | 0 formatting errors |
 | **Mypy strict** | 0 type errors (74 files checked) |
-| **Phase 1 regression** | 0 — tất cả 104 tests Phase 1 vẫn pass |
+| **Phase 1 regression** |0 — all 104 Phase 1 tests still pass|
 
 ---
 
@@ -43,8 +43,8 @@ Phase 2 triển khai **kết nối thị trường và data pipeline** cho nền
 | 4 | Exponential backoff: 1s, 2s, 4s, 8s... 60s cap | DONE |
 | 5 | Circuit breaker: CLOSED→OPEN→HALF_OPEN | DONE |
 | 6 | Data Agent: 1000 ticks → DuckDB (tested) | DONE |
-| 7 | Parquet round-trip (từ Phase 1) | DONE |
-| 8 | Vnstock adapter (stub, sẵn sàng cho live data) | DONE |
+| 7 |Parquet round-trip (from Phase 1)| DONE |
+| 8 |Vnstock adapter (stub, ready for live data)| DONE |
 | 9 | FastAPI /api/health → 200 | DONE |
 | 10 | WebSocket /ws/market connects | DONE |
 | 11 | Phase 1 tests regression-free | DONE |
@@ -126,12 +126,12 @@ tests/
 
 ---
 
-## 5. Tổ chức tài liệu
+## 5. Organize documents
 
-Các file .md blueprint đã được chuyển vào thư mục phù hợp:
+The blueprint .md files have been moved to the appropriate folder:
 ```
 docs/
-├── blueprints/          # 7 file thiết kế (bc1.md + 01-06)
+├── blueprints/ # 7 design files (bc1.md + 01-06)
 ├── plans/               # IMPLEMENTATION_PLAN.md
 └── reports/             # PHASE1_COMPLETION_REPORT.md + PHASE2_COMPLETION_REPORT.md
 ```
@@ -161,9 +161,9 @@ docs/
 
 ---
 
-## 7. Sẵn sàng cho Phase 3
+## 7. Ready for Phase 3
 
-Phase 3 sẽ triển khai **Intelligence Engine — Agents & Quant**:
+Phase 3 will deploy **Intelligence Engine — Agents & Quant**:
 - Agent State Schema (TypedDict)
 - Screener Agent (SQL vectorized screening)
 - Technical Analysis Agent (pandas-ta scoring)

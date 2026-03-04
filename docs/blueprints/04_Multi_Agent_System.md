@@ -1,6 +1,6 @@
 # 04 — MULTI-AGENT SYSTEM: AI ORCHESTRATION & EDGE INFERENCE
 
-**Project:** Hệ thống Giao dịch Thuật toán Đa Tác vụ (Enterprise Edition)
+**Project:** Multi-Task Algorithmic Trading System (Enterprise Edition)
 **Role:** AI Engineer & Quant Developer
 **Version:** 1.0 | February 2026
 **Stack:** LangGraph 0.2+ | OpenVINO GenAI 2024.4+ | DuckDB 1.1+ (vss) | Python 3.12+
@@ -9,21 +9,21 @@
 
 ## 1. AGENT ORCHESTRATION — LANGGRAPH STATE MACHINE
 
-### 1.1. Tại sao LangGraph thay vì LangChain Chains
+### 1.1. Why LangGraph instead of LangChain Chains
 
-| Tiêu chí | LangChain (Sequential Chain) | LangGraph (StateGraph) | Verdict |
+|Criteria| LangChain (Sequential Chain) | LangGraph (StateGraph) | Verdict |
 |:---|:---|:---|:---|
-| **Flow control** | Linear (A → B → C) hoặc branching đơn giản | Directed graph — cycles, conditionals, parallel branches | **LangGraph** ✓ |
-| **State management** | Implicit (output chain = input chain tiếp theo) | Explicit `TypedDict` state — mọi agent đọc/ghi cùng 1 state | **LangGraph** ✓ |
-| **Error recovery** | Try-catch rồi fail toàn bộ chain | Node-level retry, conditional routing sang fallback node | **LangGraph** ✓ |
-| **Human-in-the-loop** | Hack bằng callback | Native `interrupt_before` / `interrupt_after` | **LangGraph** ✓ |
-| **Debuggability** | Log string dài, khó trace | Graph visualization, step-by-step replay, state snapshot | **LangGraph** ✓ |
-| **Determinism** | Non-deterministic (LLM decides routing) | **Deterministic** — routing logic là Python code, không phải LLM | **LangGraph** ✓ |
-| **Lý do chọn** | Trong trading system, **determinism là bắt buộc**. Không thể để LLM "quyết định" nên gọi Risk Agent hay không. LangGraph cho phép mô hình hóa business workflow dưới dạng state machine — mọi transition đều explicit, testable, auditable. | | |
+| **Flow control** |Linear (A → B → C) or simple branching| Directed graph — cycles, conditionals, parallel branches | **LangGraph** ✓ |
+| **State management** |Implicit (output chain = next input chain)|Explicit `TypedDict` state — every agent reads/writes the same state| **LangGraph** ✓ |
+| **Error recovery** |Try-catch then fail the entire chain| Node-level retry, conditional routing sang fallback node | **LangGraph** ✓ |
+| **Human-in-the-loop** |Hacking with callbacks| Native `interrupt_before` / `interrupt_after` | **LangGraph** ✓ |
+| **Debuggability** |Log string is long, difficult to trace| Graph visualization, step-by-step replay, state snapshot | **LangGraph** ✓ |
+| **Determinism** | Non-deterministic (LLM decides routing) |**Deterministic** — routing logic is Python code, not LLM| **LangGraph** ✓ |
+|**Reason for choosing**|In the trading system, **determinism is mandatory**. The LLM cannot be left to "decide" whether to call Risk Agent or not. LangGraph allows modeling business workflows as a state machine — every transition is explicit, testable, auditable.| | |
 
 ### 1.2. AgentState — Shared State Schema
 
-Tất cả agent trong graph đọc và ghi vào một `TypedDict` duy nhất. Đây là "blackboard" trung tâm.
+All agents in the graph read and write to a single `TypedDict`. This is the central "blackboard".
 
 ```python
 # packages/agents/src/agents/state.py
@@ -402,15 +402,15 @@ class ScreenerAgent:
         # Step 1: Fundamental screening (EPS growth, PE ratio)
         raw_candidates = await asyncio.to_thread(
             self._screener.screen,
-            min_eps_growth=0.10,     # EPS tăng ≥ 10%
+min_eps_growth=0.10, # EPS growth ≥ 10%
             max_pe_ratio=15.0,       # PE ≤ 15
-            min_market_cap=1000e9,   # Vốn hóa ≥ 1,000 tỷ VND
+min_market_cap=1000e9, # Capitalization ≥ 1,000 billion VND
         )
 
         # Step 2: Volume spike detection via DuckDB
         volume_spikes = await asyncio.to_thread(
             self._tick_repo.query_volume_spikes,
-            threshold_multiplier=2.0,  # Volume > 2x trung bình 20 phiên
+threshold_multiplier=2.0, # Volume > 2x average of 20 sessions
         )
         spike_symbols = {r["symbol"] for r in volume_spikes}
 
@@ -692,7 +692,7 @@ class RiskAgent:
 
             # ── Calculate Stop-Loss / Take-Profit ──────────
             latest_price = await self._get_latest_price(symbol)
-            stop_loss = latest_price * Decimal("0.93")    # -7% (sàn HOSE)
+stop_loss = latest_price * Decimal("0.93") # -7% (HOSE exchange)
             take_profit = latest_price * Decimal("1.10")  # +10% target
 
             # ── APPROVED ───────────────────────────────────
@@ -877,7 +877,7 @@ graph TD
 
 ## 2. LOCAL INFERENCE OPTIMIZATION — OPENVINO ON NPU
 
-### 2.1. Tại sao INT4 Quantization trên NPU thay vì Cloud LLM
+### 2.1. Why INT4 Quantization on NPU instead of Cloud LLM
 
 ```
 Cloud LLM API (GPT-4 / Claude):
@@ -908,7 +908,7 @@ Local NPU INT4 (Phi-3-mini / Llama-3-8B):
 | Model RAM | N/A (cloud) | ~2.2 GB | ~4.5 GB |
 | **Verdict for financial text** | Overkill | **Best balance** | Best quality |
 
-**Kết luận:** Phi-3-mini INT4 là lựa chọn tối ưu cho hệ thống này. Đủ thông minh để phân tích tin tức tài chính, đủ nhỏ để chạy mượt trên 48 TOPS NPU, và hoàn toàn private.
+**Conclusion:** Phi-3-mini INT4 is the optimal choice for this system. Smart enough to analyze financial news, small enough to run smoothly on 48 TOPS NPU, and completely private.
 
 ### 2.2. Model Selection & Quantization Strategy
 
@@ -922,9 +922,9 @@ Local NPU INT4 (Phi-3-mini / Llama-3-8B):
 | **Llama-3.2-3B-Instruct** | 3.2B | ~1.8 GB | ~30-40 tok/s | Moderate | Moderate |
 | **Qwen2.5-7B-Instruct** | 7B | ~4.0 GB | ~18-28 tok/s | **Excellent** | Good (Chinese/Asian finance) |
 
-**Khuyến nghị:** Bắt đầu với **Phi-3-mini-4k-instruct** (nhỏ, nhanh, đủ tốt). Scale lên **Llama-3-8B** khi cần phân tích sâu hơn. Cân nhắc **Qwen2.5-7B** nếu cần xử lý tiếng Việt nhiều.
+**Recommended:** Start with **Phi-3-mini-4k-instruct** (small, fast, good enough). Scale to **Llama-3-8B** when deeper analysis is needed. Consider **Qwen2.5-7B** if you need to process a lot of Vietnamese.
 
-#### 2.2.2. Quantization Pipeline — Từ FP16 → INT4
+#### 2.2.2. Quantization Pipeline — From FP16 → INT4
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -973,7 +973,7 @@ Local NPU INT4 (Phi-3-mini / Llama-3-8B):
 uv add optimum[openvino] openvino-genai nncf
 
 # ── Step 2: Export + Quantize (one-time, ~10-30 minutes) ─────
-# Sử dụng optimum-cli để convert HuggingFace model → OpenVINO IR + INT4
+# Use optimal-cli to convert HuggingFace model → OpenVINO IR + INT4
 
 uv run optimum-cli export openvino \
     --model microsoft/Phi-3-mini-4k-instruct \
@@ -984,12 +984,12 @@ uv run optimum-cli export openvino \
     --trust-remote-code \
     --output ./data/models/phi-3-mini-int4
 
-# ── Giải thích parameters: ───────────────────────────────────
-# --weight-format int4    : Lượng tử hóa weights xuống 4-bit integer
-# --group-size 128        : Nhóm 128 weights share 1 scale factor
-#                           (balance giữa accuracy và compression)
-# --ratio 0.8             : 80% layers được quantize INT4,
-#                           20% giữ INT8 (sensitive layers: first/last)
+# ── Explanation of parameters: ───────────────────────────────────
+# --weight-format int4 : Quantize weights to a 4-bit integer
+# --group-size 128 : Group of 128 weights share 1 scale factor
+Error 504 (Server Error)!!1504.That’s an error.There was an error. Please try again later.That’s all we know.
+# --ratio 0.8 : 80% of layers are quantized INT4,
+# 20% keep INT8 (sensitive layers: first/last)
 # --sym                   : Symmetric quantization (simpler, NPU-friendly)
 # --trust-remote-code     : Required cho Phi-3 custom architecture
 ```
@@ -997,7 +997,7 @@ uv run optimum-cli export openvino \
 ### 2.4. Step-by-Step: INT4 Quantization cho Llama-3-8B
 
 ```bash
-# Llama-3 yêu cầu accept license trên HuggingFace trước
+# Llama-3 requires accepting license on HuggingFace first
 # https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
 
 # ── Export + Quantize ─────────────────────────────────────────
@@ -1009,15 +1009,15 @@ uv run optimum-cli export openvino \
     --sym \
     --output ./data/models/llama-3-8b-int4
 
-# ── Kết quả kỳ vọng: ─────────────────────────────────────────
+# ── Expected results: ──────────────────── ─────────────────────
 # Original FP16:  ~16 GB
 # INT4 quantized: ~4.5 GB (3.5x compression)
-# Accuracy loss:  < 2% trên financial text benchmarks
+# Accuracy loss: < 2% on financial text benchmarks
 ```
 
 ### 2.5. Advanced: NNCF Quantization (Finer Control)
 
-Khi `optimum-cli` không đủ kiểm soát, sử dụng NNCF (Neural Network Compression Framework) trực tiếp:
+When `optimum-cli` is not enough control, use NNCF (Neural Network Compression Framework) directly:
 
 ```python
 # scripts/quantize_model.py
@@ -1048,14 +1048,14 @@ model = OVModelForCausalLM.from_pretrained(
 # Use representative financial analysis prompts
 # This helps NNCF find optimal quantization scales
 calibration_texts = [
-    "Phân tích kỹ thuật mã FPT: RSI 28.5 (quá bán), MACD cắt lên, "
-    "giá chạm Bollinger Band dưới. EPS tăng 15% YoY.",
+Error 504 (Server Error)!!1504.That’s an error.There was an error. Please try again later.That’s all we know.
+Error 504 (Server Error)!!1504.That’s an error.There was an error. Please try again later.That’s all we know.
 
-    "Đánh giá rủi ro danh mục: VaR 95% = 3.2%, tỷ trọng VNM 18% NAV, "
-    "thanh khoản trung bình 20 phiên = 1.2M cổ phiếu/ngày.",
+"Portfolio risk assessment: VaR 95% = 3.2%, VNM proportion 18% NAV,"
+"Average liquidity of 20 sessions = 1.2M shares/day.",
 
-    "Tin tức: NHNN giữ nguyên lãi suất điều hành. "
-    "Tác động đến nhóm ngân hàng: VCB, BID, CTG.",
+"News: SBV keeps operating interest rates unchanged."
+Error 504 (Server Error)!!1504.That’s an error.There was an error. Please try again later.That’s all we know.
 
     # Add 50-100 more representative samples...
 ]
@@ -1290,7 +1290,7 @@ def get_device_info() -> dict[str, str]:
     return info
 ```
 
-### 2.8. Performance Benchmarks — INT4 trên Intel Core Ultra 7 256V
+### 2.8. Performance Benchmarks — INT4 on Intel Core Ultra 7 256V
 
 | Model | Format | Device | 1st Token | Throughput | RAM | Power |
 |:---|:---|:---|:---|:---|:---|:---|
@@ -1301,25 +1301,25 @@ def get_device_info() -> dict[str, str]:
 | Llama-3-8B | INT8 | NPU | ~600ms | ~12 tok/s | ~8 GB | ~10W |
 | **Llama-3-8B** | **INT4** | **NPU** | **~500ms** | **~20 tok/s** | **~4.5 GB** | **~8W** |
 
-**Ghi chú:**
-- Throughput đo trên Intel Core Ultra 7 256V (Lunar Lake), NPU 48 TOPS.
-- 1st Token latency bao gồm prompt processing (prefill phase).
-- Một analysis report ~200 tokens = **~7s (Phi-3)** hoặc **~10s (Llama-3)**.
+**Note:**
+- Throughput measured on Intel Core Ultra 7 256V (Lunar Lake), NPU 48 TOPS.
+- 1st Token latency includes prompt processing (prefill phase).
+- An analysis report ~200 tokens = **~7s (Phi-3)** or **~10s (Llama-3)**.
 
 ---
 
 ## 3. PROMPT ENGINEERING SYSTEM — VERSIONED FINANCIAL PROMPTS
 
-### 3.1. Tại sao cần Prompt Versioning
+### 3.1. Why is Prompt Versioning needed?
 
-Trong production trading system, prompt chính là "code" của AI Agent. Thay đổi 1 từ trong prompt có thể thay đổi output từ "BUY" sang "HOLD". Vì vậy, prompt cần được quản lý với cùng discipline như source code:
+In the production trading system, the prompt is the "code" of the AI ​​Agent. Changing one word in the prompt can change the output from "BUY" to "HOLD". Therefore, the prompt needs to be managed with the same discipline as the source code:
 
 ```
-★ Version Control: Mỗi prompt có version number, author, changelog.
-★ A/B Testing: Chạy 2 prompt versions song song, so sánh accuracy.
-★ Rollback: Nếu prompt mới cho kết quả tệ, rollback về version trước.
-★ Audit Trail: Mọi AI decision đều trace được tới prompt version cụ thể.
-★ Separation of Concerns: Prompt template tách khỏi business logic.
+★ Version Control: Each prompt has version number, author, changelog.
+★ A/B Testing: Run 2 prompt versions in parallel, compare accuracy.
+Error 504 (Server Error)!!1504.That’s an error.There was an error. Please try again later.That’s all we know.
+★ Audit Trail: Every AI decision is traced to a specific prompt version.
+★ Separation of Concerns: Prompt template separated from business logic.
 ```
 
 ### 3.2. Prompt Storage Architecture
@@ -1437,23 +1437,23 @@ You will receive:
 ## OUTPUT FORMAT (Strict)
 Respond in this exact structure:
 
-**[SYMBOL] — [ACTION: MUA/BÁN/GIỮ]**
+**[SYMBOL] — [ACTION: BUY/SELL/HOLD]**
 
-Phân tích: [2-3 câu phân tích kỹ thuật dựa trên chỉ báo được cung cấp]
+Analysis: [2-3 sentences technical analysis based on the indicator provided]
 
-Tin tức: [1-2 câu đánh giá tác động tin tức nếu có, hoặc "Không có tin tức đáng chú ý"]
+News: [1-2 sentences assessing news impact if any, or "No notable news"]
 
-Rủi ro: [1 câu nêu rủi ro chính]
+Risks: [1 sentence stating main risks]
 
-Mức độ tin cậy: [CAO/TRUNG BÌNH/THẤP]
+Error 500 (Server Error)!!1500.That’s an error.There was an error. Please try again later.That’s all we know.
 
 ## RULES
 1. NEVER fabricate data. Only reference indicators provided in input.
 2. ALWAYS state risk. No analysis is complete without risk acknowledgment.
 3. Use Vietnamese for the analysis body. Technical terms in English are OK.
 4. Keep total response under 200 words.
-5. Confidence level must align with score: |score| ≥ 7 = CAO, 4-6 = TRUNG BÌNH, < 4 = THẤP.
-6. If score is between -4 and +4, always recommend GIỮ (HOLD).
+5. Confidence level must align with score: |score| ≥ 7 = HIGH, 4-6 = MEDIUM, < 4 = LOW.
+6. If score is between -4 and +4, always recommend HOLD.
 ```
 
 ### 3.5. Prompt Builder — Runtime Assembly
@@ -1625,37 +1625,37 @@ class FinancialPromptBuilder:
         news_headlines: list[str] | None,
     ) -> str:
         lines = [
-            f"Phân tích mã: {symbol} ({company_name})",
+Error 504 (Server Error)!!1504.That’s an error.There was an error. Please try again later.That’s all we know.
             "",
-            "## Chỉ báo kỹ thuật:",
+"## Technical indicator:",
             f"- RSI(14): {rsi:.1f}",
             f"- MACD: {macd_signal}",
             f"- Bollinger Bands: {bb_position}",
             f"- MA50/MA200: {trend_ma}",
-            f"- Điểm tổng hợp: {technical_score:+.1f}/10",
+Error 504 (Server Error)!!1504.That’s an error.There was an error. Please try again later.That’s all we know.
         ]
 
         if eps_growth is not None or pe_ratio is not None:
             lines.append("")
-            lines.append("## Cơ bản:")
+lines.append("## Basic:")
             if eps_growth is not None:
-                lines.append(f"- EPS tăng trưởng: {eps_growth:.1%}")
+lines.append(f"- EPS growth: {eps_growth:.1%}")
             if pe_ratio is not None:
                 lines.append(f"- PE ratio: {pe_ratio:.1f}")
 
         if news_headlines:
             lines.append("")
-            lines.append("## Tin tức gần đây:")
+lines.append("## Recent news:")
             for headline in news_headlines[:5]:
                 lines.append(f"- {headline}")
 
         lines.append("")
-        lines.append("Hãy phân tích và đưa ra khuyến nghị.")
+Error 500 (Server Error)!!1500.That’s an error.There was an error. Please try again later.That’s all we know.
 
         return "\n".join(lines)
 ```
 
-### 3.6. Fundamental Agent — Tích hợp Prompt + NPU
+### 3.6. Fundamental Agent — Prompt + NPU integration
 
 ```python
 # packages/agents/src/agents/fundamental_agent.py
@@ -1808,11 +1808,11 @@ def evaluate_prompt_version(
 
 
 def _extract_action(response: str) -> str:
-    """Parse MUA/BÁN/GIỮ from model response."""
+"""Parse BUY/SELL/HOLD from model response."""
     response_upper = response.upper()
     if "MUA" in response_upper or "BUY" in response_upper:
         return "BUY"
-    if "BÁN" in response_upper or "SELL" in response_upper:
+if "SELL" in response_upper or "SELL" in response_upper:
         return "SELL"
     return "HOLD"
 ```
@@ -1821,34 +1821,34 @@ def _extract_action(response: str) -> str:
 
 ## 4. VECTOR DATABASE STRATEGY — RAG WITH DUCKDB VSS
 
-### 4.1. Khi nào cần RAG cho Trading System
+### 4.1. When do you need RAG for Trading System?
 
 ```
-Scenario Analysis: RAG cần thiết khi nào?
+Scenario Analysis: When is RAG necessary?
 
-❌ Không cần RAG:
-  - Phân tích kỹ thuật (RSI, MACD, BB) → Dữ liệu số, tính toán trực tiếp
-  - Portfolio optimization → PyPortfolioOpt, không cần LLM
-  - Risk calculation (VaR) → SQL trên DuckDB
+❌ No need for RAG:
+- Technical analysis (RSI, MACD, BB) → Digital data, direct calculations
+- Portfolio optimization → PyPortfolioOpt, no LLM needed
+- Risk calculation (VaR) → SQL on DuckDB
 
-✅ Cần RAG:
-  - Phân tích tin tức tài chính → Hàng nghìn bài báo, cần tìm relevant context
-  - Báo cáo tài chính (BCTC) → PDF/text dài, LLM context window giới hạn (4K tokens)
-  - Hỏi đáp về quy định giao dịch → Nhiều tài liệu pháp lý
+✅ Need RAG:
+- Analyzing financial news → Thousands of articles, need to find relevant context
+- Financial statements → PDF/long text, limited LLM context window (4K tokens)
+Error 504 (Server Error)!!1504.That’s an error.There was an error. Please try again later.That’s all we know.
   - Market commentary → Historical analysis patterns
 ```
 
-### 4.2. Tại sao DuckDB VSS thay vì Vector DB riêng biệt
+### 4.2. Why DuckDB VSS instead of separate Vector DB
 
-| Tiêu chí | DuckDB + vss Extension | Chroma / Qdrant / Pinecone |
+|Criteria| DuckDB + vss Extension | Chroma / Qdrant / Pinecone |
 |:---|:---|:---|
-| **Kiến trúc** | In-process, cùng DB với tick data | Separate server/process |
-| **Ops overhead** | Zero — đã dùng DuckDB cho analytics | Thêm 1 service cần quản lý |
+|**Architecture**|In-process, same DB with tick data| Separate server/process |
+| **Ops overhead** |Zero — used DuckDB for analytics|One more service that needs management|
 | **Latency** | ~0.1-1ms (in-process) | ~2-10ms (IPC/network) |
-| **SQL integration** | Native — JOIN embeddings với tick data, orders | Phải bridge 2 hệ thống |
-| **Scale** | ~1M vectors thoải mái (single-user) | Scale tốt hơn ở multi-million |
+| **SQL integration** |Native — JOIN embeddings with tick data, orders|Must bridge 2 systems|
+| **Scale** |~1M comfortable vectors (single-user)|Scale is better at multi-million|
 | **Similarity search** | HNSW index via `vss` extension | HNSW, IVF, PQ, ... |
-| **Lý do chọn** | Hệ thống single-user, đã dùng DuckDB. Thêm 1 extension tốt hơn thêm 1 service. Vector search kết hợp SQL filter (WHERE date > ... AND symbol = ...) là killer feature cho financial RAG. | |
+|**Reason for choosing**|Single-user system, used DuckDB. Adding 1 extension is better than adding 1 service. Vector search combined with SQL filter (WHERE date > ... AND symbol = ...) is a killer feature for financial RAG.| |
 
 ### 4.3. DuckDB VSS Setup & Schema
 
@@ -2149,7 +2149,7 @@ class RAGFundamentalAgent(FundamentalAgent):
             # ── Step 1: Retrieve relevant context ──────────
             # Search for news related to this symbol in last 7 days
             relevant_news = await self._vector_store.search_similar_news(
-                query=f"Phân tích cổ phiếu {item.symbol} triển vọng",
+query=f"Stock analysis {item.symbol} outlook",
                 top_k=3,
                 symbol=str(item.symbol),
                 since=datetime.now(timezone.utc) - timedelta(days=7),
@@ -2157,7 +2157,7 @@ class RAGFundamentalAgent(FundamentalAgent):
 
             # Search for report context
             relevant_reports = await self._vector_store.search_reports(
-                query="doanh thu lợi nhuận tăng trưởng",
+query="revenue profit growth",
                 symbol=str(item.symbol),
                 top_k=2,
                 report_type="quarterly",
@@ -2168,7 +2168,7 @@ class RAGFundamentalAgent(FundamentalAgent):
                 f"- [{n['published_at']}] {n['headline']}: "
                 f"{n['content'][:200]}..."
                 for n in relevant_news
-            ]) if relevant_news else "Không có tin tức gần đây."
+]) if relevant_news else "There is no recent news."
 
             report_context = "\n".join([
                 f"- [Q{r['fiscal_quarter']}/{r['fiscal_year']}] "
@@ -2180,7 +2180,7 @@ class RAGFundamentalAgent(FundamentalAgent):
             augmented_news = [n["headline"] for n in relevant_news]
             if report_context:
                 augmented_news.append(
-                    f"[Trích BCTC] {report_context[:500]}"
+f"[Financial statement extract] {report_context[:500]}"
                 )
 
             prompt, pv = self._prompt_builder.build_analysis_prompt(
@@ -2212,7 +2212,7 @@ class RAGFundamentalAgent(FundamentalAgent):
 | `bkai-foundation-models/vietnamese-bi-encoder` | 768 | 440 MB | **Excellent** | Moderate | ~12ms/text |
 | `BAAI/bge-m3` | 1024 | 2.2 GB | **Excellent** | Good | ~25ms/text |
 
-**Khuyến nghị:** Sử dụng `paraphrase-multilingual-MiniLM-L12-v2` cho balance giữa chất lượng tiếng Việt, tốc độ, và kích thước. Nếu cần tối ưu cho Vietnamese, dùng `bkai-foundation-models/vietnamese-bi-encoder`.
+**Recommendation:** Use `paraphrase-multilingual-MiniLM-L12-v2` for balance between Vietnamese quality, speed, and size. If you need to optimize for Vietnamese, use `bkai-foundation-models/vietnamese-bi-encoder`.
 
 ```python
 # packages/adapters/src/adapters/embedding/model.py
@@ -2444,11 +2444,11 @@ class TestPromptBuilder:
             macd_signal="neutral",
             bb_position="inside",
             trend_ma="neutral",
-            news_headlines=["NHNN giữ nguyên lãi suất", "VCB lãi Q4 tăng 20%"],
+news_headlines=["SBV keeps interest rates unchanged", "VCB Q4 profit increases 20%"],
         )
 
-        assert "NHNN giữ nguyên lãi suất" in prompt
-        assert "VCB lãi Q4 tăng 20%" in prompt
+assert "SBV keeps interest rates unchanged" in prompt
+assert "VCB Q4 profit increased by 20%" in prompt
 
     def test_version_selection(
         self, prompt_registry: PromptRegistry,

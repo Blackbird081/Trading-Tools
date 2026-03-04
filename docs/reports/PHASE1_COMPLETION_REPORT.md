@@ -10,13 +10,13 @@
 
 ## Executive Summary
 
-Phase 1 đã hoàn thành thành công với **tất cả Definition of Done được đáp ứng**:
+Phase 1 completed successfully with **all Definition of Done met**:
 - ✅ **106/106 tests passed** (96 unit + 10 integration)
 - ✅ **96% code coverage** (target: ≥90% core, ≥80% adapters)
 - ✅ **Zero linter warnings** (Ruff)
 - ✅ **Zero type errors** (mypy --strict)
-- ✅ **Clean Architecture** với dependency inversion hoàn chỉnh
-- ✅ **Rock-solid foundation** sẵn sàng cho Phase 2
+- ✅ **Clean Architecture** with complete dependency inversion
+- ✅ **Rock-solid foundation** ready for Phase 2
 
 ---
 
@@ -38,7 +38,7 @@ algo-trading/
     └── ci.ps1         ← CI pipeline script
 ```
 
-**Build system**: `uv` workspace với `hatchling` backend  
+**Build system**: `uv` workspace with `hatchling` backend
 **Dependency graph**: `interface → agents → adapters → core` (strictly enforced)
 
 ### 2. Core Domain Entities (Immutable, Type-Safe)
@@ -46,7 +46,7 @@ algo-trading/
 | Entity | File | Tests | Purpose |
 |:---|:---|:---:|:---|
 | `Tick`, `OHLCV` | `tick.py` | 7 | Market data |
-| `Order` + FSM | `order.py` | 23 | Order lifecycle với state machine |
+| `Order` + FSM | `order.py` | 23 |Order lifecycle with state machine|
 | `Position`, `CashBalance`, `PortfolioState` | `portfolio.py` | 8 | T+2.5 settlement aware |
 | `TradingSignal`, `AIInsight` | `signal.py` | 2 | Agent outputs |
 | `RiskLimit`, `RiskMetrics`, `VaRResult` | `risk.py` | 1 | Risk management |
@@ -55,7 +55,7 @@ algo-trading/
 - ✅ All entities are `@dataclass(frozen=True, slots=True)` — immutable + memory efficient
 - ✅ NewType for domain primitives: `Symbol`, `Price`, `Quantity`
 - ✅ Decimal for financial precision (NO float!)
-- ✅ Order FSM với whitelist transitions — invalid transitions raise `InvalidOrderTransitionError`
+- ✅ Order FSM with whitelist transitions — invalid transitions raise `InvalidOrderTransitionError`
 
 ### 3. Core Use Cases (Pure Business Logic)
 
@@ -76,8 +76,8 @@ algo-trading/
 
 **Validation highlights:**
 - `validate_order()`: 7-check comprehensive validation (Kill Switch, Price Band, Lot Size, Position Size, Buying Power, Sellable Qty, Daily Loss Limit)
-- `calculate_price_band()`: HOSE ±7%, HNX ±10%, UPCOM ±15% với tick size rules
-- `calculate_settlement_date()`: T+2.5 với holiday handling (Vietnam market)
+- `calculate_price_band()`: HOSE ±7%, HNX ±10%, UPCOM ±15% with tick size rules
+- `calculate_settlement_date()`: T+2.5 with holiday handling (Vietnam market)
 
 ### 4. Ports (Protocol-based Interfaces)
 
@@ -99,7 +99,7 @@ algo-trading/
 | Adapter | File | Features |
 |:---|:---|:---|
 | `DuckDBTickRepository` | `tick_repo.py` | Batch insert, OHLCV aggregation, **ASOF JOIN** |
-| `DuckDBOrderRepository` | `order_repo.py` | Order CRUD với idempotency |
+| `DuckDBOrderRepository` | `order_repo.py` |Order CRUD with idempotency|
 | `ParquetPartitionManager` | `partitioning.py` | Hive-style partitioning (year/month/day) |
 | SQL Queries | `queries/*.sql` | ASOF JOIN PnL, screening indicators, Historical VaR |
 
@@ -280,7 +280,7 @@ def calculate_settlement_date(trade_date: date) -> SettlementDate:
 
 ## Challenges & Solutions
 
-### Challenge 1: Type Safety với NewType
+### Challenge 1: Type Safety with NewType
 
 **Problem**: `Price = NewType("Price", Decimal)` makes mypy very strict about conversions.
 
@@ -308,9 +308,9 @@ await asyncio.to_thread(repo.insert_batch_sync, ticks)
 
 **Solution**: Disabled TC001/TC002/TC003 because entities need runtime imports (not just type-checking).
 
-### Challenge 4: Order FSM với replace()
+### Challenge 4: Order FSM with replace()
 
-**Problem**: `dataclasses.replace()` với `**kwargs` has type errors in strict mode.
+**Problem**: `dataclasses.replace()` with `**kwargs` has type errors in strict mode.
 
 **Solution**: Added `# type: ignore[arg-type]` after verifying the FSM logic is correct.
 

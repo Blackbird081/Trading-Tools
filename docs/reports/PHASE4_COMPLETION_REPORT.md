@@ -1,14 +1,14 @@
-# BÁO CÁO HOÀN THÀNH PHASE 4: FRONTEND & REAL-TIME UI
+# PHASE 4 COMPLETION REPORT: FRONTEND & REAL-TIME UI
 
-**Ngày hoàn thành:** 2026-02-10
+**Completion date:** 2026-02-10
 **Phase:** 4 / 6
-**Trạng thái:** HOÀN THÀNH
+**Status:** COMPLETED
 
 ---
 
-## 1. TỔNG QUAN
+## 1. OVERVIEW
 
-Phase 4 xây dựng toàn bộ Next.js 15 trading terminal với AG Grid price board, TradingView charts, 5 Zustand stores, WebSocket data bridge, và Command Palette. UI sẵn sàng **hiển thị real-time market data và agent signals**.
+Phase 4 builds the entire Next.js 15 trading terminal with AG Grid price board, TradingView charts, 5 Zustand stores, WebSocket data bridge, and Command Palette. UI ready **displays real-time market data and agent signals**.
 
 ---
 
@@ -16,7 +16,7 @@ Phase 4 xây dựng toàn bộ Next.js 15 trading terminal với AG Grid price b
 
 ### 2.1. Project Setup (Task 4.1)
 
-| File | Mô tả |
+| File |Describe|
 |:---|:---|
 | `frontend/package.json` | Next.js 15, React 19, TypeScript 5.7+, Tailwind CSS 4 |
 | `frontend/tsconfig.json` | Strict mode, noUncheckedIndexedAccess, path aliases |
@@ -35,26 +35,26 @@ Phase 4 xây dựng toàn bộ Next.js 15 trading terminal với AG Grid price b
 | `order-store` | `stores/order-store.ts` | On-demand (orders) |
 | `ui-store` | `stores/ui-store.ts` | User-driven (symbol, palette, sidebar) |
 
-Tất cả stores sử dụng `subscribeWithSelector` middleware cho surgical re-renders.
+All stores use `subscribeWithSelector` middleware for surgical re-renders.
 
 ### 2.3. WebSocket Provider (Task 4.3)
 
-| File | Mô tả |
+| File |Describe|
 |:---|:---|
 | `providers/ws-provider.tsx` | Auto-reconnect, message routing by type (`tick`, `tick_batch`, `candle`, `signal`, `portfolio`) |
 
-Routing sử dụng `getState()` (không `setState` trong provider) — zero unnecessary React re-renders.
+Routing using `getState()` (not `setState` in provider) — zero unnecessary React re-renders.
 
 ### 2.4. AG Grid Price Board (Task 4.4)
 
-| File | Mô tả |
+| File |Describe|
 |:---|:---|
 | `app/(dashboard)/_components/price-board.tsx` | DOM virtualization, symbol/ceiling/floor/price/change/volume columns |
 | `hooks/use-market-stream.ts` | `requestAnimationFrame` batching — 1 DOM update per frame |
 
 ### 2.5. TradingView Chart (Task 4.5)
 
-| File | Mô tả |
+| File |Describe|
 |:---|:---|
 | `app/(dashboard)/_components/trading-chart.tsx` | Canvas-based candlestick, dark theme, ResizeObserver, real-time updates |
 | `app/(dashboard)/_components/chart-overlays/signal-markers.ts` | BUY/SELL arrow markers on chart |
@@ -74,7 +74,7 @@ Routing sử dụng `getState()` (không `setState` trong provider) — zero unn
 
 ### 2.7. Command Palette (Task 4.7)
 
-| File | Mô tả |
+| File |Describe|
 |:---|:---|
 | `components/command-palette.tsx` | Ctrl+K, `cmdk` library, navigation + symbol + trade commands |
 
@@ -82,7 +82,7 @@ Parses: `"BUY FPT 1000 PRICE 98.5"`, `"SELL VNM 500"`, navigation routes.
 
 ### 2.8. Type System
 
-| File | Mô tả |
+| File |Describe|
 |:---|:---|
 | `types/market.ts` | `TickData`, `CandleData`, `AgentSignal`, `Position`, `OrderData` |
 | `lib/utils.ts` | `cn()` — clsx + tailwind-merge |
@@ -178,9 +178,9 @@ frontend/
 
 ---
 
-## 6. BƯỚC TIẾP THEO — PHASE 5
+## 6. NEXT STEP — PHASE 5
 
-Phase 5 sẽ triển khai **AI Edge Inference & Order Execution**:
+Phase 5 will deploy **AI Edge Inference & Order Execution**:
 - OpenVINO INT4 model quantization + engine
 - Fundamental Agent (NPU-powered)
 - Idempotent Order Placement (OMS)

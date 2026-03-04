@@ -136,7 +136,7 @@ Notes:
 - Date-Time (UTC+7): 2026-03-02 14:32
 - Type: bugfix
 - Scope: Normalize mobile Market Board sector tab button sizing for consistent visual layout.
-- Impact: Sector tabs (`VN30`, `Bất động sản`, `Chứng khoán`, ...) now render with equal frame size, eliminating mixed button heights/widths.
+- Impact: Sector tabs (`VN30`, `Real Estate`, `Stocks`, ...) now render with equal frame size, eliminating mixed button heights/widths.
 - Root Cause: Variable label lengths combined with unconstrained button sizing caused uneven mobile tab dimensions.
 - Files Changed: `frontend/app/market-board/page.tsx`
 - Validation Evidence: `pnpm -C frontend exec tsc --noEmit` pass; `pnpm -C frontend exec vitest run __tests__/lib/market-sectors.test.ts` pass (5/5).
@@ -308,3 +308,39 @@ Notes:
 - Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` Phase 7 (quality and release evidence)
 - Owner: Codex + project owner
 - Notes: Frontend total coverage in this report reflects targeted regression suite only, not full project test universe.
+
+### CVF-TT-20260304-019
+- Date-Time (UTC+7): 2026-03-04 10:35
+- Type: test
+- Scope: Raise pre-live financial safety confidence by adding branch-level tests for data-loader/profile-vault/news adapter and introducing a dedicated API-key pre-live quality gate.
+- Impact: Critical backend paths now have enforceable `>=90%` coverage gate before real API key onboarding; profile vault serialization bug (slots dataclass + `__dict__`) is fixed and covered.
+- Root Cause: Existing regression suite did not provide sufficient branch coverage on high-risk pre-live modules; one runtime defect in profile listing path was uncovered by new tests.
+- Files Changed: `packages/interface/src/interface/profile_vault.py`, `tests/integration/test_setup_profiles_api.py`, `tests/integration/test_data_loader_api.py`, `tests/unit/test_data_loader_helpers.py`, `tests/unit/test_vnstock_news_adapter.py`, `tests/unit/test_profile_vault.py`, `scripts/pre-live-api-gate.ps1`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `python -m pytest tests/integration/test_setup_api.py tests/integration/test_setup_profiles_api.py tests/integration/test_order_safety_controls.py tests/integration/test_data_loader_api.py tests/unit/test_vnstock_news_adapter.py tests/unit/test_data_loader_helpers.py tests/unit/test_profile_vault.py -q` with `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src` (pass, 36 tests)
+  - `python -m pytest tests/integration/test_setup_profiles_api.py tests/integration/test_data_loader_api.py tests/unit/test_data_loader_helpers.py tests/unit/test_vnstock_news_adapter.py tests/unit/test_profile_vault.py --cov=interface.profile_vault --cov=interface.rest.data_loader --cov=adapters.vnstock.news --cov-fail-under=90 --cov-report=term -q` with same `PYTHONPATH` (pass, coverage total 96%)
+  - `pnpm -C frontend exec vitest run __tests__/integration/data-loader.test.tsx __tests__/stores/market-store.test.ts __tests__/stores/signal-store.test.ts __tests__/lib/market-sectors.test.ts --coverage --coverage.reporter=text-summary --coverage.reporter=json-summary --coverage.reportsDirectory=coverage` (pass, 16 tests; frontend global-line snapshot remains low)
+- Deployment Target: repository test/docs/process gate (pre-live quality controls)
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.10` (Pre-Live API Key Quality Gate)
+- Owner: Codex + project owner
+- Notes: Pre-live gate is backend-critical by design; frontend global 90% remains a separate expansion item.
+
+### CVF-TT-20260304-020
+- Date-Time (UTC+7): 2026-03-04 14:05
+- Type: docs
+- Scope: Standardize repository documentation language to English, keeping only `SOUL_VN.md` in Vietnamese, and update README headings by removing vendor-inspired labels.
+- Impact: Documentation is now language-consistent for global collaboration; README no longer contains `baocaotaichinh-inspired` or `FinceptTerminal-inspired` labels.
+- Root Cause: Mixed Vietnamese/English documentation increased onboarding friction and made cross-team reviews inconsistent.
+- Files Changed: `README.md`, `ROADMAP.md`, `docs/**/*.md` (all markdown docs except `SOUL_VN.md`), `packages/agents/src/agents/skills/builtin/*.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `rg -n "baocaotaichinh-inspired|FinceptTerminal-inspired" README.md docs -g "*.md"` (no matches)
+  - `rg -n "[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ]" -g "*.md" -g "!SOUL_VN.md"` (no matches)
+  - `powershell -ExecutionPolicy Bypass -File scripts/pre-live-api-gate.ps1 -StrictWarnings` (pass)
+- Deployment Target: repository documentation baseline
+- Deployment Status: pending push/deploy
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: CVF governance Section `0.4`/`0.5` documentation traceability
+- Owner: Codex + project owner
+- Notes: `SOUL_VN.md` remains intentionally Vietnamese by product direction.

@@ -1,6 +1,6 @@
 # 01 — SYSTEM ARCHITECTURE OVERVIEW
 
-**Project:** Hệ thống Giao dịch Thuật toán Đa Tác vụ (Enterprise Edition)
+**Project:** Multi-Task Algorithmic Trading System (Enterprise Edition)
 **Platform:** Hybrid AI & Intel Core Ultra
 **Author:** Senior System Architect
 **Version:** 1.0 | February 2026
@@ -9,18 +9,18 @@
 
 ## 1. EXECUTIVE SUMMARY (TECHNICAL VIEW)
 
-### 1.1. Mô hình Hybrid AI & Edge Computing — Tại sao không Cloud-native thuần túy?
+### 1.1. Hybrid AI & Edge Computing model — Why not pure Cloud-native?
 
-Kiến trúc hệ thống được thiết kế theo mô hình **Hybrid Cloud-Edge**, trong đó workload được phân tách rõ ràng giữa hai tầng xử lý:
+The system architecture is designed according to the **Hybrid Cloud-Edge** model, in which the workload is clearly separated between two processing layers:
 
-| Tầng | Workload | Đặc tính |
+| Floor | Workload | Features |
 |:---|:---|:---|
 | **Cloud (Remote)** | Market Data ingestion, Portfolio Sync, News Feed | I/O-bound, high-bandwidth, low-compute |
 | **Edge (Local NPU/CPU)** | AI Inference, Quantitative Analysis, Risk Calc | Compute-bound, latency-sensitive, data-private |
 
-#### 1.1.1. Bài toán Latency — Tại sao Edge thắng Cloud
+#### 1.1.1. The Latency Problem — Why Edge Wins Over Cloud
 
-Trong giao dịch thuật toán, **mỗi mili-giây đều có giá trị tiền tệ**. Phân tích latency budget cho một chu kỳ quyết định (decision cycle):
+In algorithmic trading, **every millisecond has a monetary value**. Analyze latency budget for a decision cycle:
 
 ```
 Cloud-native Pipeline:
@@ -32,19 +32,19 @@ Hybrid Edge Pipeline:
   Latency:  ~2ms    ~0.1ms (IPC)       ~8-25ms (INT4 local)  ~0.5-2ms    = 10.6-29.1ms
 ```
 
-**Kết luận:** Pipeline Edge giảm latency trung bình **5-10x** so với Cloud-native. Với tick data tần suất cao (hàng trăm tick/giây), việc loại bỏ network round-trip là yếu tố quyết định.
+**Conclusion:** Pipeline Edge reduces latency on average **5-10x** compared to Cloud-native. With high frequency tick data (hundreds of ticks/second), eliminating network round-trip is the deciding factor.
 
-#### 1.1.2. Bài toán Privacy — Zero Data Leakage
+#### 1.1.2. Privacy problem — Zero Data Leakage
 
-Cloud-native buộc dữ liệu tài chính nhạy cảm (portfolio positions, trading signals, risk parameters) phải transit qua public internet và lưu trên infrastructure của bên thứ ba. Mô hình Edge giải quyết triệt để:
+Cloud-native forces sensitive financial data (portfolio positions, trading signals, risk parameters) to transit through the public internet and store on third-party infrastructure. The Edge model thoroughly solves:
 
-- **Data Residency:** Toàn bộ dữ liệu giao dịch, danh mục, và AI model weights nằm trên local storage. Không có byte nào rời khỏi máy trừ API calls tới sàn.
-- **Inference Privacy:** LLM chạy trên NPU xử lý phân tích cơ bản (tin tức, báo cáo tài chính) hoàn toàn offline. Không có prompt/response nào bị log bởi third-party API provider.
-- **Compliance-ready:** Phù hợp với các quy định về bảo mật dữ liệu tài chính cá nhân mà không cần mã hóa end-to-end phức tạp qua cloud.
+- **Data Residency:** All transaction data, categories, and AI model weights reside on local storage. No bytes leave the machine except API calls to the exchange.
+- **Inference Privacy:** LLM runs on NPU and processes basic analysis (news, financial reports) completely offline. No prompt/response is logged by the third-party API provider.
+- **Compliance-ready:** Compliant with regulations on personal financial data security without the need for complex end-to-end encryption via the cloud.
 
-#### 1.1.3. Tại sao NPU Intel Core Ultra 7 256V?
+#### 1.1.3. Why Intel Core Ultra 7 256V NPU?
 
-NPU (Neural Processing Unit) trên Lunar Lake cung cấp **48 TOPS (INT8)** — đủ để chạy các model LLM lượng tử hóa INT4 (Phi-3-mini, Llama-3-8B) với throughput chấp nhận được, trong khi tiêu thụ chỉ **~5-10W TDP** (so với GPU discrete tiêu thụ 75-350W). Đây là điểm cân bằng tối ưu giữa hiệu năng AI inference và power efficiency cho một hệ thống chạy liên tục trong phiên giao dịch (9:00–15:00 daily).
+The NPU (Neural Processing Unit) on Lunar Lake provides **48 TOPS (INT8)** — enough to run INT4 quantized LLM models (Phi-3-mini, Llama-3-8B) with acceptable throughput, while consuming only **~5-10W TDP** (compared to discrete GPUs consuming 75-350W). This is the optimal balance between AI inference performance and power efficiency for a system that runs continuously during the trading session (9:00–15:00 daily).
 
 ---
 
@@ -52,52 +52,52 @@ NPU (Neural Processing Unit) trên Lunar Lake cung cấp **48 TOPS (INT8)** — 
 
 ### 2.1. Package Manager: `uv` (Rust) vs `poetry` (Python)
 
-| Tiêu chí | `uv` (Astral, Rust) | `poetry` (Python) | Verdict |
+| Criteria | `uv` (Astral, Rust) | `poetry` (Python) | Verdict |
 |:---|:---|:---|:---|
-| **Tốc độ resolve + install** | 10-100x nhanh hơn pip/poetry (benchmark thực tế: `uv pip install` < 1s cho ~200 packages) | Resolve chậm, đặc biệt với dependency tree phức tạp (~30-120s) | **uv** ✓ |
-| **Cold start** | Không cần Python runtime để bootstrap | Cần Python + pip để cài poetry trước | **uv** ✓ |
-| **Monorepo / Workspaces** | Native support — cho phép tổ chức `/core`, `/connectors`, `/analytics`, `/agents` trong cùng repo | Không hỗ trợ native, phải dùng workaround (path dependencies) | **uv** ✓ |
-| **Lockfile determinism** | `uv.lock` — cross-platform, reproducible | `poetry.lock` — tương đương | Ngang |
-| **Ecosystem maturity** | Mới (2024+), API đang ổn định nhanh | Mature, community lớn | **poetry** ✓ |
-| **Lý do chọn** | Trong hệ thống trading, CI/CD pipeline và developer iteration speed là critical. `uv` giảm thời gian setup environment từ phút xuống giây, và native workspace support phù hợp hoàn hảo với kiến trúc Multi-Agent monorepo. | | |
+| **Resolve + install speed** | 10-100x faster than pip/poetry (real benchmark: `uv pip install` < 1s for ~200 packages) | Resolve is slow, especially with complex dependency trees (~30-120s) | **uv** ✓ |
+| **Cold start** | No need for Python runtime to bootstrap | Need Python + pip to install poetry first | **uv** ✓ |
+| **Monorepo / Workspaces** | Native support — allows organizing `/core`, `/connectors`, `/analytics`, `/agents` in the same repo | Does not support native, must use workaround (path dependencies) | **uv** ✓ |
+| **Lockfile determinism** | `uv.lock` — cross-platform, reproducible | `poetry.lock` — equivalent to | Horizontal |
+| **Ecosystem maturity** | New (2024+), API is stabilizing fast | Mature, large community | **poetry** ✓ |
+| **Reason for choosing** | In trading systems, CI/CD pipeline and developer iteration speed are critical. `uv` reduces environment setup time from minutes to seconds, and native workspace support fits perfectly into the Multi-Agent monorepo architecture. | | |
 
 ### 2.2. Database: DuckDB (OLAP) vs PostgreSQL (OLTP) cho Tick Data
 
-| Tiêu chí | DuckDB | PostgreSQL (+ TimescaleDB) | Verdict |
+| Criteria | DuckDB | PostgreSQL (+ TimescaleDB) | Verdict |
 |:---|:---|:---|:---|
-| **Kiến trúc** | In-process, embedded (như SQLite nhưng columnar) | Client-server, cần daemon riêng | **DuckDB** ✓ |
+| **Architecture** | In-process, embedded (like SQLite but columnar) | Client-server, needs separate daemon | **DuckDB** ✓ |
 | **Storage format** | Columnar (column-oriented) | Row-oriented (TimescaleDB: hybrid) | **DuckDB** ✓ cho analytics |
-| **Network latency** | **Zero** — chạy cùng process với Python | ~0.5-2ms per query (localhost TCP) | **DuckDB** ✓ |
-| **Compression ratio (tick data)** | Cực cao — columnar + dictionary encoding trên cột `symbol`, `exchange`. Parquet files nén ~5-10x | Moderate — TOAST compression, row-level | **DuckDB** ✓ |
-| **ASOF JOIN** | **Native SQL support** — critical cho financial time-series (ghép lệnh với giá tại thời điểm gần nhất) | Không native, phải dùng `LATERAL JOIN` + subquery phức tạp | **DuckDB** ✓ |
-| **Vectorized execution** | Toàn bộ query engine xử lý theo batch (vector of values), tối ưu CPU cache | Tuple-at-a-time (Volcano model) | **DuckDB** ✓ |
-| **Scan trực tiếp Parquet** | Native — query trực tiếp file `.parquet` trên disk mà không cần import | Cần ETL pipeline riêng (COPY, fdw) | **DuckDB** ✓ |
-| **Concurrent writes** | Single-writer — không phù hợp multi-user OLTP | Multi-writer, ACID full | **PostgreSQL** ✓ |
-| **Lý do chọn** | Hệ thống này là **single-user analytical workstation**, không phải multi-tenant web app. DuckDB loại bỏ hoàn toàn overhead của database server, network protocol, connection pooling. Với tick data (append-heavy, scan-heavy, join-heavy), columnar storage + vectorized execution + native ASOF JOIN tạo ra lợi thế hiệu năng **10-100x** cho các truy vấn phân tích so với PostgreSQL row-store. | | |
+| **Network latency** | **Zero** — runs in the same process as Python | ~0.5-2ms per query (localhost TCP) | **DuckDB** ✓ |
+| **Compression ratio (tick data)** | Extreme — columnar + dictionary encoding on columns `symbol`, `exchange`. Parquet files compressed ~5-10x | Moderate — TOAST compression, row-level | **DuckDB** ✓ |
+| **ASOF JOIN** | **Native SQL support** — critical for financial time-series (matching orders with prices at the most recent time) | Not native, must use `LATERAL JOIN` + complex subquery | **DuckDB** ✓ |
+| **Vectorized execution** | The entire query engine processes in batches (vector of values), optimizing CPU cache | Tuple-at-a-time (Volcano model) | **DuckDB** ✓ |
+| **Direct Scan of Parquet** | Native — directly query file `.parquet` on disk without import | Need separate ETL pipeline (COPY, fdw) | **DuckDB** ✓ |
+| **Concurrent writes** | Single-writer — not suitable for multi-user OLTP | Multi-writer, full ACID | **PostgreSQL** ✓ |
+| **Reason for choosing** | This system is a **single-user analytical workstation**, not a multi-tenant web app. DuckDB completely eliminates the overhead of database server, network protocol, and connection pooling. With tick data (append-heavy, scan-heavy, join-heavy), columnar storage + vectorized execution + native ASOF JOIN creates a **10-100x** performance advantage for analytical queries compared to PostgreSQL row-store. | | |
 
 ### 2.3. AI Orchestration: LangGraph + OpenVINO
 
-| Tiêu chí | LangGraph + OpenVINO | Alternatives (LangChain + Cloud LLM API) |
+| Criteria | LangGraph + OpenVINO | Alternatives (LangChain + Cloud LLM API) |
 |:---|:---|:---|
-| **Agent orchestration** | Graph-based state machine — deterministic, debuggable | Chain-based, khó kiểm soát flow phức tạp |
-| **Inference runtime** | OpenVINO trên NPU — local, zero API cost | Cloud API (OpenAI, Anthropic) — pay-per-token, latency cao |
-| **Model support** | Phi-3-mini, Llama-3-8B (INT4 quantized) — đủ cho financial text analysis | GPT-4, Claude — mạnh hơn nhưng overkill + privacy risk |
-| **Lý do chọn** | LangGraph cho phép mô hình hóa Multi-Agent System dưới dạng directed graph với state management rõ ràng (Supervisor pattern). OpenVINO là runtime duy nhất tối ưu cho Intel NPU, cho phép chạy LLM inference mà không cần GPU discrete. | |
+| **Agent orchestration** | Graph-based state machine — deterministic, debuggable | Chain-based, difficult to control complex flows |
+| **Inference runtime** | OpenVINO on NPU — local, zero API cost | Cloud API (OpenAI, Anthropic) — pay-per-token, high latency |
+| **Model support** | Phi-3-mini, Llama-3-8B (INT4 quantized) — enough for financial text analysis | GPT-4, Claude — stronger but overkill + privacy risk |
+| **Reason for choosing** | LangGraph allows modeling Multi-Agent System as directed graph with clear state management (Supervisor pattern). OpenVINO is the only runtime optimized for Intel NPU, allowing to run LLM inference without the need for a discrete GPU. | |
 
 ### 2.4. Frontend: Next.js + AG Grid + TradingView Lightweight Charts
 
-| Tiêu chí | Lựa chọn | Lý do |
+| Criteria | Options | Reason |
 |:---|:---|:---|
-| **Framework** | Next.js (App Router, React 19) | Server Components cho initial load, Client Components cho real-time WebSocket. Persistent layouts tránh re-render khi chuyển view. |
-| **Data Grid** | AG Grid Enterprise | DOM virtualization — render chỉ viewport rows. Cell-level transaction update ở 60fps. Pivot/Master-Detail cho phân tích đa chiều. |
-| **Charting** | TradingView Lightweight Charts | HTML5 Canvas (không SVG) — zero reflow/repaint overhead. Custom overlay API cho Technical/Risk Agent markers. |
-| **UI System** | Shadcn UI + Tailwind CSS | High-density design, Dark Mode mặc định (Slate/Zinc palette). Component-level tree-shaking. |
+| **Framework** | Next.js (App Router, React 19) | Server Components for initial load, Client Components for real-time WebSocket. Persistent layouts avoid re-rendering when switching views. |
+| **Data Grid** | AG Grid Enterprise | DOM virtualization — render only viewport rows. Cell-level transaction update at 60fps. Pivot/Master-Detail for multidimensional analysis. |
+| **Charting** | TradingView Lightweight Charts | HTML5 Canvas (no SVG) — zero reflow/repaint overhead. Custom overlay API for Technical/Risk Agent markers. |
+| **UI System** | Shadcn UI + Tailwind CSS | High-density design, default Dark Mode (Slate/Zinc palette). Component-level tree-shaking. |
 
 ---
 
 ## 3. SYSTEM TOPOGRAPHY — DATA FLOW
 
-### 3.1. Tổng quan luồng dữ liệu End-to-End
+### 3.1. End-to-End data flow overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -114,9 +114,9 @@ NPU (Neural Processing Unit) trên Lunar Lake cung cấp **48 TOPS (INT8)** — 
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │                     DATA AGENT (Ingestion Layer)                    │    │
-│  │  • WebSocket client (async) nhận market ticks                      │    │
-│  │  • In-memory buffer (dict/deque) giữ latest price per symbol       │    │
-│  │  • Batch writer: flush buffer → DuckDB mỗi 1s                     │    │
+│ │ • WebSocket client (async) receives market ticks │ │
+│ │ • In-memory buffer (dict/deque) holds latest price per symbol │ │
+│ │ • Batch writer: flush buffer → DuckDB every 1s │ │
 │  └──────────────────────────┬──────────────────────────────────────────┘    │
 │                             │                                               │
 │                             ▼                                               │
@@ -169,23 +169,23 @@ NPU (Neural Processing Unit) trên Lunar Lake cung cấp **48 TOPS (INT8)** — 
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2. Chi tiết luồng xử lý theo từng phase
+### 3.2. Details of processing flow for each phase
 
 **Phase 1 — Data Ingestion (Continuous)**
-1. `Data Agent` mở persistent WebSocket connection tới SSI FastConnect.
-2. Mỗi tick message được deserialize, validate (Pydantic V2 — Rust core), và ghi vào in-memory buffer (Python `dict` keyed by symbol).
-3. Background task flush buffer vào DuckDB mỗi 1 giây (batch insert ~500-2000 rows/batch). Đồng thời ghi Parquet file partitioned theo ngày.
+1. `Data Agent` opens a persistent WebSocket connection to SSI FastConnect.
+2. Each tick message is deserialized, validated (Pydantic V2 — Rust core), and written to the in-memory buffer (Python `dict` keyed by symbol).
+3. Background task flush buffer into DuckDB every 1 second (batch insert ~500-2000 rows/batch). At the same time, write Parquet file partitioned by date.
 
 **Phase 2 — Analysis (Event-driven + Periodic)**
-4. `Screener Agent` chạy SQL vectorized queries trên DuckDB mỗi 30s–60s, tính toán chỉ báo kỹ thuật trên toàn thị trường. Output: Dynamic Watchlist.
-5. `Technical Agent` nhận trigger khi có symbol vào watchlist hoặc theo schedule. Chạy `pandas-ta` cho scoring, `PyPortfolioOpt` cho portfolio rebalancing. Đẩy logic nặng xuống DuckDB SQL (ASOF JOIN, window functions).
-6. `Fundamental Agent` lấy tin tức từ Vnstock, đóng gói thành prompt, gửi vào NPU qua OpenVINO runtime. Nhận lại AI Insight (natural language analysis).
-7. `Risk Agent` chạy song song, validate mọi signal/order trước khi phát ra. Tính VaR từ historical data trong DuckDB.
+4. `Screener Agent` runs vectorized SQL queries on DuckDB every 30–60 seconds, calculating technical indicators across the market. Output: Dynamic Watchlist.
+5. `Technical Agent` receives a trigger when a symbol is added to the watchlist or according to the schedule. Run `pandas-ta` for scoring, `PyPortfolioOpt` for portfolio rebalancing. Push heavy logic down to DuckDB SQL (ASOF JOIN, window functions).
+6. `Fundamental Agent` retrieves information from Vnstock, packages it into a prompt, and sends it to NPU via OpenVINO runtime. Get back AI Insight (natural language analysis).
+7. `Risk Agent` runs in parallel, validating every signal/order before emitting it. Calculate VaR from historical data in DuckDB.
 
 **Phase 3 — Delivery (Real-time)**
-8. `Supervisor Agent` (LangGraph) tổng hợp output từ tất cả agent, resolve conflicts, tạo unified signal.
-9. FastAPI WebSocket server stream kết quả về frontend: JSON cho signals/insights, MessagePack cho high-frequency data.
-10. Next.js Client Components nhận data, cập nhật AG Grid (cell-level transaction update), vẽ overlay lên TradingView Charts, refresh Portfolio Dashboard.
+8. `Supervisor Agent` (LangGraph) aggregates output from all agents, resolves conflicts, creates unified signal.
+9. FastAPI WebSocket server streams results to the frontend: JSON for signals/insights, MessagePack for high-frequency data.
+10. Next.js Client Components receive data, update AG Grid (cell-level transaction update), draw overlay on TradingView Charts, refresh Portfolio Dashboard.
 
 ---
 
@@ -193,9 +193,9 @@ NPU (Neural Processing Unit) trên Lunar Lake cung cấp **48 TOPS (INT8)** — 
 
 ### 4.1. Intel Core Ultra 7 256V — Resource Map
 
-Lunar Lake cung cấp 3 compute domains:
+Lunar Lake provides 3 compute domains:
 
-| Domain | Specs (Core Ultra 7 256V) | Đặc tính tối ưu |
+| Domain | Specs (Core Ultra 7 256V) | Optimal properties |
 |:---|:---|:---|
 | **CPU** | 4P-cores (Lion Cove) + 4E-cores (Skymont), ~30W PBP | General-purpose, sequential logic, I/O orchestration |
 | **NPU** | Intel AI Boost, 48 TOPS (INT8) | Sustained AI inference, power-efficient, matrix operations |
@@ -245,38 +245,38 @@ Lunar Lake cung cấp 3 compute domains:
 └─────────────────────┴───────────┴───────────┴───────────────────┘
 ```
 
-### 4.3. Chiến lược phân bổ chi tiết
+### 4.3. Detailed allocation strategy
 
-#### CPU — Phân chia P-core / E-core
+#### CPU — P-core / E-core split
 
-- **E-cores (Efficiency):** Dành cho các tác vụ I/O-bound chạy liên tục — `Data Agent` (WebSocket listener), `Supervisor Agent` (state routing), `Screener Agent` (SQL dispatch). Các tác vụ này cần throughput ổn định nhưng không cần single-thread performance cao. E-cores tiêu thụ ít điện, phù hợp cho workload always-on.
-- **P-cores (Performance):** Dành cho burst compute — `Technical Agent` khi chạy portfolio optimization (SciPy solver), `Risk Agent` khi tính VaR Monte Carlo simulation. Các tác vụ này cần peak single-thread IPC cao nhưng chỉ chạy theo event/schedule.
+- **E-cores (Efficiency):** For I/O-bound tasks that run continuously — `Data Agent` (WebSocket listener), `Supervisor Agent` (state routing), `Screener Agent` (SQL dispatch). These tasks need stable throughput but do not need high single-thread performance. E-cores consume little power, suitable for always-on workloads.
+- **P-cores (Performance):** For burst compute — `Technical Agent` when running portfolio optimization (SciPy solver), `Risk Agent` when calculating VaR Monte Carlo simulation. These tasks need high peak single-thread IPC but only run according to event/schedule.
 
-**Cơ chế:** Sử dụng OS thread affinity (`taskset` trên Linux, `SetThreadAffinityMask` trên Windows) hoặc Python `os.sched_setaffinity()` để pin agent threads vào core groups phù hợp. DuckDB tự quản lý thread pool nội bộ, tận dụng tất cả available cores khi chạy query.
+**Mechanism:** Use OS thread affinity (`taskset` on Linux, `SetThreadAffinityMask` on Windows) or Python `os.sched_setaffinity()` to pin agent threads to appropriate core groups. DuckDB manages its own internal thread pool, taking advantage of all available cores when running queries.
 
 #### NPU — Dedicated cho LLM Inference
 
-- **Exclusive workload:** `Fundamental Agent` là consumer duy nhất của NPU.
+- **Exclusive workload:** `Fundamental Agent` is the only consumer of NPU.
 - **Pipeline:** Tokenization (CPU) → Model forward pass (NPU via OpenVINO) → Detokenization (CPU).
-- **Model config:** Phi-3-mini-4k-instruct (INT4, ~2.2GB) hoặc Llama-3-8B (INT4, ~4.5GB). Batch size = 1 (single request at a time, phù hợp single-user).
-- **Throughput target:** ~15-30 tokens/second (INT4 on 48 TOPS NPU) — đủ để generate 1 đoạn AI Insight (~200 tokens) trong ~7-13 giây.
-- **Power profile:** NPU tiêu thụ ~5-10W khi active, ~0W khi idle. Không ảnh hưởng thermal budget của CPU/GPU.
+- **Model config:** Phi-3-mini-4k-instruct (INT4, ~2.2GB) or Llama-3-8B (INT4, ~4.5GB). Batch size = 1 (single request at a time, suitable for single-user).
+- **Throughput target:** ~15-30 tokens/second (INT4 on 48 TOPS NPU) — enough to generate 1 piece of AI Insight (~200 tokens) in ~7-13 seconds.
+- **Power profile:** NPU consumes ~5-10W when active, ~0W when idle. Does not affect CPU/GPU thermal budget.
 
 #### GPU (Intel Arc iGPU) — Visualization + Optional Compute
 
-- **Primary role:** Browser rendering — TradingView Canvas 2D, AG Grid DOM compositing, CSS animations. Đây là workload tự nhiên của GPU trong mọi hệ thống desktop.
-- **Secondary role (optional):** Nếu cần tăng tốc matrix operations cho `Technical Agent` (large-scale covariance matrix, Monte Carlo), có thể sử dụng Intel oneAPI/SYCL để offload sang GPU. Tuy nhiên, với quy mô thị trường Việt Nam (~1,800 mã), CPU P-cores đủ xử lý.
-- **Không dùng GPU cho LLM:** NPU hiệu quả hơn GPU integrated cho inference workload sustained (tokens/watt cao hơn).
+- **Primary role:** Browser rendering — TradingView Canvas 2D, AG Grid DOM compositing, CSS animations. This is the natural workload of the GPU in any desktop system.
+- **Secondary role (optional):** If you need to speed up matrix operations for `Technical Agent` (large-scale covariance matrix, Monte Carlo), you can use Intel oneAPI/SYCL to offload to GPU. However, with the size of the Vietnamese market (~ 1,800 codes), P-core CPUs are enough to handle.
+- **Do not use GPU for LLM:** NPU is more efficient than integrated GPU for sustained inference workload (higher tokens/watt).
 
-### 4.4. Thermal & Power Budget (Ước tính phiên giao dịch)
+### 4.4. Thermal & Power Budget (Estimated trading session)
 
-| Trạng thái | CPU | NPU | GPU | Tổng TDP |
+| Status | CPU | NPU | GPU | Total TDP |
 |:---|:---|:---|:---|:---|
-| **Idle** (ngoài giờ giao dịch) | ~5W (E-cores only) | 0W | ~2W (desktop render) | ~7W |
-| **Normal** (phiên giao dịch, data streaming) | ~12W (E-cores active, P-cores boost occasional) | 0-5W (on-demand inference) | ~3W (charts updating) | ~15-20W |
+| **Idle** (outside trading hours) | ~5W (E-cores only) | 0W | ~2W (desktop render) | ~7W |
+| **Normal** (session, data streaming) | ~12W (E-cores active, P-cores boost occasionally) | 0-5W (on-demand inference) | ~3W (charts updated) | ~15-20W |
 | **Peak** (portfolio rebalance + AI analysis + full market scan) | ~25W (all cores boost) | ~10W (sustained inference) | ~5W (heavy chart render) | ~40W |
 
-Tất cả trạng thái đều nằm trong PBP 30W của Lunar Lake, đảm bảo hệ thống chạy ổn định trên laptop không cần nguồn ngoài trong thời gian ngắn, hoặc chạy liên tục khi cắm nguồn.
+All statuses are within Lunar Lake's 30W PBP, ensuring the system runs stably on laptops without external power for short periods of time, or runs continuously when plugged in.
 
 ---
 
@@ -284,11 +284,11 @@ Tất cả trạng thái đều nằm trong PBP 30W của Lunar Lake, đảm b�
 
 | # | Decision | Rationale | Trade-off |
 |:---|:---|:---|:---|
-| ADR-001 | In-process DB (DuckDB) thay vì client-server DB | Zero network latency, zero ops overhead | Single-writer, không scale multi-user |
-| ADR-002 | NPU inference thay vì Cloud LLM API | Privacy, zero cost, low latency | Model capability giới hạn (≤8B params) |
-| ADR-003 | Monorepo + `uv` workspaces | Shared types, atomic refactoring, fast CI | Cần discipline trong module boundaries |
-| ADR-004 | WebSocket-first (không REST polling) | Real-time data push, lower overhead | Phức tạp hơn trong error handling/reconnection |
-| ADR-005 | Parquet partitioned storage | Compression, direct scan, time-travel queries | Không phù hợp cho random point lookups |
+| ADR-001 | In-process DB (DuckDB) instead of client-server DB | Zero network latency, zero ops overhead | Single-writer, not scalable to multi-user |
+| ADR-002 | NPU inference instead of Cloud LLM API | Privacy, zero cost, low latency | Limited model capability (≤8B params) |
+| ADR-003 | Monorepo + `uv` workspaces | Shared types, atomic refactoring, fast CI | Need discipline within module boundaries |
+| ADR-004 | WebSocket-first (no REST polling) | Real-time data push, lower overhead | More complicated error handling/reconnection |
+| ADR-005 | Parquet partitioned storage | Compression, direct scan, time-travel queries | Not suitable for random point lookups |
 
 ---
 

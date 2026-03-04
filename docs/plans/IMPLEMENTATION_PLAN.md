@@ -34,7 +34,7 @@ Phase 1 ──► Phase 2 ──► Phase 3 ──┐
                          (parallel with Phase 3)
 ```
 
-**Tài liệu người dùng:** Sổ tay hướng dẫn từ cơ bản đến nâng cao và chạy chương trình: [`docs/USER_MANUAL.md`](../USER_MANUAL.md).
+**User documents:** Instruction manual from basic to advanced and running the program: [`docs/USER_MANUAL.md`](../USER_MANUAL.md).
 
 ---
 
@@ -199,6 +199,32 @@ Reference gate runner:
 - Local roadmap sync update (`2026-03-04`):
   - Phase 1/2/3/4/5/6/7 and Fix-01/Fix-02/Fix-03/Fix-04/Fix-05 are now tracked as implemented in `LOCAL_PERSONAL_TRADING_ROADMAP.md`.
   - Remaining focus is live broker adapter hardening and recurring clean-machine release evidence per release cycle.
+
+### 0.10 Pre-Live API Key Quality Gate (Financial Safety)
+
+Before attaching real broker/API credentials, run a dedicated gate focused on data integrity + setup profile security + order safety.
+
+- Gate script: `scripts/pre-live-api-gate.ps1`
+- Required command (backend critical gate):
+  - `powershell -ExecutionPolicy Bypass -File scripts/pre-live-api-gate.ps1`
+- Optional command (include frontend regression coverage snapshot):
+  - `powershell -ExecutionPolicy Bypass -File scripts/pre-live-api-gate.ps1 -WithFrontend`
+
+Current enforced thresholds in this gate:
+- `interface.rest.data_loader` coverage: `>= 90%`
+- `interface.profile_vault` coverage: `>= 90%`
+- `adapters.vnstock.news` coverage: `>= 90%`
+- `tests/integration/test_order_safety_controls.py`: must pass
+
+Latest execution snapshot (`2026-03-04`, local):
+- Critical backend coverage total: `96%`
+  - `data_loader`: `94%`
+  - `profile_vault`: `99%`
+  - `vnstock.news`: `98%`
+
+Policy note:
+- Full frontend global coverage is tracked separately and is not yet at 90% total-line level.
+- Real API key onboarding is blocked until this pre-live backend gate passes on the release candidate branch.
 
 ---
 

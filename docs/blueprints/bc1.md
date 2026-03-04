@@ -1,185 +1,185 @@
-Dưới đây là bản báo cáo tổng hợp hoàn chỉnh (Final Report), được biên soạn dựa trên cấu trúc chuẩn của Báo cáo 2 ("Nâng Cấp Kiến Trúc Hệ Thống Tài Chính") và tích hợp chi tiết kỹ thuật, thuật toán, mã nguồn từ Báo cáo 1 ("Tư vấn xây dựng Web App chứng khoán").
+Below is the complete summary report (Final Report), compiled based on the standard structure of Report 2 ("Upgrading Financial System Architecture") and integrating technical details, algorithms, and source code from Report 1 ("Consulting on building a securities Web App").
 
-Nội dung đảm bảo giữ nguyên 100% các thông tin quan trọng từ cả hai báo cáo, được sắp xếp lại logic để tạo thành một thể thống nhất: **Hệ thống giao dịch thuật toán Enterprise trên nền tảng Hybrid AI & Intel Core Ultra.**
-
----
-
-# BÁO CÁO NGHIÊN CỨU CHUYÊN SÂU: KIẾN TRÚC HỆ THỐNG GIAO DỊCH THUẬT TOÁN ĐA TÁC VỤ THẾ HỆ MỚI (ENTERPRISE EDITION) & TRIỂN KHAI TRÊN NỀN TẢNG HYBRID AI
-
-## TỔNG QUAN ĐIỀU HÀNH VÀ TẦM NHÌN CHIẾN LƯỢC
-
-### 1.1. Bối Cảnh và Sự Chuyển Dịch Mô Hình
-Trong kỷ nguyên tài chính kỹ thuật số, ranh giới giữa giao dịch tổ chức (institutional trading) và cá nhân chuyên nghiệp đang bị xóa nhòa. Tuy nhiên, các hệ thống hiện tại thường đánh đổi giữa giao diện đẹp (GUI) và chiều sâu xử lý. Báo cáo này đề xuất kiến trúc tham chiếu cho một nền tảng giao dịch "Make-in-Vietnam", phá vỡ sự đánh đổi trên bằng cách kết hợp:
-1.  **Trải nghiệm Enterprise:** GUI được coi là "sản phẩm cốt lõi", tương đương Bloomberg Terminal nhưng chạy trên Web hiện đại.
-2.  **Sức mạnh Hybrid AI:** Tận dụng NPU của chip Intel Core Ultra (dòng Lunar Lake) để chạy AI cục bộ kết hợp với dữ liệu đám mây.
-3.  **Hệ thống Đa Tác Vụ (Multi-Agent System - MAS):** Các tác nhân AI chuyên biệt phối hợp xử lý dữ liệu thời gian thực.
-
-### 1.2. Mục Tiêu Cốt Lõi
-Hệ thống "Cố vấn số" (Digital Advisor) và Giao dịch tự động này có khả năng:
-*   **Kết nối sâu (Deep Linking):** Truy xuất danh mục tài sản thời gian thực từ CTCK (SSI, DNSE).
-*   **Xử lý thời gian thực (Real-time):** Phân tích luồng dữ liệu thị trường với độ trễ thấp bằng DuckDB và WebSockets.
-*   **Trí tuệ nhân tạo biên (Edge AI):** Chạy mô hình ngôn ngữ lớn (LLM) cục bộ trên NPU Intel Core Ultra.
-*   **Thuật toán định lượng:** Kết hợp Phân tích kỹ thuật và Lý thuyết danh mục hiện đại (MPT).
+The content is guaranteed to retain 100% of the important information from both reports, logically rearranged to form a unified whole: **Enterprise algorithmic trading system on Hybrid AI & Intel Core Ultra platform.**
 
 ---
 
-## CHƯƯƠNG 1: CÁC TRỤ CỘT CÔNG NGHỆ VÀ KIẾN TRÚC HYBRID
+# IN-DEPTH RESEARCH REPORT: ARCHITECTURE OF NEW GENERATION MULTI-TASK ALGORITHM TRADING SYSTEM (ENTERPRISE EDITION) & IMPLEMENTATION ON HYBRID AI PLATFORM
 
-Để hiện thực hóa tầm nhìn, việc lựa chọn ngăn xếp công nghệ (tech stack) dựa trên hiệu năng và khả năng mở rộng.
+## EXECUTIVE OVERVIEW AND STRATEGIC VISION
 
-### 1.1. Bảng Công Nghệ Lựa Chọn (Tech Stack)
+### 1.1. Context and Paradigm Shift
+In the era of digital finance, the lines between institutional trading and professional individuals are blurring. However, current systems often trade off between a beautiful interface (GUI) and processing depth. This report proposes a reference architecture for a "Make-in-Vietnam" trading platform, which breaks the above trade-offs by incorporating:
+1. **Enterprise Experience:** GUI is considered the "core product", equivalent to Bloomberg Terminal but running on the modern Web.
+2. **Hybrid AI Power:** Leverage the NPU of the Intel Core Ultra chip (Lunar Lake series) to run local AI combined with cloud data.
+3. **Multi-Agent System (MAS):** Specialized AI agents coordinate real-time data processing.
 
-| Thành phần | Công nghệ lựa chọn | Lý do chiến lược |
+### 1.2. Core Goals
+This "Digital Advisor" and Automated Trading system is capable of:
+* **Deep Linking:** Retrieve real-time asset portfolio from securities companies (SSI, DNSE).
+* **Real-time processing:** Analyze market data streams with low latency using DuckDB and WebSockets.
+* **Edge AI:** Run large language models (LLM) locally on Intel Core Ultra NPUs.
+* **Quantitative Algorithm:** Combines Technical Analysis and Modern Portfolio Theory (MPT).
+
+---
+
+## CHAPTER 1: TECHNOLOGY PILLARS AND HYBRID ARCHITECTURE
+
+To realize the vision, the choice of technology stack is based on performance and scalability.
+
+### 1.1. Tech Stack
+
+|Ingredient|Technology selection|Strategic reasons|
 | :--- | :--- | :--- |
-| **Phần cứng (Hardware)** | **Intel Core Ultra 7 256V (Lunar Lake)** | Tận dụng NPU 48 TOPS để chạy AI cục bộ, tiết kiệm điện năng và bảo mật dữ liệu. |
-| **Frontend (GUI)** | **Next.js (React 19) + AG Grid Enterprise** | Render hàng nghìn dòng dữ liệu/giây; Server Components tối ưu tải trang; Kiến trúc module hóa. |
-| **Trực quan hóa** | **TradingView Lightweight Charts** | Sử dụng Canvas HTML5 thay vì SVG, tối ưu cho tick data tần suất cao, độ trễ gần như bằng không. |
-| **Backend API** | **FastAPI (Python)** | Framework nhanh nhất, hỗ trợ bất đồng bộ (asyncio), tích hợp chặt chẽ hệ sinh thái AI. |
-| **Quản lý Gói** | **uv (Astral)** | Thay thế pip/poetry. Viết bằng Rust, tốc độ cài đặt nhanh gấp 10-100 lần, hỗ trợ Workspaces cho monorepo. |
-| **Cơ sở dữ liệu** | **DuckDB** | DB phân tích nhúng (in-process OLAP), thay thế TimescaleDB/SQLite, cho phép truy vấn vector hóa trên dữ liệu tick ngay trong RAM. |
-| **Trí tuệ nhân tạo** | **LangGraph + OpenVINO** | Điều phối hệ thống đa tác nhân (Multi-Agent) và tối ưu hóa model AI chạy trên NPU Intel. |
+|**Hardware**| **Intel Core Ultra 7 256V (Lunar Lake)** |Leverage the 48 TOPS NPU to run AI locally, save power, and secure data.|
+| **Frontend (GUI)** | **Next.js (React 19) + AG Grid Enterprise** |Render thousands of lines of data/second; Server Components optimize page loading; Modular architecture.|
+|**Visualization**| **TradingView Lightweight Charts** |Use HTML5 Canvas instead of SVG, optimized for high-frequency data ticks, with almost zero latency.|
+| **Backend API** | **FastAPI (Python)** |Fastest framework, asynchronous support (asyncio), tightly integrated with the AI ​​ecosystem.|
+|**Package Management**| **uv (Astral)** |Replace pip/poetry. Written in Rust, installation speed is 10-100 times faster, supports Workspaces for monorepo.|
+|**Database**| **DuckDB** |Embedded analytics DB (in-process OLAP), replacing TimescaleDB/SQLite, allows vectorized queries on tick data right in RAM.|
+|**Artificial Intelligence**| **LangGraph + OpenVINO** |Multi-Agent system orchestration and optimization of AI models running on Intel NPUs.|
 
-### 1.2. Kiến Trúc Hybrid Cloud-Edge
-Hệ thống hoạt động theo mô hình Hybrid để tối ưu hóa tài nguyên:
-*   **Cloud (API CTCK & Market Data):** Các tác vụ I/O bound như lấy giá realtime, đồng bộ danh mục từ SSI/Vnstock.
-*   **Edge (Local NPU - Intel Core Ultra):** Các tác vụ Compute bound (Tính toán nặng) và AI Inference chạy cục bộ. Việc chạy Local LLM trên NPU giúp bảo mật tuyệt đối dữ liệu tài chính và không tốn chi phí API token.
-
----
-
-## CHƯƠNG 2: KIẾN TRÚC FRONTEND - TRẢI NGHIỆM CHUẨN ENTERPRISE
-
-Yêu cầu tiên quyết: "GUI là yếu tố quan trọng nhất". Frontend được xây dựng độc lập, giao tiếp với Backend qua WebSockets.
-
-### 2.1. Nền Tảng Next.js và Chiến Lược Render
-Sử dụng **Next.js (App Router)** để cung cấp trải nghiệm cấp doanh nghiệp:
-*   **Server Components:** Xử lý khung vỏ (App Shell), layout, xác thực ban đầu.
-*   **Client Components:** Chứa logic giao dịch thực sự (Bảng giá, Biểu đồ, Sổ lệnh) để duy trì kết nối WebSocket liên tục.
-*   **Persistent Layouts:** Thanh điều hướng và widget "ghim" không bị re-render khi chuyển trang (ví dụ: từ "Screener" sang "Portfolio").
-
-### 2.2. Hệ Thống Lưới Dữ Liệu: AG Grid Enterprise
-*   **Ảo hóa DOM:** Chỉ render các dòng đang hiển thị (viewport), đảm bảo mượt mà dù Watchlist có 2.000 mã.
-*   **Transaction Update:** Cập nhật dữ liệu ở mức tế bào (cell level) theo lô (batch update) khớp với tần số quét màn hình (60fps).
-*   **Master-Detail & Pivot:** Cho phép click vào mã chứng khoán để mở panel chi tiết (biểu đồ mini, chỉ số cơ bản) hoặc xoay chiều dữ liệu theo nhóm ngành/rủi ro.
-
-### 2.3. Trực Quan Hóa: TradingView Lightweight Charts & Custom Overlays
-Sử dụng công nghệ HTML5 Canvas để vẽ biểu đồ nến và chỉ báo kỹ thuật mà không tốn tài nguyên CPU (reflow/repaint) như SVG.
-*   **Lớp phủ tương tác (Custom Overlays):**
-    *   *Technical Agent:* Vẽ tự động các đường trendline, điểm chốt mô hình "Vai-Đầu-Vai".
-    *   *Risk Agent:* Hiển thị mức Stop-loss/Take-profit động, cho phép kéo thả trực tiếp trên biểu đồ.
-    *   *Signal Markers:* Mũi tên Mua/Bán kèm tooltip giải thích lý do (ví dụ: "RSI quá bán + Divergence").
-
-### 2.4. Giao Diện UI/UX
-*   **Shadcn UI + Tailwind CSS:** Thiết kế theo phong cách "High Density" (Mật độ thông tin cao).
-*   **Dark Mode:** Chế độ tối mặc định, độ tương phản cao (Slate/Zinc palette).
-*   **Command Palette (Ctrl+K):** Trung tâm điều khiển, cho phép nhập lệnh bằng văn bản (ví dụ: "Buy FPT 1000 price 98.5" hoặc "Show MA 200").
+### 1.2. Hybrid Cloud-Edge Architecture
+The system operates according to a Hybrid model to optimize resources:
+* **Cloud (API CTCK & Market Data):** Bound I/O tasks such as getting realtime prices, synchronizing catalogs from SSI/Vnstock.
+* **Edge (Local NPU - Intel Core Ultra):** Compute bound and AI Inference tasks run locally. Running Local LLM on NPU provides absolute security of financial data and no API token costs.
 
 ---
 
-## CHƯƠNG 3: HẠ TẦNG BACKEND & ĐỘNG CƠ DỮ LIỆU (DUCKDB)
+## CHAPTER 2: FRONTEND ARCHITECTURE - ENTERPRISE STANDARD EXPERIENCE
 
-Backend được xây dựng lại hoàn toàn trên nền tảng Python hiện đại, tối ưu cho tốc độ cao.
+Prerequisite: "GUI is the most important element". Frontend is built independently, communicating with Backend via WebSockets.
 
-### 3.1. Quản Lý Gói và Môi Trường với uv
-Sử dụng **uv** (viết bằng Rust) thay cho pip/poetry.
-*   **Tốc độ:** Cài đặt và giải quyết phụ thuộc nhanh gấp 10-100 lần.
-*   **Kiến trúc Monorepo:** Sử dụng tính năng Workspaces của uv để tổ chức mã nguồn thành các gói riêng biệt (`/core`, `/connectors`, `/analytics`, `/agents`) nhưng quản lý chung trong một repo.
+### 2.1. Next.js Platform and Render Strategy
+Use **Next.js (App Router)** to deliver enterprise-grade experiences:
+* **Server Components:** Handles the App Shell, layout, and initial authentication.
+* **Client Components:** Contains the actual trading logic (Price List, Chart, Order Book) to maintain a persistent WebSocket connection.
+* **Persistent Layouts:** Navigation bars and "pinned" widgets are not re-rendered when switching pages (e.g. from "Screener" to "Portfolio").
 
-### 3.2. FastAPI và Kiến Trúc Bất Đồng Bộ
-*   **Asyncio:** Xử lý hàng nghìn kết nối WebSocket đồng thời.
-*   **Background Tasks:** Đẩy các tác vụ nặng (chạy NPU Inference, tối ưu Portfolio) xuống chạy ngầm, trả phản hồi tức thì cho UI.
-*   **Pydantic V2:** Validate dữ liệu JSON từ sàn giao dịch cực nhanh nhờ core viết bằng Rust.
+### 2.2. Data Grid System: AG Grid Enterprise
+* **DOM virtualization:** Only renders the currently displayed lines (viewport), ensuring smoothness even though the Watchlist has 2,000 codes.
+* **Transaction Update:** Update cell level data in batches (batch update) matching the screen scanning frequency (60fps).
+* **Master-Detail & Pivot:** Allows clicking on a stock code to open a detailed panel (mini chart, basic index) or rotate data by industry/risk group.
 
-### 3.3. Động Cơ Dữ Liệu: DuckDB (Thay thế TimescaleDB)
-DuckDB hoạt động như một DB OLAP nhúng, loại bỏ độ trễ mạng.
-*   **Lưu trữ dạng cột (Columnar):** Nén dữ liệu Tick cực tốt.
-*   **Phân vùng (Partitioning):** Lưu trữ file Parquet theo Ngày/Tháng, truy vấn trực tiếp không cần nạp toàn bộ vào RAM.
-*   **Kỹ thuật ASOF JOIN:** "Vũ khí" của tài chính. Ghép nối bảng Lệnh và Bảng Giá dựa trên thời điểm gần nhất (ví dụ: Tìm giá thị trường tại chính xác mili-giây lệnh bán được gửi đi) để tính PnL và Backtesting siêu tốc.
-*   **Phân tích Vector hóa:** Các Agent đẩy logic tính toán xuống DuckDB (SQL) thay vì lặp bằng Python.
+### 2.3. Visualization: TradingView Lightweight Charts & Custom Overlays
+Use HTML5 Canvas technology to draw candlestick charts and technical indicators without consuming CPU resources (reflow/repaint) like SVG.
+* **Custom Overlays:**
+* *Technical Agent:* Automatically draw trendlines and key points of the "Head-Shoulders" model.
+* *Risk Agent:* Displays dynamic Stop-loss/Take-profit levels, allowing drag and drop directly on the chart.
+* *Signal Markers:* Buy/Sell arrow with tooltip explaining the reason (e.g. "Oversold RSI + Divergence").
+
+### 2.4. UI/UX Interface
+* **Shadcn UI + Tailwind CSS:** Designed in "High Density" style.
+* **Dark Mode:** Default dark mode, high contrast (Slate/Zinc palette).
+* **Command Palette (Ctrl+K):** Control center, allowing to enter text commands (for example: "Buy FPT 1000 price 98.5" or "Show MA 200").
 
 ---
 
-## CHƯƠNG 4: HỆ THỐNG ĐA TÁC VỤ (MULTI-AGENT SYSTEM) & THUẬT TOÁN
+## CHAPTER 3: BACKEND INFRASTRUCTURE & DATA ENGINE (DUCKDB)
 
-Hệ thống AI ("The Brain") được chia nhỏ thành các Agent chuyên biệt, phối hợp qua framework **LangGraph** theo mô hình Supervisor (Siêu Agent điều phối).
+The backend is completely rebuilt on a modern Python platform, optimized for high speed.
 
-### 4.1. Data Agent (Cảm Biến Thị Trường)
-*   **Nhiệm vụ:** Kết nối WebSocket tới SSI/Vnstock, chuẩn hóa dữ liệu.
-*   **Kỹ thuật:**
-    *   Sử dụng thư viện `websockets` của Python (async).
-    *   Quản lý bộ đệm (buffer) để ghi dữ liệu vào DuckDB theo lô (batch insert) mỗi 1 giây.
-    *   Quản lý dữ liệu In-Memory (Redis hoặc Python Dict) cho giá mới nhất để truy xuất cực nhanh, không query DB cho mỗi tick.
+### 3.1. Package and Environment Management with uv
+Use **uv** (written in Rust) instead of pip/poetry.
+* **Speed:** Install and resolve dependencies 10-100 times faster.
+* **Monorepo Architecture:** Uses uv's Workspaces feature to organize source code into separate packages (`/core`, `/connectors`, `/analytics`, `/agents`) but manage them together in one repo.
 
-### 4.2. Screener Agent (Bộ Lọc)
-*   **Nhiệm vụ:** Quét toàn bộ thị trường tìm cơ hội.
-*   **Kỹ thuật:**
-    *   Sử dụng `vnstock.stock_screening()` để lọc cơ bản (EPS tăng, PE thấp).
-    *   Định kỳ kích hoạt truy vấn SQL vector hóa trên DuckDB để tính toán chỉ báo kỹ thuật.
-    *   Kết quả trả về là "Dynamic Watchlist" đẩy lên Frontend.
+### 3.2. FastAPI and Asynchronous Architecture
+* **Asyncio:** Handles thousands of concurrent WebSocket connections.
+* **Background Tasks:** Push heavy tasks (running NPU Inference, optimizing Portfolio) to the background, giving instant feedback to the UI.
+* **Pydantic V2:** Validate JSON data from the exchange extremely fast thanks to the core written in Rust.
 
-### 4.3. Technical Analysis Agent (Nhà Phân Tích Kỹ Thuật)
-Đây là nơi áp dụng các thuật toán định lượng từ Báo cáo 1.
-*   **Công cụ:** Thư viện `pandas-ta` và `PyPortfolioOpt`.
-*   **Thuật toán 1: Tối Ưu Hóa Danh Mục (Portfolio Rebalancing):**
-    *   Dựa trên Modern Portfolio Theory (MPT).
-    *   Sử dụng `PyPortfolioOpt` để tìm đường biên hiệu quả (Efficient Frontier).
-    *   Xử lý ràng buộc lô chẵn (Lot Size 100) bằng module `DiscreteAllocation`.
-*   **Thuật toán 2: Chấm điểm kỹ thuật (Technical Scoring):**
-    *   Hệ thống chấm điểm thang 10 dựa trên: RSI (Quá mua/Quá bán), MACD (Cắt lên/xuống), Bollinger Bands, Trend (MA50/MA200).
-    *   **Quyết nghị:** Điểm > 8 (MUA MỚI), < -5 (BÁN), -5 đến 5 (NẮM GIỮ).
+### 3.3. Data Engine: DuckDB (Replaces TimescaleDB)
+DuckDB works as an embedded OLAP DB, eliminating network latency.
+* **Columnar storage:** Compresses Tick data extremely well.
+* **Partitioning:** Store Parquet files by Day/Month, query directly without loading the entire file into RAM.
+* **ASOF JOIN technique:** "Weapon" of finance. Pair the Order table and Price table based on the most recent time (for example: Find the market price at the exact millisecond the sell order was sent) to calculate PnL and Backtesting super fast.
+* **Vectorized Analysis:** Agents push computational logic down to DuckDB (SQL) instead of looping in Python.
 
-### 4.4. Fundamental Analysis Agent (Nhà Phân Tích Cơ Bản & AI)
-Tận dụng phần cứng Intel Core Ultra.
-*   **Công nghệ:** **OpenVINO™ GenAI**.
-*   **Triển khai:**
-    *   Chạy model **Phi-3-mini** hoặc **Llama-3-8B** đã được lượng tử hóa (INT4) trên NPU.
-    *   **Quy trình:** Lấy tin tức từ vnstock -> Gửi vào NPU kèm chỉ số kỹ thuật -> NPU trả về đoạn văn bản phân tích tự nhiên ("AI Insight").
-    *   **Lợi ích:** Không chia sẻ dữ liệu ra ngoài, tốc độ suy luận cao, không tốn chi phí.
+---
 
-### 4.5. Risk Management Agent (Quản Trị Rủi Ro)
-*   **Nhiệm vụ:** Middleware kiểm soát mọi lệnh đặt.
+## CHAPTER 4: MULTI-AGENT SYSTEM & ALGORITHM
+
+The AI ​​system ("The Brain") is divided into specialized Agents, coordinated through the **LangGraph** framework according to the Supervisor model.
+
+### 4.1. Data Agent (Market Sensor)
+* **Task:** Connect WebSocket to SSI/Vnstock, standardize data.
+*   **Technique:**
+* Use Python's `websockets` library (async).
+* Buffer management to write data to DuckDB in batch inserts every 1 second.
+* In-Memory data management (Redis or Python Dict) for the latest prices for extremely fast retrieval, without querying the DB for every tick.
+
+### 4.2. Screener Agent
+* **Task:** Scan the entire market for opportunities.
+*   **Technique:**
+* Use `vnstock.stock_screening()` for basic filtering (EPS up, PE down).
+* Periodically enable vectorized SQL queries on DuckDB to calculate technical indicators.
+* The returned result is "Dynamic Watchlist" pushed to the Frontend.
+
+### 4.3. Technical Analysis Agent
+This is where the quantitative algorithms from Report 1 apply.
+* **Tools:** Libraries `pandas-ta` and `PyPortfolioOpt`.
+* **Algorithm 1: Portfolio Optimization (Portfolio Rebalancing):**
+* Based on Modern Portfolio Theory (MPT).
+* Use `PyPortfolioOpt` to find the efficient frontier.
+* Handle the even lot constraint (Lot Size 100) using the `DiscreteAllocation` module.
+* **Algorithm 2: Technical Scoring:**
+* 10 scale scoring system based on: RSI (Overbought/Oversold), MACD (Cut up/down), Bollinger Bands, Trend (MA50/MA200).
+* **Resolution:** Score > 8 (BUY NEW), < -5 (SELL), -5 to 5 (HOLD).
+
+### 4.4. Fundamental Analysis Agent
+Take advantage of Intel Core Ultra hardware.
+* **Technology:** **OpenVINO™ GenAI**.
+*   **Deployment:**
+* Run the quantized **Phi-3-mini** or **Llama-3-8B** model (INT4) on the NPU.
+* **Process:** Get news from vnstock -> Send to NPU with technical indicators -> NPU returns natural analysis text ("AI Insight").
+* **Benefits:** No data sharing, high inference speed, no cost.
+
+### 4.5. Risk Management Agent
+* **Task:** Middleware controls all orders.
 *   **Logic:**
-    *   **Kill Switch:** Nút dừng khẩn cấp trên giao diện.
-    *   **Safety Checks:** Không mua quá 20% NAV/lệnh, giá đặt không vượt trần/sàn.
-    *   **VaR (Value at Risk):** Tính toán rủi ro thời gian thực bằng dữ liệu lịch sử trong DuckDB.
+* **Kill Switch:** Emergency stop button on the interface.
+* **Safety Checks:** Do not buy more than 20% NAV/order, set price does not exceed ceiling/floor.
+* **VaR (Value at Risk):** Calculate real-time risk using historical data in DuckDB.
 
 ---
 
-## CHƯƠNG 5: TÍCH HỢP DỮ LIỆU THỊ TRƯỜNG VIỆT NAM (SSI & DNSE)
+## CHAPTER 5: VIETNAM MARKET DATA INTEGRATION (SSI & DNSE)
 
-Hệ thống được thiết kế đặc thù cho thị trường Việt Nam (T+2.5).
+The system is specifically designed for the Vietnamese market (T+2.5).
 
-### 5.1. Phân Tích Hạ Tầng Môi Giới
-*   **Chiến lược "Hai Trụ Cột":**
-    1.  **SSI (FastConnect Trading API):** Dùng cho giao dịch và lấy dữ liệu Portfolio chính xác nhất. Ổn định, chuẩn mực.
-    2.  **Vnstock (Wrapper):** Dùng làm nguồn dữ liệu bổ trợ (Lịch sử giá, Tin tức, Data Mining) thay thế cho các gói dữ liệu đắt đỏ.
+### 5.1. Brokerage Infrastructure Analysis
+* **"Two Pillars" Strategy:**
+1. **SSI (FastConnect Trading API):** Used for trading and getting the most accurate Portfolio data. Stable, standard.
+2. **Vnstock (Wrapper):** Used as a supplementary data source (Price History, News, Data Mining) to replace expensive data packages.
 
-### 5.2. Chi Tiết Triển Khai Kết Nối SSI (Implementation)
-Khác với API thông thường, SSI yêu cầu ký số RSA.
-*   **Quy trình xác thực (Handshake):**
-    1.  Tạo cặp khóa RSA (Private/Public Key). Upload Public Key lên iBoard SSI.
-    2.  Sử dụng thư viện `pycryptodome` để ký các request bằng Private Key.
-    3.  Lấy Access Token (JWT) để duy trì phiên làm việc.
-*   **Đồng bộ Danh mục (Portfolio Sync):**
-    *   Gọi endpoint `stockPosition`.
-    *   **Data Normalization:** Chuẩn hóa dữ liệu thô từ SSI về cấu trúc nội bộ (Mapping các trường `onHand`, `sellableQty`, `avgPrice`, `marketPrice`).
-    *   **Xử lý T+2.5:** Logic phân biệt "Tiền mặt thực có" (cashBal) và "Sức mua" (purchasingPower) để tránh Call Margin.
+### 5.2. SSI Connection Deployment Details (Implementation)
+Different from regular API, SSI requires RSA digital signing.
+* **Authentication process (Handshake):**
+1. Create a RSA key pair (Private/Public Key). Upload Public Key to iBoard SSI.
+2. Use the `pycryptodome` library to sign requests with Private Key.
+3. Get Access Token (JWT) to maintain session.
+* **Portfolio Sync:**
+* Call endpoint `stockPosition`.
+* **Data Normalization:** Normalize raw data from SSI to internal structure (Mapping fields `onHand`, `sellableQty`, `avgPrice`, `marketPrice`).
+* **Handling T+2.5:** Logic distinguishes "CashBal" and "Purchase Power" (purchasingPower) to avoid Call Margin.
 
-### 5.3. Kết Nối DNSE (Entrade X)
-*   Tận dụng API hiện đại RESTful của DNSE cho các tác vụ cần tốc độ cao hoặc miễn phí giao dịch.
-*   Lưu ý cơ chế quản lý Token/Refresh Token để tránh mất kết nối.
-
----
-
-## CHƯƠNG 6: LỘ TRÌNH TRIỂN KHAI & KẾT LUẬN
-
-### 6.1. Lộ Trình Phát Triển (12 Tuần)
-1.  **Giai đoạn 1 (Tuần 1-4):** Thiết lập hạ tầng `uv` workspace, kết nối DuckDB. Xây dựng Data Agent kết nối SSI (xác thực RSA) và Vnstock.
-2.  **Giai đoạn 2 (Tuần 5-8):** Phát triển Frontend Next.js với AG Grid và TradingView Charts. Hiển thị dữ liệu realtime qua WebSocket.
-3.  **Giai đoạn 3 (Tuần 9-10):** Phát triển các Agent thuật toán (Screener, Tech Analysis với PyPortfolioOpt/Pandas-TA). Tích hợp logic ASOF JOIN.
-4.  **Giai đoạn 4 (Tuần 11-12):** Tích hợp Fundamental Agent (OpenVINO GenAI trên NPU). Hoàn thiện Risk Agent, GUI Dark Mode, Command Palette và Testing.
-
-### 6.2. Kết Luận
-Báo cáo đã trình bày một kiến trúc toàn diện, kết hợp sức mạnh phần cứng cá nhân tiên tiến (Intel Core Ultra) với kiến trúc phần mềm Enterprise (Next.js, DuckDB, Multi-Agent). Đây không chỉ là công cụ giao dịch, mà là một lợi thế cạnh tranh công nghệ, cho phép nhà đầu tư khai thác tối đa cơ hội thị trường với sự hỗ trợ đắc lực của AI và tốc độ xử lý vượt trội.
+### 5.3. DNSE Connection (Entrade X)
+* Leverage DNSE's modern RESTful API for tasks that require high speed or transaction fees.
+* Note the Token/Refresh Token management mechanism to avoid losing connection.
 
 ---
-*Hết báo cáo.*
+
+## CHAPTER 6: IMPLEMENTATION ROADMAP & CONCLUSION
+
+### 6.1. Development Roadmap (12 Weeks)
+1. **Phase 1 (Weeks 1-4):** Set up `uv` workspace infrastructure, connect DuckDB. Build Data Agent connecting SSI (RSA authentication) and Vnstock.
+2. **Phase 2 (Weeks 5-8):** Next.js Frontend Development with AG Grid and TradingView Charts. Display realtime data via WebSocket.
+3. **Phase 3 (Weeks 9-10):** Develop algorithmic agents (Screener, Tech Analysis with PyPortfolioOpt/Pandas-TA). Integrated ASOF JOIN logic.
+4. **Phase 4 (Weeks 11-12):** Integrate Fundamental Agent (OpenVINO GenAI on NPU). Complete Risk Agent, GUI Dark Mode, Command Palette and Testing.
+
+### 6.2. Conclude
+The report presented a comprehensive architecture that combines advanced personal hardware power (Intel Core Ultra) with Enterprise software architecture (Next.js, DuckDB, Multi-Agent). This is not just a trading tool, but a technological competitive advantage, allowing investors to maximize market opportunities with the powerful support of AI and outstanding processing speed.
+
+---
+*End of report.*

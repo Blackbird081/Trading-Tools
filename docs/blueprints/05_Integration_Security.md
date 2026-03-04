@@ -1,6 +1,6 @@
 # 05 — INTEGRATION & SECURITY: BROKER CONNECTIVITY, OMS & HARDENING
 
-**Project:** Hệ thống Giao dịch Thuật toán Đa Tác vụ (Enterprise Edition)
+**Project:** Multi-Task Algorithmic Trading System (Enterprise Edition)
 **Role:** Security Engineer & Integration Specialist
 **Version:** 1.0 | February 2026
 **Posture:** Zero-Trust | Defense-in-Depth | Assume Breach
@@ -10,24 +10,24 @@
 
 ## 1. SSI RSA AUTHENTICATION FLOW — ZERO-TRUST HANDSHAKE
 
-### 1.1. Threat Model — Tại sao SSI dùng RSA thay vì Username/Password
+### 1.1. Threat Model — Why does SSI use RSA instead of Username/Password
 
-SSI FastConnect API yêu cầu **chữ ký số RSA** cho mỗi request xác thực, thay vì mô hình username/password thông thường. Đây là mô hình **mutual authentication** ở mức API consumer:
+SSI FastConnect API requires **RSA digital signature** for each authentication request, instead of the usual username/password model. Here is the **mutual authentication** model at the API consumer level:
 
 ```
-Mô hình truyền thống (Username/Password):
+Traditional model (Username/Password):
   Client → [username + password] → Server
-  ★ Risk: Password bị lộ = toàn quyền truy cập
-  ★ Risk: Man-in-the-middle có thể replay credential
-  ★ Risk: Phishing — fake login page bắt credential
+★ Risk: Password exposed = full access
+★ Risk: Man-in-the-middle can replay credential
+★ Risk: Phishing — fake login page captures credential
 
-Mô hình SSI (RSA Digital Signature):
+SSI model (RSA Digital Signature):
   Client → [payload + RSA_SIGN(payload, PRIVATE_KEY)] → Server
   Server → [VERIFY(signature, PUBLIC_KEY)] → Accept/Reject
-  ★ Private Key KHÔNG BAO GIỜ rời khỏi máy client
-  ★ Mỗi request có signature KHÁC NHAU (nonce + timestamp)
-  ★ Replay attack bị chặn bởi timestamp window
-  ★ Man-in-the-middle chỉ thấy signature, không thể tạo signature mới
+★ Private Key NEVER leaves the client computer
+★ Each request has a DIFFERENT signature (nonce + timestamp)
+★ Replay attack is blocked by timestamp window
+★ Man-in-the-middle only sees signatures, cannot create new signatures
 ```
 
 ### 1.2. RSA Key Pair Lifecycle
@@ -677,7 +677,7 @@ PRE-DEPLOYMENT SECURITY CHECKLIST
 
 ### 2.1. Order State Machine — Deterministic Lifecycle
 
-Mọi lệnh giao dịch đi qua một state machine xác định (deterministic FSM). Không có transition ngầm — mọi thay đổi trạng thái đều explicit và auditable.
+Every trading order goes through a determined state machine (deterministic FSM). There are no implicit transitions — every state change is explicit and auditable.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -703,8 +703,8 @@ Mọi lệnh giao dịch đi qua một state machine xác định (deterministic
 │              │ ┌────────┐ ┌────────┐ ┌──────────┐                      │
 │              │ │PARTIAL │ │MATCHED │ │BROKER_   │                      │
 │              │ │_FILL   │ │(fully  │ │REJECTED  │                      │
-│              │ │        │ │filled) │ │(sàn từ   │                      │
-│              │ └───┬────┘ └────────┘ │ chối)    │                      │
+│ │ │ │ │filled) │ │(floor from │ │
+│ │ └───┬────┘ └────────┘ │ deny) │ │
 │              │     │                  └──────────┘                      │
 │              │     │ (more fills)                                       │
 │              │     ▼                                                    │
@@ -897,7 +897,7 @@ class InvalidOrderTransition(Exception):
 
 ### 2.3. Idempotency — Preventing Duplicate Orders
 
-Trong điều kiện mạng không ổn định (timeout, retry, WebSocket reconnect), cùng một lệnh có thể được gửi **nhiều lần**. Nếu không có cơ chế idempotency, mỗi lần gửi tạo ra một lệnh mới → **mua/bán gấp đôi, gấp ba** → thua lỗ nghiêm trọng.
+Under unstable network conditions (timeout, retry, WebSocket reconnect), the same command may be sent **multiple times**. Without the idempotency mechanism, each submission creates a new order → **double or triple buy/sell** → serious losses.
 
 ```
 PROBLEM: Network Timeout + Retry Without Idempotency
@@ -1341,24 +1341,24 @@ WHERE new_status = 'PENDING';  -- Only first submission counts
 
 ## 3. VIETNAM MARKET SPECIFICS — T+2.5 & PRICE BANDS
 
-### 3.1. T+2.5 Settlement Logic — Tại sao phức tạp
+### 3.1. T+2.5 Settlement Logic — Why it's complicated
 
-Thị trường chứng khoán Việt Nam sử dụng chu kỳ thanh toán **T+2.5**, có nghĩa:
+The Vietnamese stock market uses a payment cycle of **T+2.5**, which means:
 
 ```
-Mua ngày T (Thứ 2):
-  T+0: Lệnh khớp. Cổ phiếu "về tài khoản" nhưng CHƯA bán được.
-  T+1: Vẫn chưa bán được.
-  T+2: Sáng — vẫn chưa. Chiều (14:00) — BÁN ĐƯỢC (T+2.5).
+Buy on T (Monday):
+T+0: Matched order. Shares "returned to account" but have NOT been sold yet.
+T+1: Still not sold.
+T+2: Morning — not yet. Afternoon (14:00) — SOLD (T+2.5).
 
-★ "2.5" = 2 ngày làm việc + nửa ngày (buổi chiều ngày T+2).
-★ Nếu T là Thứ 5 → bán được vào chiều Thứ 2 tuần sau (skip weekend).
-★ Nếu T là Thứ 6 → bán được vào chiều Thứ 3 tuần sau.
+★ "2.5" = 2 working days + half day (afternoon of day T+2).
+★ If T is Thursday → can be sold on the afternoon of next Monday (skip weekend).
+★ If T is Friday → sold on Tuesday afternoon next week.
 
-NGUY HIỂM: Nếu hệ thống không track T+2.5 đúng cách:
-  → Agent đề xuất BÁN cổ phiếu vừa mua hôm qua
-  → Lệnh bị sàn TỪ CHỐI
-  → Hoặc tệ hơn: bán vượt số lượng sellable → bị call margin
+DANGER: If the system does not track T+2.5 properly:
+→ Agent proposes to SELL the shares just bought yesterday
+→ The order was REJECTED by the exchange
+→ Or worse: oversold sellable quantity → margin call
 ```
 
 ### 3.2. SSI Position Data — Field Mapping
@@ -1368,17 +1368,17 @@ SSI API Response (stockPosition):
 ┌──────────────────────────────────────────────────────────────────┐
 │  {                                                               │
 │    "symbol": "FPT",                                              │
-│    "onHand": 5000,        ← Tổng số CK đang có (all states)    │
-│    "sellableQty": 3000,   ← Số lượng BÁN ĐƯỢC (đã settle T+2.5)│
-│    "holdingQty": 2000,    ← Đang chờ settle (mua gần đây)      │
-│    "avgPrice": 95000,     ← Giá vốn bình quân (VND)            │
-│    "marketPrice": 98500,  ← Giá thị trường hiện tại            │
-│    "receivingT1": 1000,   ← Sẽ settle vào T+1                  │
-│    "receivingT2": 1000,   ← Sẽ settle vào T+2                  │
+│ "onHand": 5000, ← Total stocks available (all states) │
+│ "sellableQty": 3000, ← SELLABLE QTY (settled T+2.5)│
+│ "holdingQty": 2000, ← Waiting to settle (recently purchased) │
+│ "avgPrice": 95000, ← Average cost price (VND) │
+│ "marketPrice": 98500, ← Current market price │
+│ "receivingT1": 1000, ← Will settle on T+1 │
+│ "receivingT2": 1000, ← Will settle on T+2 │
 │  }                                                               │
 │                                                                  │
-│  ★ CRITICAL: Chỉ dùng sellableQty khi kiểm tra lệnh BÁN       │
-│  ★ onHand ≠ sellableQty khi có giao dịch mua gần đây           │
+│ ★ CRITICAL: Only use sellableQty when checking SELL orders │
+│ ★ onHand ≠ sellableQty on recent purchases │
 │  ★ holdingQty = onHand - sellableQty = receivingT1 + receivingT2│
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -1441,10 +1441,10 @@ class CashBalance:
     """
     Cash position with T+2.5 settlement awareness.
 
-    ★ cashBal: Tiền mặt THỰC CÓ (settled cash).
-    ★ purchasingPower: Sức mua (bao gồm margin nếu có).
-    ★ CRITICAL: Dùng purchasingPower cho BUY validation,
-      dùng cashBal cho withdrawal/transfer validation.
+★ cashBal: Settled cash.
+★ purchasingPower: Purchasing power (including margin if any).
+★ CRITICAL: Use purchasingPower for BUY validation,
+Use cashBal for withdrawal/transfer validation.
     """
     cash_bal: Decimal              # Settled cash balance
     purchasing_power: Decimal      # Available buying power (incl. margin)
@@ -1629,10 +1629,10 @@ class PriceBand:
     """Ceiling and floor prices for a symbol on a given trading day."""
     symbol: Symbol
     exchange: Exchange
-    reference_price: Price     # Giá tham chiếu (opening reference)
-    ceiling_price: Price       # Giá trần (max allowed)
-    floor_price: Price         # Giá sàn (min allowed)
-    tick_size: Decimal         # Bước giá (min price increment)
+reference_price: Price # Reference price (opening reference)
+ceiling_price: Price # Ceiling price (max allowed)
+floor_price: Price # Floor price (min allowed)
+tick_size: Decimal # Price increment (min price increment)
 
 
 def calculate_price_band(
