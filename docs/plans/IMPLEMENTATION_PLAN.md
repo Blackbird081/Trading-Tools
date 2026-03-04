@@ -300,7 +300,7 @@ Execution update (2026-03-04):
 - `AI-R2 Provider A/B + Consensus` DONE (baseline): evaluator now reports `agreement_rate`, per-provider hit-rate, and `consensus_hit_rate` via `tests/evals/provider_ab_consensus.py`.
 - `AI-R3 Weekly Drift Monitor` DONE (baseline): weekly recommendation-vs-outcome report and drift alerts are generated via `tests/evals/weekly_drift_monitor.py`.
 - `AI-R4` DONE (baseline): weekly reliability automation is wired via `scripts/run-weekly-reliability-pack.ps1` and scheduled CI workflow `.github/workflows/reliability-weekly.yml`.
-- `AR-4` remains OPEN and is the next hardening priority (frontend global coverage uplift >= 80%).
+- `AR-4` is now IN PROGRESS: dashboard DataLoader critical-flow tests were expanded and release-validation frontend critical snapshot is now `96.6%` lines/statements; remaining scope is broader orders/screener/market-board/global coverage uplift.
 
 ### 0.12 Re-Assessment Snapshot (2026-03-04)
 
@@ -309,25 +309,26 @@ Status summary:
 - AI pipeline orchestration: single-provider multi-role flow is complete (`AI-Orchestrator`).
 - Native provider capability: runtime supports `OpenAI + Anthropic + Gemini + Alibaba` selection in setup/settings path.
 - AI reliability governance: baseline layer is complete (`AI-R1/AI-R2/AI-R3/AI-R4`) with reproducible artifacts and weekly automation.
-- Remaining release risk: `AR-4` is still open (frontend global regression coverage uplift).
+- Remaining release risk: `AR-4` global-scope completion is still open (current uplift is critical-flow scoped, not full frontend global suite).
 
 Current baseline metric snapshot (fixed dataset pack):
 - Quant benchmark: `Precision@K=0.60`, `Hit-rate=0.50`, `MDD=0.1554`.
 - Provider A/B: `agreement_rate=0.40`, `consensus_hit_rate=0.40`.
 - Drift monitor: weekly drift alerts are generated correctly; scheduler now publishes weekly artifacts.
+- Frontend critical-flow snapshot (release-validation scope): lines/statements `96.6%`, branches `70.58%`, functions `85.71%`.
 
 Risk interpretation:
 - Security, provider policy, and monetary precision gates are in place.
-- The largest remaining product risk is insufficient frontend regression coverage for safe release scaling.
+- The largest remaining product risk is insufficient broad frontend regression coverage (outside critical-flow subset) for safe release scaling.
 - AI reliability output is measurable, but still benchmark-style (offline/fixed dataset), not operationally automated.
 
 Locked next execution order:
-1. `AR-4` Frontend coverage uplift to >=80% statements with risk-critical flows.
+1. `AR-4` Expand coverage uplift from dashboard critical flow to full risk-critical UI packs (orders, screener, market board) while sustaining >=90% critical-flow snapshot.
 2. `AI-R4` Weekly reliability automation (scheduled runner + artifact publication + threshold alarm).
 3. `AI-R5` Provider parity calibration on rolling datasets (OpenAI/Claude/Gemini comparison harness).
 
 Next checkpoint acceptance:
-- Frontend global coverage gate passes (`>=80%` statements) and is enforced in release validation.
+- Frontend critical-flow snapshot remains >=90% and full frontend global gate reaches >=80% in release validation.
 - Reliability pack runs automatically each week and publishes traceable artifacts.
 - Drift alerts are reviewable in CVF trace and used as release/no-release input.
 
@@ -412,7 +413,7 @@ Execution update (2026-03-04):
 - `E4` is now `DONE (baseline)`:
   - `OBS-01`: correlation-id propagation across REST/SSE and observability events query API.
   - `OPS-01`: consolidated local operator runbook linked into release checklist gate.
-- Next active phase: frontend coverage uplift (`Hardening-A4` / `AR-4`) from baseline threshold to release target.
+- Next active phase: continue `Hardening-A4` / `AR-4` from current dashboard critical-flow uplift (`96.6%` lines/statements) to full risk-critical UI coverage and sustained release-grade targets.
 
 ---
 

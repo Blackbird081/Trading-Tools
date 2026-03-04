@@ -147,10 +147,11 @@ export function DataLoader() {
       }
 
       try {
+        const { preset: currentPreset, years: currentYears } = useUIStore.getState();
         const url =
           mode === "load"
-            ? `${API_BASE}/load-data?preset=${preset}&years=${years}`
-            : `${API_BASE}/update-data?preset=${preset}`;
+            ? `${API_BASE}/load-data?preset=${currentPreset}&years=${currentYears}`
+            : `${API_BASE}/update-data?preset=${currentPreset}`;
 
         const res = await fetch(url, { signal: controller.signal });
         if (!res.ok || !res.body) {
@@ -212,7 +213,7 @@ export function DataLoader() {
         }
       }
     },
-    [preset, years, handleEvent, clearTicks]
+    [handleEvent, clearTicks]
   );
 
   const handleLoad = useCallback(() => {

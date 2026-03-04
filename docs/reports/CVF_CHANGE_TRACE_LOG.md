@@ -544,3 +544,22 @@ Notes:
 - Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.13` (`E3`, `E4`) + `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`AI-11`, `AI-12`, `OBS-01`, `OPS-01`)
 - Owner: Codex + project owner
 - Notes: Frontend release gate remains at baseline `>=80%`; target `>=90%` uplift is still tracked under `Hardening-A4`.
+
+### CVF-TT-20260304-032
+- Date-Time (UTC+7): 2026-03-04 18:30
+- Type: test
+- Scope: Continue `Hardening-A4` by expanding dashboard DataLoader integration coverage, fixing preset/year stale-read race in loader stream execution, and re-running full release validation gates.
+- Impact: DataLoader critical-flow assertions now cover cache-restore/update stream, preset-year routing, HTTP error, and cancellation branches; loader runtime now resolves `preset/years` from latest UI state at execution time, reducing fast-click stale-config risk; release validation frontend critical snapshot increased to lines/statements `96.6%`.
+- Root Cause: Hardening-A4 roadmap status was still `NOT STARTED` while release confidence required stronger deterministic frontend regression evidence and runtime-safe parameter handling in DataLoader.
+- Files Changed: `frontend/__tests__/integration/data-loader.test.tsx`, `frontend/app/(dashboard)/_components/data-loader.tsx`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/AI_RELIABILITY_WEEKLY_LATEST.md`, `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `pnpm -C frontend exec vitest run __tests__/integration/data-loader.test.tsx` (pass, 6 tests)
+  - `pnpm -C frontend exec vitest run __tests__/integration/data-loader.test.tsx __tests__/stores/market-store.test.ts __tests__/stores/signal-store.test.ts __tests__/lib/market-sectors.test.ts --coverage --coverage.include="app/(dashboard)/_components/data-loader.tsx" --coverage.include="stores/market-store.ts" --coverage.include="stores/signal-store.ts" --coverage.include="lib/market-sectors.ts"` (pass, 20 tests; critical snapshot lines/statements `96.6%`)
+  - `pnpm -C frontend exec tsc --noEmit` (pass)
+  - `powershell -ExecutionPolicy Bypass -File scripts/release-validation.ps1` (pass; overall `PASS`)
+- Deployment Target: frontend dashboard loader runtime/test pack + roadmap governance artifacts
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`Hardening-A4`) + `IMPLEMENTATION_PLAN.md` (`AR-4` continuation)
+- Owner: Codex + project owner
+- Notes: Hardening-A4 is now `PARTIAL (in progress)`; remaining work is expanding beyond dashboard critical-flow scope to orders/screener/market-board for sustained release-grade confidence.
