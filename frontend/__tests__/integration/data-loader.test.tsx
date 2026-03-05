@@ -178,6 +178,31 @@ describe("DataLoader (P0 gate)", () => {
     expect(screen.getByText("Cập nhật: 03/03/2026 09:10")).toBeInTheDocument();
   });
 
+  it("applies tick defaults when SSE payload omits numeric fields", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(mockCachedEmptyResponse())
+      .mockResolvedValueOnce(
+        mockSseResponse([
+          { event: "start", data: { total: 1 } },
+          { event: "progress", data: { loaded: 1, percent: 50, status: "Loading..." } },
+          { event: "tick", data: { symbol: "ACB" } },
+          { event: "complete", data: { loaded: 1, total: 1, message: "Load done" } },
+        ]),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DataLoader />);
+    fireEvent.click(await screen.findByRole("button", { name: /^load$/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const acb = useMarketStore.getState().ticks.ACB;
+    expect(acb).toBeTruthy();
+    expect(acb?.price).toBe(0);
+    expect(acb?.change).toBe(0);
+    expect(acb?.volume).toBe(0);
+  });
+
   it("changes preset/years before load and passes them to load URL", async () => {
     const fetchMock = vi
       .fn()

@@ -149,6 +149,10 @@ describe("PipelineRunner integration", () => {
     expect(screen.getByText(/Trang 1\/2/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "2" }));
     expect(screen.getByText(/Trang 2\/2/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /trang trước/i }));
+    expect(screen.getByText(/Trang 1\/2/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /trang sau/i }));
+    expect(screen.getByText(/Trang 2\/2/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /hiện chi tiết agents/i }));
     expect(screen.getByRole("button", { name: /ẩn chi tiết agents/i })).toBeInTheDocument();
@@ -199,5 +203,33 @@ describe("PipelineRunner integration", () => {
 
     await waitFor(() => expect(screen.getByText("Pipeline Error")).toBeInTheDocument());
     expect(screen.getByText(/http 500/i)).toBeInTheDocument();
+  });
+
+  it("falls back to summary defaults and supports all action filter states", async () => {
+    const results = buildResults(16);
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockSseResponse([
+        { event: "pipeline_start", data: { total_steps: 5, device: "CPU" } },
+        {
+          event: "pipeline_complete",
+          data: {
+            avg_score: 4.2,
+            results,
+          },
+        },
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PipelineRunner />);
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+
+    await waitFor(() => expect(screen.getByText("16 kết quả")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /^mua\s*\(\d+\)$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^giữ\s*\(\d+\)$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^bán\s*\(\d+\)$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^tất cả\s*\(\d+\)$/i }));
+    await waitFor(() => expect(screen.getByText("16 kết quả")).toBeInTheDocument());
   });
 });

@@ -101,10 +101,17 @@ describe("OrderForm integration", () => {
   });
 
   it("validates non-positive quantity and clears inline error when input is empty", () => {
+    const placeOrderMock = vi.fn().mockResolvedValue({ ok: true, message: "Order placed" });
+    useOrderStore.setState({ placeOrder: placeOrderMock } as Partial<ReturnType<typeof useOrderStore.getState>>);
+
     render(<OrderForm />);
 
+    fireEvent.click(screen.getByRole("button", { name: /^bán$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^mua$/i }));
     fireEvent.change(screen.getByPlaceholderText("100"), { target: { value: "0" } });
     expect(screen.getByText(/khối lượng phải là số dương/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /mua fpt/i }));
+    expect(placeOrderMock).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByPlaceholderText("100"), { target: { value: "" } });
     expect(screen.queryByText(/khối lượng phải là số dương/i)).not.toBeInTheDocument();

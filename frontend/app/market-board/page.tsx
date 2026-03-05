@@ -85,7 +85,6 @@ export default function MarketBoardPage() {
     const [mobileSectorIndex, setMobileSectorIndex] = useState(0);
     const touchStartXRef = useRef<number | null>(null);
     const touchStartYRef = useRef<number | null>(null);
-    const showMobileStepControls = false; // Temporary disabled on mobile to reduce UI noise.
     const sectors = useMemo(() => buildMarketSectors(preset, ticks), [preset, ticks]);
     const totalPages = Math.max(1, Math.ceil(sectors.length / SECTORS_PER_PAGE));
 
@@ -228,31 +227,6 @@ export default function MarketBoardPage() {
                         </div>
                     </div>
 
-                    {showMobileStepControls && (
-                        <div className="flex items-center justify-between">
-                            <span className="text-[11px] text-zinc-500">
-                                Mục {mobileSectorIndex + 1}/{sectors.length}
-                            </span>
-                            <div className="flex items-center gap-1">
-                                <button
-                                    onClick={goToMobilePrev}
-                                    disabled={mobileSectorIndex === 0}
-                                    className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-                                >
-                                    <ChevronLeft className="h-3.5 w-3.5" />
-                                    Trước
-                                </button>
-                                <button
-                                    onClick={goToMobileNext}
-                                    disabled={mobileSectorIndex === sectors.length - 1}
-                                    className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-                                >
-                                    Tiếp
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
 

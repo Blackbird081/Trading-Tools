@@ -153,4 +153,38 @@ describe("MarketBoard mobile controls", () => {
     });
     expect(firstTab.className).toContain("bg-emerald-600");
   });
+
+  it("uses cached ticks when backend cache is available and skips mock fallback", async () => {
+    const replaceTicksSpy = vi.fn();
+    useMarketStore.setState({ replaceTicks: replaceTicksSpy } as Partial<ReturnType<typeof useMarketStore.getState>>);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          ticks: [
+            {
+              symbol: "FPT",
+              price: 100,
+              change: 1,
+              changePct: 1,
+              volume: 10_000,
+              high: 101,
+              low: 99,
+              open: 99.5,
+              ceiling: 107,
+              floor: 93,
+              reference: 99,
+              timestamp: Date.now(),
+            },
+          ],
+        }),
+      } as Response),
+    );
+
+    render(<MarketBoardPage />);
+    await waitFor(() => expect(replaceTicksSpy).toHaveBeenCalledTimes(1));
+    expect(replaceTicksSpy.mock.calls[0]?.[0]).toHaveLength(1);
+  });
 });

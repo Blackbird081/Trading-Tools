@@ -184,4 +184,21 @@ describe("MarketStore", () => {
     expect(state.ticks).toEqual({});
     expect(state.latestTick).toBeNull();
   });
+
+  it("keeps latestTick null when replacing with empty snapshot", () => {
+    useMarketStore.getState().replaceTicks([]);
+    expect(useMarketStore.getState().latestTick).toBeNull();
+  });
+
+  it("keeps latestTick null when bulk update receives empty list", () => {
+    useMarketStore.getState().bulkUpdateTicks([]);
+    expect(useMarketStore.getState().latestTick).toBeNull();
+  });
+
+  it("updates websocket connection status explicitly", () => {
+    useMarketStore.getState().setConnectionStatus("connecting");
+    expect(useMarketStore.getState().connectionStatus).toBe("connecting");
+    useMarketStore.getState().setConnectionStatus("connected");
+    expect(useMarketStore.getState().connectionStatus).toBe("connected");
+  });
 });

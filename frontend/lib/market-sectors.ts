@@ -274,9 +274,5 @@ export function buildMarketSectors(
     }
   }
 
-  if (sectors.length > 0) {
-    return sectors;
-  }
-
-  return [{ title: "Top 100", symbols: orderedSymbols }];
+  return sectors;
 }
