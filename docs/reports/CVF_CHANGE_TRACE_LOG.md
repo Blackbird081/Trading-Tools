@@ -581,3 +581,21 @@ Notes:
 - Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`Hardening-A4`) + `IMPLEMENTATION_PLAN.md` (`AR-4` continuation)
 - Owner: Codex + project owner
 - Notes: Next step is raising expanded critical-flow snapshot from `82.45%` toward `>=90%` with additional high-risk scenarios (pagination/filter branches, error/retry edges, order-history actions).
+
+### CVF-TT-20260305-034
+- Date-Time (UTC+7): 2026-03-05 08:10
+- Type: test
+- Scope: Complete `Hardening-A4` target by adding deeper `PipelineRunner`/`MarketBoard` branch scenarios and re-running expanded frontend gate until critical-flow lines/statements exceed 90%.
+- Impact: Expanded frontend critical-flow snapshot increased from `82.45%` to `94.57%` (lines/statements) with additional coverage for live-mode run URL, filter/search reset, pagination/detail toggle, stop/abort flow, market-board mock fallback, and mobile swipe navigation.
+- Root Cause: Previous A4 run only met release floor (`>=80%`) on expanded scope and did not satisfy the desired `>=90%` target for critical-flow lines/statements.
+- Files Changed: `frontend/__tests__/integration/pipeline-runner.test.tsx`, `frontend/__tests__/integration/market-board-mobile.test.tsx`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/AI_RELIABILITY_WEEKLY_LATEST.md`, `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `pnpm -C frontend exec vitest run __tests__/integration/pipeline-runner.test.tsx __tests__/integration/market-board-mobile.test.tsx` (pass, 7 tests)
+  - `powershell -ExecutionPolicy Bypass -File scripts/pre-live-api-gate.ps1 -StrictWarnings -WithFrontend` (pass; frontend expanded critical snapshot lines/statements `94.57%`)
+  - `powershell -ExecutionPolicy Bypass -File scripts/release-validation.ps1` (pass; overall `PASS`)
+- Deployment Target: frontend integration test pack + roadmap governance/docs artifacts
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`Hardening-A4` closure) + `IMPLEMENTATION_PLAN.md` (`AR-4` gated closure)
+- Owner: Codex + project owner
+- Notes: AR-4 line/statements target is now closed; next follow-up is branch/function depth uplift (`AR-4B`) without regressing lines/statements coverage.

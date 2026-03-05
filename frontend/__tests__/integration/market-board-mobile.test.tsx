@@ -100,4 +100,38 @@ describe("MarketBoard mobile controls", () => {
     fireEvent.click(screen.getByRole("button", { name: /Trước/i }));
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
   });
+
+  it("falls back to mock ticks and supports mobile swipe navigation", async () => {
+    const replaceTicksSpy = vi.fn();
+    useMarketStore.setState({ replaceTicks: replaceTicksSpy } as Partial<ReturnType<typeof useMarketStore.getState>>);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ ticks: [] }),
+      } as Response),
+    );
+
+    const { container } = render(<MarketBoardPage />);
+    await waitFor(() => expect(replaceTicksSpy).toHaveBeenCalled());
+
+    const swipeContainer = Array.from(container.querySelectorAll("div")).find(
+      (el) => el.className.includes("md:hidden") && el.className.includes("shrink-0"),
+    );
+    expect(swipeContainer).toBeTruthy();
+
+    const firstTab = screen.getByRole("button", { name: "VN30" });
+    const secondTab = screen.getByRole("button", { name: "Bất động sản" });
+    expect(firstTab.className).toContain("bg-emerald-600");
+
+    fireEvent.touchStart(swipeContainer as Element, {
+      touches: [{ clientX: 220, clientY: 100 }],
+    });
+    fireEvent.touchEnd(swipeContainer as Element, {
+      changedTouches: [{ clientX: 140, clientY: 102 }],
+    });
+
+    expect(secondTab.className).toContain("bg-emerald-600");
+  });
 });

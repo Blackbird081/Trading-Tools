@@ -1,7 +1,7 @@
 ﻿# AI Reliability Weekly Report (Latest)
 
-- Generated-At (UTC): 2026-03-04T11:48:45.029204+00:00
-- Source Artifact: tests/evals/results/reliability_pack_2026-03-04-114845.json
+- Generated-At (UTC): 2026-03-05T01:04:01.448888+00:00
+- Source Artifact: tests/evals/results/reliability_pack_2026-03-05-010401.json
 - Precision@K: 0.6
 - Hit-rate: 0.5
 - MDD: 

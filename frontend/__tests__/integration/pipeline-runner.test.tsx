@@ -22,6 +22,25 @@ function mockSseResponse(events: Array<{ event: string; data: Record<string, unk
   } as Response;
 }
 
+function buildResults(count: number) {
+  return Array.from({ length: count }).map((_, idx) => {
+    const i = idx + 1;
+    const action = i % 3 === 0 ? "HOLD" : i % 2 === 0 ? "SELL" : "BUY";
+    return {
+      symbol: `SYM${String(i).padStart(2, "0")}`,
+      score: 10 - i * 0.2,
+      action,
+      rsi: 45 + (i % 25),
+      macd: action === "BUY" ? "bullish" : action === "SELL" ? "bearish" : "neutral",
+      risk: action === "BUY" ? "LOW" : action === "SELL" ? "HIGH" : "MEDIUM",
+      entry_price: 20 + i,
+      quantity: 100,
+      order_type: "LO",
+      reasoning: i === 1 ? "Sample AI rationale" : undefined,
+    };
+  });
+}
+
 describe("PipelineRunner integration", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -73,6 +92,75 @@ describe("PipelineRunner integration", () => {
     expect(screen.getByText("BBB")).toBeInTheDocument();
   });
 
+  it("supports live mode query, filters, search reset, detail expand, and pagination", async () => {
+    const results = buildResults(18);
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockSseResponse([
+        { event: "pipeline_start", data: { total_steps: 5, device: "CPU" } },
+        { event: "agent_start", data: { step: 1, agent: "Screener Agent", icon: "search", detail: "running", device: "CPU", percent: 10 } },
+        { event: "agent_progress", data: { step: 1, sub_percent: 40, percent: 40 } },
+        { event: "agent_done", data: { step: 1, percent: 60, duration_ms: 1300, result_count: 18 } },
+        {
+          event: "pipeline_complete",
+          data: {
+            total_symbols: 18,
+            buy_count: 6,
+            sell_count: 6,
+            hold_count: 6,
+            avg_score: 6.8,
+            results,
+          },
+        },
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PipelineRunner />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "live" } });
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(String(fetchMock.mock.calls[0]?.[0] ?? "")).toContain("mode=live");
+    await waitFor(() => expect(screen.getByText("18 kết quả")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /^bán\s*\(\d+\)$/i }));
+    await waitFor(() => expect(screen.getByText("6 kết quả")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByPlaceholderText("Tìm mã..."), { target: { value: "ZZZ" } });
+    await waitFor(() => expect(screen.getByText("Không có mã nào khớp bộ lọc.")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /xóa bộ lọc/i }));
+    await waitFor(() => expect(screen.getByText("18 kết quả")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("SYM01"));
+    await waitFor(() => expect(screen.getByText("AI Analysis & Reasoning")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /cuối/i }));
+    expect(screen.getByText(/Trang 2\/2/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /hiện chi tiết agents/i }));
+    expect(screen.getByRole("button", { name: /ẩn chi tiết agents/i })).toBeInTheDocument();
+  });
+
+  it("supports stop action while running", async () => {
+    const fetchMock = vi.fn().mockImplementation((_url: string, options?: { signal?: AbortSignal }) => {
+      return new Promise<Response>((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () => {
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+        });
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PipelineRunner />);
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /stop/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /run pipeline/i })).toBeInTheDocument());
+  });
+
   it("renders explicit error panel when pipeline emits error event", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       mockSseResponse([
@@ -89,4 +177,3 @@ describe("PipelineRunner integration", () => {
     expect(screen.getByText(/prompts missing/i)).toBeInTheDocument();
   });
 });
-
