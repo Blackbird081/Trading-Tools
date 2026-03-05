@@ -3,8 +3,8 @@
 ## CVF Traceability
 - CVF-Doc-ID: CVF-MB-MOBILE-20260301-R2
 - Owner: Frontend
-- Last-Updated: 2026-03-03
-- Status: In execution (P1-P6 implemented, P7 pending release validation)
+- Last-Updated: 2026-03-05
+- Status: Completed (P1-P7 done and release-validated)
 - Related files:
   - frontend/app/market-board/page.tsx
   - frontend/components/sector-column.tsx
@@ -21,7 +21,7 @@
 6. Remove duplicate LIVE indicator in top area to reduce visual noise.
 7. Add color intensity scale for gain/loss with neutral amber for 0%.
 
-## Execution Mapping Snapshot (2026-03-03)
+## Execution Mapping Snapshot (2026-03-05)
 
 | Phase | Status | Evidence | Remaining |
 |---|---|---|---|
@@ -31,7 +31,7 @@
 | P4 - Dashboard Mobile Control Compaction | `DONE` | Mobile `DataLoader` places preset buttons + load/update actions in same row (`frontend/app/(dashboard)/_components/data-loader.tsx`). | None. |
 | P5 - Remove Duplicate LIVE in Top Area | `DONE` | `MarketIndexBar` right status hidden on mobile (`md:flex`), mobile LIVE shown in `TopNav` only. | None. |
 | P6 - Color Scale and Sort Readability | `DONE` | Multi-band red/amber/green intensity + neutral amber applied in `frontend/components/sector-column.tsx`. | Tune visual thresholds only if product requests. |
-| P7 - QA, Coverage, and Release | `PARTIAL` | Core checks were run during implementation cycles; roadmap-specific release checklist entry still pending. | Complete viewport regression matrix + publish release note with coverage. |
+| P7 - QA, Coverage, and Release | `DONE` | Viewport regression + integration packs passed (`data-loader`, `order-form`, `pipeline-runner`, `market-board-mobile`) and release validation report updated in `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md` with frontend critical snapshot lines/statements `99.52%`, branches `92.88%`, functions `100%`. | Keep regression matrix re-run on each release candidate. |
 
 ## Problem Summary
 - Current market-board categories are hard-coded to 6 blocks; not auto-generated from loaded Top100 data.
@@ -139,6 +139,10 @@ Goal: confirm stability and standards.
 Target:
 - Frontend tests pass.
 - Coverage meets project baseline (report exact value in release note).
+
+Execution result (2026-03-05):
+- `DONE` with release-validation evidence in `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md`.
+- Expanded frontend critical snapshot: lines/statements `99.52%`, branches `92.88%`, functions `100%`.
 
 ## Risks and Mitigations
 - Risk: Missing reliable sector metadata for all Top100 symbols.

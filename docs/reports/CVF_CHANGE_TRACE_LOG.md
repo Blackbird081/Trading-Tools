@@ -620,3 +620,54 @@ Notes:
 - Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.12` (`AR-4B` continuation + reliability strict gate) + `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`Hardening-A4` follow-up / `AI-09` gate integration)
 - Owner: Codex + project owner
 - Notes: Strict reliability mode is now enforceable but intentionally opt-in until threshold calibration on rolling real-user datasets is completed.
+
+### CVF-TT-20260305-036
+- Date-Time (UTC+7): 2026-03-05 08:39
+- Type: test
+- Scope: Extend frontend regression suites and remove dead UI branches to raise gated critical-flow confidence before final coverage uplift.
+- Impact: Added deeper integration assertions in dashboard/screener/market-board paths and removed dead branches in runtime UI components; release validation snapshot moved to frontend lines `97.36%`.
+- Root Cause: Post-AR-4 closure still had weak branch-path confidence and stale UI branches reducing practical regression quality.
+- Files Changed: `frontend/__tests__/integration/data-loader.test.tsx`, `frontend/__tests__/integration/market-board-mobile.test.tsx`, `frontend/__tests__/integration/order-form.test.tsx`, `frontend/__tests__/integration/pipeline-runner.test.tsx`, `frontend/__tests__/stores/market-store.test.ts`, `frontend/app/market-board/page.tsx`, `frontend/app/screener/_components/pipeline-runner.tsx`, `frontend/lib/market-sectors.ts`, `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md`, `docs/reports/AI_RELIABILITY_WEEKLY_LATEST.md`
+- Validation Evidence:
+  - `git show --name-only 0a100a1` (pass; file scope verified)
+  - `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md` snapshot at commit time (pass; frontend lines `97.36%`)
+- Deployment Target: frontend regression hardening + release evidence docs
+- Deployment Status: pushed to GitHub (`origin/main`)
+- Commit SHA: `0a100a1f8a98ac2e6cd160991c1a9787f36761e3`
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` (`AR-4B` continuation) + `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`Hardening-A4` sustain)
+- Owner: Codex + project owner
+- Notes: This change set prepared the final branch-depth uplift in the next commit.
+
+### CVF-TT-20260305-037
+- Date-Time (UTC+7): 2026-03-05 10:01
+- Type: test
+- Scope: Raise expanded frontend branch coverage above 90% and stabilize critical-flow quality gate.
+- Impact: Expanded critical-flow snapshot now reports lines/statements `99.52%`, branches `92.88%`, functions `100%`; release validation latest report shows frontend global lines `99.4%`.
+- Root Cause: Financial-safe release target required branch coverage >=90% on critical UI flows before real API-key onboarding.
+- Files Changed: `frontend/__tests__/integration/data-loader.test.tsx`, `frontend/__tests__/integration/market-board-mobile.test.tsx`, `frontend/__tests__/integration/pipeline-runner.test.tsx`, `frontend/app/(dashboard)/_components/data-loader.tsx`, `frontend/app/screener/_components/pipeline-runner.tsx`, `frontend/lib/market-sectors.ts`, `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md`, `docs/reports/AI_RELIABILITY_WEEKLY_LATEST.md`
+- Validation Evidence:
+  - `pnpm -C frontend exec vitest run __tests__/integration/data-loader.test.tsx __tests__/integration/order-form.test.tsx __tests__/integration/pipeline-runner.test.tsx __tests__/integration/market-board-mobile.test.tsx __tests__/stores/market-store.test.ts __tests__/stores/signal-store.test.ts __tests__/lib/market-sectors.test.ts --coverage --coverage.include="app/(dashboard)/_components/data-loader.tsx" --coverage.include="app/screener/_components/pipeline-runner.tsx" --coverage.include="app/market-board/page.tsx" --coverage.include="stores/market-store.ts" --coverage.include="stores/signal-store.ts" --coverage.include="lib/market-sectors.ts" --coverage.reporter=text-summary` (pass; lines/statements `99.52%`, branches `92.88%`, functions `100%`)
+  - `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md` (pass; overall `PASS`, frontend lines `99.4%`)
+- Deployment Target: frontend regression/coverage gate + release evidence docs
+- Deployment Status: pushed to GitHub (`origin/main`)
+- Commit SHA: `d1fc2a48ea150962b3d751548d38ee38dfd390ee`
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` (`AR-4B`) + `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`Hardening-A4` sustain gate)
+- Owner: Codex + project owner
+- Notes: This closes the previously open branch-depth gap for current critical-flow scope.
+
+### CVF-TT-20260305-038
+- Date-Time (UTC+7): 2026-03-05 10:20
+- Type: docs
+- Scope: Synchronize planning/governance docs with latest gated evidence and close stale `PARTIAL` roadmap statuses.
+- Impact: Local roadmap, master implementation plan, and market-board mobile roadmap now reflect latest validated coverage baseline (`99.52/92.88/100`) and updated post-closure focus.
+- Root Cause: Planning artifacts and trace ledger were stale after pushed commits (`0a100a1`, `d1fc2a4`), causing CVF traceability drift.
+- Files Changed: `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/MARKET_BOARD_MOBILE_FIX_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `rg -n "99\\.52|92\\.88|100%|P7 - QA, Coverage, and Release|Re-Assessment Snapshot \\(2026-03-05\\)" docs/plans/*.md docs/reports/CVF_CHANGE_TRACE_LOG.md` (pass)
+  - `git status --short` (pass; only expected doc files changed)
+- Deployment Target: governance/planning documentation
+- Deployment Status: local update completed
+- Commit SHA: `N/A` (docs-only synchronization)
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0` governance + `LOCAL_PERSONAL_TRADING_ROADMAP.md` + `MARKET_BOARD_MOBILE_FIX_ROADMAP.md`
+- Owner: Codex + project owner
+- Notes: This entry backfills CVF trace completeness and restores plan-to-evidence alignment.

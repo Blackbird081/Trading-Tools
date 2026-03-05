@@ -223,7 +223,7 @@ Latest execution snapshot (`2026-03-04`, local):
   - `vnstock.news`: `98%`
 
 Policy note:
-- Full frontend global coverage is tracked separately and is not yet at 90% total-line level.
+- Full frontend global coverage is tracked separately from the critical-flow gate; latest release validation snapshot reports frontend lines `99.4%`.
 - Real API key onboarding is blocked until this pre-live backend gate passes on the release candidate branch.
 
 ### 0.11 Independent Audit Remediation Roadmap (Locked)
@@ -300,30 +300,30 @@ Execution update (2026-03-04):
 - `AI-R2 Provider A/B + Consensus` DONE (baseline): evaluator now reports `agreement_rate`, per-provider hit-rate, and `consensus_hit_rate` via `tests/evals/provider_ab_consensus.py`.
 - `AI-R3 Weekly Drift Monitor` DONE (baseline): weekly recommendation-vs-outcome report and drift alerts are generated via `tests/evals/weekly_drift_monitor.py`.
 - `AI-R4` DONE (baseline+): weekly reliability automation is wired via `scripts/run-weekly-reliability-pack.ps1` and scheduled CI workflow `.github/workflows/reliability-weekly.yml`; strict threshold mode is available (`-FailOnDriftSeverity high`) and wired into `scripts/release-validation.ps1 -StrictReliability`.
-- `AR-4` is now DONE (gated): expanded integration suites cover dashboard/order/screener/market-board critical flows, frontend gate scope in `pre-live-api-gate.ps1` is widened, and latest release-validation critical snapshot reached lines/statements `96.01%` on expanded scope.
+- `AR-4` is now DONE (gated): expanded integration suites cover dashboard/order/screener/market-board critical flows, frontend gate scope in `pre-live-api-gate.ps1` is widened, and latest expanded critical snapshot reached lines/statements `99.52%`, branches `92.88%`, functions `100%`.
 
-### 0.12 Re-Assessment Snapshot (2026-03-04)
+### 0.12 Re-Assessment Snapshot (2026-03-05)
 
 Status summary:
 - Core hardening readiness: `AR-1/AR-2/AR-3/AR-5` are complete and evidenced.
 - AI pipeline orchestration: single-provider multi-role flow is complete (`AI-Orchestrator`).
 - Native provider capability: runtime supports `OpenAI + Anthropic + Gemini + Alibaba` selection in setup/settings path.
 - AI reliability governance: baseline layer is complete (`AI-R1/AI-R2/AI-R3/AI-R4`) with reproducible artifacts and weekly automation.
-- Remaining release risk: AR-4 line/statements target is closed; branch/function depth remains below 90% and should continue improving for stronger regression confidence.
+- Remaining release risk: AR-4 thresholds are currently satisfied, but sustained quality depends on keeping this coverage stable as new UI branches/features are added.
 
 Current baseline metric snapshot (fixed dataset pack):
 - Quant benchmark: `Precision@K=0.60`, `Hit-rate=0.50`, `MDD=0.1554`.
 - Provider A/B: `agreement_rate=0.40`, `consensus_hit_rate=0.40`.
 - Drift monitor: weekly drift alerts are generated correctly; scheduler now publishes weekly artifacts.
-- Frontend critical-flow snapshot (expanded release-validation scope): lines/statements `96.01%`, branches `77.70%`, functions `91.66%`.
+- Frontend critical-flow snapshot (expanded release-validation scope): lines/statements `99.52%`, branches `92.88%`, functions `100%`.
 
 Risk interpretation:
 - Security, provider policy, and monetary precision gates are in place.
-- The largest remaining product risk is insufficient broad frontend regression coverage (outside critical-flow subset) for safe release scaling.
+- The largest remaining product risk is release drift (new UI branches or provider paths added without matching tests), not the current gated baseline.
 - AI reliability automation is operational (scheduled + strict threshold mode), but thresholds still need calibration against rolling real-user datasets before strict mode can be default.
 
 Locked next execution order:
-1. `AR-4B` Continue branch/function-path uplift in expanded frontend critical-flow suites.
+1. `AR-4B` Preserve >=90 critical-flow coverage while expanding non-critical UI regression breadth.
 2. `AI-R5` Provider parity calibration on rolling datasets (OpenAI/Claude/Gemini comparison harness).
 3. `OBS-02` Extend deep observability coverage into broker adapter + websocket internals.
 
@@ -413,7 +413,7 @@ Execution update (2026-03-04):
 - `E4` is now `DONE (baseline)`:
   - `OBS-01`: correlation-id propagation across REST/SSE and observability events query API.
   - `OPS-01`: consolidated local operator runbook linked into release checklist gate.
-- Next active phase: post-closure hardening (`AR-4B`) to improve frontend branch/function-path depth while preserving expanded critical-flow lines/statements >=90%.
+- Next active phase: post-closure hardening (`AR-4B`) to preserve >=90 critical-flow coverage and prevent regression drift on new UI/provider paths.
 
 ---
 

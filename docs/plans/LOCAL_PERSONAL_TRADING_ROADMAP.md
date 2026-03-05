@@ -7,7 +7,7 @@
 - Status: In execution
 - Scope: Turn Trading-Tools from demo/mixed-mock to local personal trading product.
 
-## Execution Mapping Snapshot (Updated, 2026-03-04)
+## Execution Mapping Snapshot (Updated, 2026-03-05)
 
 Status scale:
 - `DONE`: exit criteria completed and evidenced.
@@ -32,8 +32,8 @@ Status scale:
 | Hardening-A1 Runtime Security Middleware Wiring | `DONE (gated)` | Added `AuthMiddleware` + runtime wiring of `RateLimitMiddleware` in `interface.app`; added integration coverage in `tests/integration/test_runtime_security_middleware.py` for unauthorized/reject + rate-limit behavior. | Monitor token distribution policy for non-dev protected environments. |
 | Hardening-A2 Real Data Provider Policy | `DONE (gated)` | Added explicit provider contract (`DATA_PROVIDER_MODE=mock/live`) with production guard (`mock` blocked) in `interface.rest.data_loader`; added integration/unit tests (`tests/integration/test_data_loader_api.py`, `tests/unit/test_data_loader_helpers.py`). | Keep live provider dependency (`vnstock`) and source reliability monitored in production. |
 | Hardening-A3 Monetary Precision (`Decimal`) | `DONE (gated)` | Migrated OMS request/risk checks to `Decimal` in `interface.rest.orders` (price/notional/daily-loss/buying-power path); added boundary precision regression test in `tests/integration/test_order_safety_controls.py`. | Continue Decimal migration in downstream analytics/store paths for full end-to-end precision parity. |
-| Hardening-A4 Frontend Coverage Expansion | `DONE (gated)` | Expanded integration packs for dashboard/order/screener/market-board (`frontend/__tests__/integration/{data-loader,order-form,pipeline-runner,market-board-mobile}.test.tsx`), fixed stale preset/year race in loader stream (`frontend/app/(dashboard)/_components/data-loader.tsx`), and widened gate scope in `scripts/pre-live-api-gate.ps1`; latest expanded frontend critical snapshot: lines/statements `96.01%`, functions `91.66%`, branches `77.70%`. | Continue branch-path depth uplift (branches < 90) while preserving >=90 lines/statements and functions. |
-| REL-01 Release Quality Gate Uplift (financial-safe) | `DONE (gated)` | `scripts/pre-live-api-gate.ps1` now supports configurable backend threshold and risk-based frontend coverage scope; `scripts/release-validation.ps1` enforces backend + frontend critical gates; latest run passed with backend critical `97.51%` and expanded frontend critical lines/statements `96.01%`. | Keep >=90 expanded critical-flow lines/statements stable across release candidates. |
+| Hardening-A4 Frontend Coverage Expansion | `DONE (gated)` | Expanded integration packs for dashboard/order/screener/market-board (`frontend/__tests__/integration/{data-loader,order-form,pipeline-runner,market-board-mobile}.test.tsx`), fixed stale preset/year race in loader stream (`frontend/app/(dashboard)/_components/data-loader.tsx`), and widened gate scope in `scripts/pre-live-api-gate.ps1`; latest expanded frontend critical snapshot: lines/statements `99.52%`, functions `100%`, branches `92.88%`. | Maintain >=90 lines/statements/functions/branches across release candidates. |
+| REL-01 Release Quality Gate Uplift (financial-safe) | `DONE (gated)` | `scripts/pre-live-api-gate.ps1` now supports configurable backend threshold and risk-based frontend coverage scope; `scripts/release-validation.ps1` enforces backend + frontend critical gates; latest run passed with backend critical `97.51%` and expanded frontend critical lines/statements `99.52%`. | Keep >=90 expanded critical-flow lines/statements stable across release candidates. |
 | UX-01 Setup Save/Apply Clarity | `DONE (gated)` | `frontend/app/settings/_components/setup-wizard.tsx` now uses explicit `Save Draft`, `Apply Draft`, `Revert` actions with `Saved/Unsaved` status + last-saved timestamp; added integration test `frontend/__tests__/integration/setup-wizard.test.tsx`. | Extend UX consistency to profile import/export rotate flows with same dirty-state semantics. |
 | DATA-01 DuckDB Migration + Backup/Restore + Integrity Gate | `DONE (gated)` | Added cache schema marker + migration metadata + startup integrity probe (`interface.rest.data_loader`, `interface.app`, `interface.rest.setup`) and backup/restore scripts (`scripts/data-cache-backup.ps1`, `scripts/data-cache-restore.ps1`). | Maintain migration marker policy for future schema upgrades. |
 | SEC-01 Secret Redaction Hardening | `DONE (gated)` | Added shared redaction utilities (`interface.redaction`) and applied redaction in setup/data-loader runtime errors, profile decrypt response, and diagnostics paths with tests (`tests/unit/test_redaction.py`, setup/data-loader test updates). | Extend redaction policy to any new external adapter error path. |
@@ -63,8 +63,7 @@ Status scale:
 ## Current Gaps (As-Is)
 - Real broker execution path still uses guarded placeholder; live adapter integration remains.
 - External data quality in live mode depends on broker/data provider availability and credentials.
-- Frontend global coverage remains below release-grade target.
-- Frontend expanded critical-flow lines/statements/functions are now strong (`96.01%` / `91.66%`), but branch depth remains lower (`77.70%`) and should keep improving.
+- Frontend critical-flow coverage is now above target (`99.52%` lines/statements, `92.88%` branches, `100%` functions); keep gate enforcement strict on every release candidate.
 - Provider parity calibration across OpenAI/Anthropic/Gemini/Alibaba is not automated yet.
 - Role outputs are currently narrative text; schema-locked role JSON contract is not yet enforced.
 - AI reliability strict threshold gate is now available; next step is calibrating production thresholds with rolling datasets and policy sign-off.
@@ -354,8 +353,8 @@ Execution update (2026-03-04):
 - `E2` completed (cache schema marker/integrity + backup/restore + secret redaction hardening with tests).
 - `E3` completed baseline (model recommendation matrix + provider failover/cost policy + weekly reliability runner automation).
 - `E4` completed baseline (correlation-id propagation + observability events API + consolidated operator runbook).
-- `Hardening-A4` is now `DONE (gated)` across dashboard/order/screener/market-board with expanded critical snapshot at lines/statements `96.01%`, functions `91.66%`, branches `77.70%`.
-- Next focus: deepen branch-path coverage in the same suites while holding `>=90%` lines/statements/functions.
+- `Hardening-A4` is now `DONE (gated)` across dashboard/order/screener/market-board with expanded critical snapshot at lines/statements `99.52%`, functions `100%`, branches `92.88%`.
+- Next focus: preserve >=90 critical-flow coverage while extending non-critical UI regression breadth.
 
 Exit policy:
 - Do not move to broader real API-key onboarding until `E1` and `E2` are complete.
