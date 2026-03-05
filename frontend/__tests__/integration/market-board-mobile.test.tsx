@@ -152,6 +152,10 @@ describe("MarketBoard mobile controls", () => {
       changedTouches: [{ clientX: 210, clientY: 180 }],
     });
     expect(firstTab.className).toContain("bg-emerald-600");
+
+    fireEvent.touchStart(swipeContainer as Element, { touches: [] });
+    fireEvent.touchEnd(swipeContainer as Element, { changedTouches: [] });
+    expect(firstTab.className).toContain("bg-emerald-600");
   });
 
   it("uses cached ticks when backend cache is available and skips mock fallback", async () => {
@@ -186,5 +190,15 @@ describe("MarketBoard mobile controls", () => {
     render(<MarketBoardPage />);
     await waitFor(() => expect(replaceTicksSpy).toHaveBeenCalledTimes(1));
     expect(replaceTicksSpy.mock.calls[0]?.[0]).toHaveLength(1);
+  });
+
+  it("continues with fallback path when cached-data API throws", async () => {
+    const replaceTicksSpy = vi.fn();
+    useMarketStore.setState({ replaceTicks: replaceTicksSpy } as Partial<ReturnType<typeof useMarketStore.getState>>);
+
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network")));
+
+    render(<MarketBoardPage />);
+    await waitFor(() => expect(replaceTicksSpy).toHaveBeenCalled());
   });
 });

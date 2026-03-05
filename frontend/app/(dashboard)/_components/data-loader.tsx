@@ -170,7 +170,7 @@ export function DataLoader() {
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
+          buffer = lines.pop() as string;
 
           for (const line of lines) {
             if (line.startsWith("event: ")) {
@@ -217,14 +217,12 @@ export function DataLoader() {
   );
 
   const handleLoad = useCallback(() => {
-    if (isBusy) return;
     void runStream("load");
-  }, [isBusy, runStream]);
+  }, [runStream]);
 
   const handleUpdate = useCallback(() => {
-    if (!canUpdate) return;
     void runStream("update");
-  }, [canUpdate, runStream]);
+  }, [runStream]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();

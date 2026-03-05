@@ -374,9 +374,8 @@ export function PipelineRunner() {
           return dir * ((a.entry_price ?? 0) - (b.entry_price ?? 0));
         case "quantity":
           return dir * ((a.quantity ?? 0) - (b.quantity ?? 0));
-        default:
-          return 0;
       }
+      return 0;
     });
   }, [state.results, sortField, sortDir, actionFilter, searchQuery]);
 
@@ -520,7 +519,7 @@ export function PipelineRunner() {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
+        buffer = lines.pop() as string;
 
         let eventType = "";
         for (const line of lines) {

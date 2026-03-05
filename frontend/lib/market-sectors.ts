@@ -257,7 +257,7 @@ export function buildMarketSectors(
 
   for (const symbol of nonVn30Symbols) {
     const title = SYMBOL_CATEGORY[symbol] ?? "Khác";
-    const bucket = sectorBuckets.get(title) ?? [];
+    const bucket = sectorBuckets.get(title)!;
     bucket.push(symbol);
     sectorBuckets.set(title, bucket);
   }
@@ -268,7 +268,7 @@ export function buildMarketSectors(
   }
 
   for (const title of CATEGORY_ORDER) {
-    const symbols = sectorBuckets.get(title) ?? [];
+    const symbols = sectorBuckets.get(title)!;
     if (symbols.length > 0) {
       sectors.push({ title, symbols });
     }

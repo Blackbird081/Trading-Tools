@@ -22,6 +22,22 @@ function mockSseResponse(events: Array<{ event: string; data: Record<string, unk
   } as Response;
 }
 
+function mockRawSseResponse(payload: string): Response {
+  let done = false;
+  return {
+    ok: true,
+    body: {
+      getReader: () => ({
+        read: vi.fn().mockImplementation(async () => {
+          if (done) return { done: true, value: undefined };
+          done = true;
+          return { done: false, value: new TextEncoder().encode(payload) };
+        }),
+      }),
+    } as unknown as ReadableStream<Uint8Array>,
+  } as Response;
+}
+
 function buildResults(count: number) {
   return Array.from({ length: count }).map((_, idx) => {
     const i = idx + 1;
@@ -178,6 +194,24 @@ describe("PipelineRunner integration", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /run pipeline/i })).toBeInTheDocument());
   });
 
+  it("renders running-step progress UI before completion event arrives", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockSseResponse([
+        { event: "pipeline_start", data: { total_steps: 5, device: "CPU" } },
+        { event: "agent_start", data: { step: 1, agent: "Screener Agent", icon: "search", detail: "running", device: "CPU", percent: 20 } },
+        { event: "agent_progress", data: { step: 1, sub_percent: 55, percent: 35 } },
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PipelineRunner />);
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+
+    await waitFor(() => expect(screen.getByText("Screener Agent")).toBeInTheDocument());
+    expect(screen.getByText("55%")).toBeInTheDocument();
+    expect(screen.getByText("Running... 35%")).toBeInTheDocument();
+  });
+
   it("renders explicit error panel when pipeline emits error event", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       mockSseResponse([
@@ -231,5 +265,73 @@ describe("PipelineRunner integration", () => {
     fireEvent.click(screen.getByRole("button", { name: /^bán\s*\(\d+\)$/i }));
     fireEvent.click(screen.getByRole("button", { name: /^tất cả\s*\(\d+\)$/i }));
     await waitFor(() => expect(screen.getByText("16 kết quả")).toBeInTheDocument());
+  });
+
+  it("handles malformed SSE payloads and renders fallback UI states", async () => {
+    const payload = [
+      "event: pipeline_start\ndata: {\"total_steps\":5,\"device\":\"TPU\"}\n\n",
+      "event: agent_start\ndata: {\"step\":1,\"agent\":\"Screener Agent\",\"icon\":\"unknown\",\"detail\":\"run\",\"device\":\"TPU\",\"percent\":10}\n\n",
+      "event: agent_start\ndata: {\"step\":1,\"agent\":\"Screener Agent\",\"icon\":\"unknown\",\"detail\":\"rerun\",\"device\":\"TPU\",\"percent\":20}\n\n",
+      "event: agent_progress\ndata: {\"step\":99,\"sub_percent\":66,\"percent\":30}\n\n",
+      "event: malformed\ndata: {not-json}\n\n",
+      "event: agent_done\ndata: {\"step\":1,\"percent\":40,\"duration_ms\":900}\n\n",
+      "event: pipeline_complete\ndata: {\"total_symbols\":0,\"buy_count\":0,\"sell_count\":0,\"hold_count\":0,\"avg_score\":5,\"results\":[{\"symbol\":\"ZZ1\",\"score\":3.2,\"action\":\"HOLD\",\"rsi\":25,\"macd\":\"neutral\",\"risk\":\"UNKNOWN\"}]}\n\n",
+    ].join("");
+    const fetchMock = vi.fn().mockResolvedValue(mockRawSseResponse(payload));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PipelineRunner />);
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+
+    await waitFor(() => expect(screen.getByText("1 kết quả")).toBeInTheDocument());
+    expect(screen.getByText("TPU")).toBeInTheDocument();
+    expect(screen.getByText("Trung tính")).toBeInTheDocument();
+    expect(screen.getByText("LO")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("ZZ1"));
+    await waitFor(() => expect(screen.getByText("Stop Loss (-7%)")).toBeInTheDocument());
+    expect(screen.queryByText("AI Analysis & Reasoning")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Đề xuất"));
+    fireEvent.click(screen.getByText("RSI"));
+    fireEvent.click(screen.getByText("Giá vào"));
+    fireEvent.click(screen.getByText("KL"));
+  });
+
+  it("supports sliding pagination window when results span more than five pages", async () => {
+    const results = buildResults(96);
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockSseResponse([
+        { event: "pipeline_start", data: { total_steps: 5, device: "CPU" } },
+        {
+          event: "pipeline_complete",
+          data: {
+            total_symbols: 96,
+            buy_count: 32,
+            sell_count: 32,
+            hold_count: 32,
+            avg_score: 6.2,
+            results,
+          },
+        },
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PipelineRunner />);
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+    await waitFor(() => expect(screen.getByText("96 kết quả")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /cuối/i }));
+    expect(screen.getByText(/Trang 7\/7/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /trang trước/i }));
+    expect(screen.getByText(/Trang 6\/7/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "4" }));
+    expect(screen.getByText(/Trang 4\/7/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "2" }));
+    expect(screen.getByText(/Trang 2\/7/i)).toBeInTheDocument();
   });
 });

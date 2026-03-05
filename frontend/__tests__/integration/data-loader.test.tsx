@@ -73,6 +73,22 @@ function mockSseResponse(events: Array<{ event: string; data: Record<string, unk
   } as Response;
 }
 
+function mockSseChunkedResponse(chunks: string[]): Response {
+  let idx = 0;
+  return {
+    ok: true,
+    body: {
+      getReader: () => ({
+        read: vi.fn().mockImplementation(async () => {
+          if (idx >= chunks.length) return { done: true, value: undefined };
+          const chunk = chunks[idx++];
+          return { done: false, value: new TextEncoder().encode(chunk) };
+        }),
+      }),
+    } as unknown as ReadableStream<Uint8Array>,
+  } as Response;
+}
+
 describe("DataLoader (P0 gate)", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -178,6 +194,38 @@ describe("DataLoader (P0 gate)", () => {
     expect(screen.getByText("Cập nhật: 03/03/2026 09:10")).toBeInTheDocument();
   });
 
+  it("restores cache tick snapshot even when metadata is missing", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ticks: [
+          {
+            symbol: "FPT",
+            price: 100,
+            change: 1,
+            changePct: 1,
+            volume: 1000000,
+            high: 101,
+            low: 99,
+            open: 99.5,
+            ceiling: 107,
+            floor: 93,
+            reference: 99,
+            timestamp: Date.now(),
+          },
+        ],
+      }),
+    } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DataLoader />);
+
+    await waitFor(() => expect(screen.getByText("0 symbols")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /market data/i }));
+    const updateButton = await screen.findByRole("button", { name: /^update$/i });
+    expect(updateButton).not.toBeDisabled();
+  });
+
   it("applies tick defaults when SSE payload omits numeric fields", async () => {
     const fetchMock = vi
       .fn()
@@ -201,6 +249,41 @@ describe("DataLoader (P0 gate)", () => {
     expect(acb?.price).toBe(0);
     expect(acb?.change).toBe(0);
     expect(acb?.volume).toBe(0);
+  });
+
+  it("uses default progress/complete messages when stream payload omits optional fields", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(mockCachedEmptyResponse())
+      .mockResolvedValueOnce(
+        mockSseChunkedResponse([
+          "event: start\ndata: {}\n\nevent: progress\ndata: {\"symbol\":\"ACB\"}\n\n",
+          "event: complete\ndata: {}\n\n",
+        ]),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DataLoader />);
+    fireEvent.click(await screen.findByRole("button", { name: /^load$/i }));
+
+    await waitFor(() => expect(screen.getAllByText("Loaded").length).toBeGreaterThan(0));
+  });
+
+  it("shows default stream error message when SSE emits error without message", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(mockCachedEmptyResponse())
+      .mockResolvedValueOnce(
+        mockSseResponse([
+          { event: "start", data: { total: 1 } },
+          { event: "error", data: {} },
+        ]),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DataLoader />);
+    fireEvent.click(await screen.findByRole("button", { name: /^load$/i }));
+    await waitFor(() => expect(screen.getByText("Operation failed")).toBeInTheDocument());
   });
 
   it("changes preset/years before load and passes them to load URL", async () => {
@@ -268,6 +351,14 @@ describe("DataLoader (P0 gate)", () => {
     await waitFor(() => expect(screen.getByText("Error: HTTP 500")).toBeInTheDocument());
   });
 
+  it("shows cache read error when cached-data API returns non-OK response", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: false, status: 503 } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DataLoader />);
+    await waitFor(() => expect(screen.getByText("Error reading cache. Please retry.")).toBeInTheDocument());
+  });
+
   it("marks cancelled when load request is aborted", async () => {
     const abortError = new Error("aborted");
     abortError.name = "AbortError";
@@ -308,5 +399,27 @@ describe("DataLoader (P0 gate)", () => {
 
     await waitFor(() => expect(screen.getByText("Cancelled by user.")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: /^load$/i })).toBeInTheDocument();
+  });
+
+  it("aborts active stream on unmount cleanup", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(mockCachedEmptyResponse())
+      .mockImplementationOnce((_url: string, options?: { signal?: AbortSignal }) => {
+        return new Promise<Response>((_resolve, reject) => {
+          options?.signal?.addEventListener("abort", () => {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          });
+        });
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const view = render(<DataLoader />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    fireEvent.click(await screen.findByRole("button", { name: /^load$/i }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    view.unmount();
   });
 });
