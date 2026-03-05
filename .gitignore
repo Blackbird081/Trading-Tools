@@ -39,6 +39,9 @@ htmlcov/
 .coverage
 .coverage.*
 coverage.xml
+frontend/coverage/
+coverage/
+.hypothesis/
 
 # ── Runtime data (DuckDB, Parquet, models) ────────────────────
 data/
@@ -61,3 +64,4 @@ Thumbs.db
 
 # ── uv ────────────────────────────────────────────────────────
 # uv.lock is committed (reproducible builds)
+

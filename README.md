@@ -3,6 +3,7 @@
 **Production-Ready** 🚀 | **Quality Score: 9.4/10** ⭐ | **Commit: `9812423`**
 
 [![CI](https://github.com/Blackbird081/Trading-Tools/actions/workflows/ci.yml/badge.svg)](https://github.com/Blackbird081/Trading-Tools/actions/workflows/ci.yml)
+[Coverage Snapshot](docs/reports/TEST_COVERAGE_LATEST.md) | [Coverage Badge Links](docs/reports/TEST_COVERAGE_BADGES.md)
 
 ## Overview
 
@@ -273,3 +274,4 @@ Proprietary — Enterprise Internal Use Only
 ---
 
 **Status**: ✅ **Production-Ready** — Quality Score **9.4/10** | 10 commits | 102 Python files + 42 TypeScript files | 38 test files
+
