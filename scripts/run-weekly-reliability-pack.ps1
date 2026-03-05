@@ -38,6 +38,7 @@ if (-not $latest) {
 $payload = Get-Content $latest.FullName -Raw | ConvertFrom-Json
 $benchmark = $payload.benchmark_quant
 $consensus = $payload.provider_ab_consensus
+$parity = $payload.provider_parity
 $alerts = @($payload.weekly_drift.alerts)
 $alertCount = $alerts.Count
 
@@ -108,6 +109,9 @@ $lines = @(
     "- MDD: $($benchmark.max_drawdown)",
     "- Provider agreement: $($consensus.agreement_rate)",
     "- Consensus hit-rate: $($consensus.consensus_hit_rate)",
+    "- Provider parity spread: $([math]::Round([double]$parity.parity_spread, 4))",
+    "- Best provider: $($parity.best_provider)",
+    "- Worst provider: $($parity.worst_provider)",
     "- Drift alerts: $alertCount",
     "- Strict gate: $strictStatus (FailOnDriftSeverity=$FailOnDriftSeverity)",
     "",
@@ -127,6 +131,18 @@ $lines += @(
     "## Drift Alerts",
     ""
 )
+
+$lines += @(
+    "",
+    "## Provider Parity",
+    "",
+    "| Provider | Sample Size | Hit-rate | Avg Confidence |",
+    "|---|---:|---:|---:|"
+)
+
+foreach ($providerRow in @($parity.providers)) {
+    $lines += "| $($providerRow.provider) | $($providerRow.sample_size) | $([math]::Round([double]$providerRow.hit_rate, 4)) | $([math]::Round([double]$providerRow.avg_confidence, 4)) |"
+}
 
 if ($alertCount -eq 0) {
     $lines += "- None"

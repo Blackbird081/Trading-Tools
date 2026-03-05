@@ -303,11 +303,11 @@ async def create(cls, conn, max_age_hours=24):
 ## 🎯 Success Metrics
 
 - [ ] Zero critical bugs trong production
-- [ ] Test coverage ≥ 85% (currently ~80% estimated)
+- [ ] Test coverage ≥ 85% (latest release validation snapshot on gated scope: frontend lines 99.4%, backend critical 97.51%)
 - [ ] P95 latency agent pipeline < 5s
 - [ ] Zero X-Forwarded-For bypass incidents
 - [ ] DuckDB pool never race condition in load test
 
 ---
 
-*Last updated: 2026-02-28*
+*Last updated: 2026-03-05*

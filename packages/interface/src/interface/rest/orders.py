@@ -11,7 +11,11 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
+from core.entities.order import Order, OrderSide, OrderStatus, OrderType
+from core.value_objects import Price, Quantity, Symbol
+from interface.live_broker import create_ssi_broker_client, live_broker_enabled
 from interface.observability import get_correlation_id, record_event
+from interface.redaction import redact_text
 from interface.trading_store import (
     compute_portfolio,
     enqueue_dlq,
@@ -78,10 +82,6 @@ class DLQReplayRequest(BaseModel):
 class KillSwitchRequest(BaseModel):
     active: bool
     reason: str = Field(default="", max_length=300)
-
-
-def _is_true(value: str) -> bool:
-    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _payload_hash(payload: PlaceOrderRequest, mode: str) -> str:
@@ -234,7 +234,67 @@ def _validate_live_confirm(payload: PlaceOrderRequest, mode: str) -> dict[str, A
 
 
 def _broker_live_enabled() -> bool:
-    return _is_true(os.getenv("ENABLE_LIVE_BROKER", "false"))
+    return live_broker_enabled()
+
+
+def _normalize_broker_status(raw: object) -> str:
+    status = str(raw or "").strip().upper()
+    allowed = {
+        "CREATED",
+        "PENDING",
+        "PARTIAL_FILL",
+        "MATCHED",
+        "REJECTED",
+        "BROKER_REJECTED",
+        "CANCELLED",
+    }
+    return status if status in allowed else "PENDING"
+
+
+async def _submit_live_order_via_broker(
+    *,
+    order_id: str,
+    payload: PlaceOrderRequest,
+    ceiling_price: float,
+    floor_price: float,
+    created_at: datetime,
+) -> tuple[str, str | None, str | None]:
+    broker, auth = create_ssi_broker_client()
+    try:
+        order = Order(
+            order_id=order_id,
+            symbol=Symbol(payload.symbol),
+            side=OrderSide(payload.side),
+            order_type=OrderType(payload.order_type),
+            quantity=Quantity(payload.quantity),
+            price=Price(payload.price),
+            ceiling_price=Price(Decimal(str(ceiling_price))),
+            floor_price=Price(Decimal(str(floor_price))),
+            status=OrderStatus.CREATED,
+            filled_quantity=Quantity(0),
+            avg_fill_price=Price(payload.price),
+            broker_order_id=None,
+            rejection_reason=None,
+            idempotency_key=payload.idempotency_key,
+            created_at=created_at,
+            updated_at=created_at,
+        )
+        placed = await broker.place_order(order)
+        local_status = _normalize_broker_status(placed.status.value)
+        return local_status, placed.broker_order_id, placed.rejection_reason
+    finally:
+        await broker.close()
+        await auth.close()
+
+
+async def _cancel_live_order_via_broker(broker_order_id: str) -> str:
+    broker, auth = create_ssi_broker_client()
+    try:
+        cancelled = await broker.cancel_order(broker_order_id)
+        return _normalize_broker_status(cancelled.status.value)
+    finally:
+        await broker.close()
+        await auth.close()
 
 
 @router.post("/orders")
@@ -270,8 +330,51 @@ async def place_order(payload: PlaceOrderRequest) -> dict[str, Any]:
 
     if mode == "live":
         if _broker_live_enabled():
-            broker_order_id = f"LIVE-{uuid.uuid4().hex[:10].upper()}"
-            status = "PENDING"
+            try:
+                status, broker_order_id, rejection_reason = await _submit_live_order_via_broker(
+                    order_id=order_id,
+                    payload=payload,
+                    ceiling_price=ceiling,
+                    floor_price=floor,
+                    created_at=created_at,
+                )
+                if status in {"BROKER_REJECTED", "REJECTED", "CANCELLED"}:
+                    success = False
+                    error = rejection_reason or f"Broker returned status {status}"
+                    dlq_id = enqueue_dlq(order_id, payload_json, error)
+                    record_order_rejection(order_id, error)
+                    record_event(
+                        flow="orders",
+                        level="error",
+                        message=f"Live broker rejected order: {error}",
+                        metadata={"order_id": order_id, "symbol": payload.symbol, "status": status},
+                    )
+                else:
+                    record_event(
+                        flow="orders",
+                        level="info",
+                        message="Live broker accepted order",
+                        metadata={
+                            "order_id": order_id,
+                            "symbol": payload.symbol,
+                            "broker_order_id": broker_order_id,
+                            "status": status,
+                        },
+                    )
+            except Exception as exc:
+                status = "BROKER_REJECTED"
+                safe_error = redact_text(str(exc))
+                rejection_reason = safe_error or "Live broker submission failed"
+                success = False
+                error = rejection_reason
+                dlq_id = enqueue_dlq(order_id, payload_json, rejection_reason)
+                record_order_rejection(order_id, rejection_reason)
+                record_event(
+                    flow="orders",
+                    level="error",
+                    message=f"Live broker call failed; routed to DLQ: {rejection_reason}",
+                    metadata={"order_id": order_id, "symbol": payload.symbol},
+                )
         else:
             status = "BROKER_REJECTED"
             rejection_reason = "Live broker adapter unavailable"
@@ -329,6 +432,33 @@ async def place_order(payload: PlaceOrderRequest) -> dict[str, Any]:
 
 @router.post("/orders/{order_id}/cancel", response_model=CancelOrderResponse)
 async def cancel_order(order_id: str) -> CancelOrderResponse:
+    order = get_order(order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found.")
+
+    mode = str(order.get("mode") or "").strip().lower()
+    broker_order_id = str(order.get("broker_order_id") or "").strip()
+    if mode == "live" and broker_order_id and _broker_live_enabled():
+        try:
+            live_status = await _cancel_live_order_via_broker(broker_order_id)
+            updated = set_order_status(order_id, live_status, "Cancelled via broker")
+            if updated is None:
+                raise HTTPException(status_code=404, detail="Order not found.")
+            record_event(
+                flow="orders",
+                level="info",
+                message="Live order cancelled via broker",
+                metadata={"order_id": order_id, "broker_order_id": broker_order_id, "status": live_status},
+            )
+            return CancelOrderResponse(success=True, order_id=order_id, status=str(updated["status"]))
+        except Exception as exc:
+            record_event(
+                flow="orders",
+                level="warn",
+                message=f"Broker cancel failed, fallback local cancel: {redact_text(str(exc))}",
+                metadata={"order_id": order_id, "broker_order_id": broker_order_id},
+            )
+
     updated = set_order_status(order_id, "CANCELLED", "Cancelled by user")
     if updated is None:
         raise HTTPException(status_code=404, detail="Order not found.")

@@ -67,6 +67,15 @@ def test_orders_live_confirmation_and_cancel_flow(client: TestClient, monkeypatc
     monkeypatch.setenv("ENABLE_LIVE_BROKER", "true")
     monkeypatch.setattr("interface.rest.orders.market_session_open", lambda: True)
 
+    async def _fake_submit_live_order_via_broker(**kwargs: object) -> tuple[str, str | None, str | None]:
+        return ("PENDING", "SIM-ORDER-001", None)
+
+    async def _fake_cancel_live_order_via_broker(broker_order_id: str) -> str:
+        return "CANCELLED"
+
+    monkeypatch.setattr("interface.rest.orders._submit_live_order_via_broker", _fake_submit_live_order_via_broker)
+    monkeypatch.setattr("interface.rest.orders._cancel_live_order_via_broker", _fake_cancel_live_order_via_broker)
+
     first = client.post(
         "/api/orders",
         json={

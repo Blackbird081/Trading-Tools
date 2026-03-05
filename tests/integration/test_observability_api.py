@@ -38,3 +38,13 @@ def test_observability_events_includes_failed_flow(
     assert any(event.get("flow") == "load" for event in body["events"])
     assert any(event.get("correlation_id") == "cid-obs-002" for event in body["events"])
 
+
+def test_websocket_events_include_correlation_id(client: TestClient) -> None:
+    with client.websocket_connect("/ws/market", headers={"X-Correlation-ID": "cid-ws-003"}) as ws:
+        ws.send_text('{"type":"ping"}')
+
+    response = client.get("/api/observability/events?flow=ws&limit=20")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] >= 1
+    assert any(event.get("correlation_id") == "cid-ws-003" for event in body["events"])

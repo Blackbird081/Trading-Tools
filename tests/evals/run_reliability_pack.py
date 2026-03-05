@@ -13,6 +13,7 @@ try:
         evaluate_provider_ab,
         load_predictions,
     )
+    from tests.evals.provider_parity_calibration import evaluate_provider_parity
     from tests.evals.reliability_metrics import evaluate_quant_benchmark, load_outcomes_csv
     from tests.evals.weekly_drift_monitor import detect_drift, summarize_weekly
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
@@ -22,6 +23,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution fallba
         evaluate_provider_ab,
         load_predictions,
     )
+    from provider_parity_calibration import evaluate_provider_parity  # type: ignore[no-redef]
     from reliability_metrics import evaluate_quant_benchmark, load_outcomes_csv  # type: ignore[no-redef]
     from weekly_drift_monitor import detect_drift, summarize_weekly  # type: ignore[no-redef]
 
@@ -34,6 +36,7 @@ def main() -> None:
 
     ab_rows = load_predictions(AB_DATASET)
     ab_metrics = evaluate_provider_ab(ab_rows)
+    parity = evaluate_provider_parity(ab_rows)
 
     weekly = summarize_weekly(outcomes)
     drift = detect_drift(weekly, baseline_weeks=4, hit_drop_threshold=0.20)
@@ -42,6 +45,7 @@ def main() -> None:
         "timestamp": datetime.now(UTC).isoformat(),
         "benchmark_quant": benchmark,
         "provider_ab_consensus": ab_metrics,
+        "provider_parity": parity,
         "weekly_drift": {
             "weeks": weekly,
             "alerts": drift,

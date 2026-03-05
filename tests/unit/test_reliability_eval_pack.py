@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from tests.evals.provider_ab_consensus import evaluate_provider_ab, load_predictions
+from tests.evals.provider_parity_calibration import evaluate_provider_parity
 from tests.evals.reliability_metrics import evaluate_quant_benchmark, load_outcomes_csv
 from tests.evals.weekly_drift_monitor import detect_drift, summarize_weekly
 
@@ -31,6 +32,11 @@ def test_provider_ab_consensus_metrics() -> None:
     assert "openai" in provider_rates
     assert "gemini" in provider_rates
 
+    parity = evaluate_provider_parity(rows)
+    assert isinstance(parity["providers"], list)
+    assert parity["best_provider"] is not None
+    assert 0.0 <= float(parity["parity_spread"]) <= 1.0
+
 
 def test_weekly_drift_detection_reports_alerts() -> None:
     rows = load_outcomes_csv(OUTCOMES_DATASET)
@@ -38,4 +44,3 @@ def test_weekly_drift_detection_reports_alerts() -> None:
     alerts = detect_drift(weekly, baseline_weeks=4, hit_drop_threshold=0.20)
     assert len(weekly) == 8
     assert len(alerts) >= 1
-

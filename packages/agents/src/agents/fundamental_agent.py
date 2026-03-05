@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import re
 from typing import Any
 
 from agents.data_contract import get_value, normalize_financial_data
@@ -33,6 +35,8 @@ _ROLE_INSTRUCTIONS: dict[str, str] = {
         "and provide strict downside warnings."
     ),
 }
+_ALLOWED_BIAS = {"BUY", "SELL", "HOLD"}
+_ALLOWED_CONFIDENCE = {"low", "medium", "high"}
 
 
 class FundamentalAgent:
@@ -237,11 +241,12 @@ class FundamentalAgent:
             }
 
         active_roles = self._select_active_roles(has_financial_data=has_financial_data, has_news=has_news)
-        role_outputs: dict[str, str] = {}
+        role_outputs: dict[str, dict[str, Any]] = {}
 
         for role in active_roles:
             role_prompt = self._build_role_prompt(role=role, base_prompt=base_prompt)
-            role_outputs[role] = await self._generate(role_prompt)
+            raw_output = await self._generate(role_prompt)
+            role_outputs[role] = self._parse_role_output(raw_output)
 
         arbitration = self._arbitrate(
             symbol=symbol,
@@ -273,19 +278,89 @@ class FundamentalAgent:
         instruction = _ROLE_INSTRUCTIONS.get(role, "Role analyst: provide structured analysis.")
         return (
             f"{instruction}\n"
-            "Output format:\n"
-            "- key_findings: ...\n"
-            "- recommendation_bias: BUY/SELL/HOLD\n"
-            "- confidence: low/medium/high\n\n"
+            "Output STRICT JSON only, no markdown:\n"
+            "{\n"
+            '  "key_findings": ["...","..."],\n'
+            '  "recommendation_bias": "BUY|SELL|HOLD",\n'
+            '  "confidence": "low|medium|high",\n'
+            '  "summary": "max 2 concise sentences"\n'
+            "}\n\n"
             f"{base_prompt}"
         )
+
+    @staticmethod
+    def _extract_json_blob(raw: str) -> str:
+        stripped = raw.strip()
+        if stripped.startswith("{") and stripped.endswith("}"):
+            return stripped
+        match = re.search(r"\{.*\}", stripped, flags=re.DOTALL)
+        if match:
+            return match.group(0)
+        return "{}"
+
+    @staticmethod
+    def _infer_bias_from_text(raw: str) -> str:
+        text = raw.lower()
+        if "sell" in text or "avoid" in text or "reduce" in text:
+            return "SELL"
+        if "buy" in text or "accumulate" in text or "add" in text:
+            return "BUY"
+        return "HOLD"
+
+    @staticmethod
+    def _infer_confidence_from_text(raw: str) -> str:
+        text = raw.lower()
+        if "high confidence" in text or "strong conviction" in text:
+            return "high"
+        if "low confidence" in text or "uncertain" in text:
+            return "low"
+        return "medium"
+
+    def _parse_role_output(self, raw: str) -> dict[str, Any]:
+        cleaned = " ".join(raw.strip().split())
+        payload: dict[str, Any] = {}
+        try:
+            payload = json.loads(self._extract_json_blob(raw))
+            if not isinstance(payload, dict):
+                payload = {}
+        except Exception:
+            payload = {}
+
+        findings_raw = payload.get("key_findings", [])
+        findings: list[str] = []
+        if isinstance(findings_raw, list):
+            findings = [str(item).strip() for item in findings_raw if str(item).strip()]
+        elif isinstance(findings_raw, str) and findings_raw.strip():
+            findings = [part.strip("- ").strip() for part in findings_raw.split(";") if part.strip()]
+        if not findings and cleaned:
+            findings = [cleaned[:220]]
+
+        rec = str(payload.get("recommendation_bias", "")).strip().upper()
+        if rec not in _ALLOWED_BIAS:
+            rec = self._infer_bias_from_text(raw)
+
+        confidence = str(payload.get("confidence", "")).strip().lower()
+        if confidence not in _ALLOWED_CONFIDENCE:
+            confidence = self._infer_confidence_from_text(raw)
+
+        summary = str(payload.get("summary", "")).strip()
+        if not summary:
+            summary = cleaned[:320]
+
+        return {
+            "key_findings": findings[:3],
+            "recommendation_bias": rec,
+            "confidence": confidence,
+            "summary": summary,
+            "raw_text": cleaned[:1200],
+        }
 
     def _arbitrate(
         self,
         symbol: str,
         technical_action: str,
         ew_result: Any | None,
-        role_outputs: dict[str, str],
+        role_outputs: dict[str, dict[str, Any]],
     ) -> dict[str, Any]:
         risk_level = str(getattr(ew_result, "risk_level", "")).strip().lower()
         policy = "risk_veto_then_consensus"
@@ -300,10 +375,10 @@ class FundamentalAgent:
 
         sentiment = 0
         for output in role_outputs.values():
-            lower = output.lower()
-            if "sell" in lower or "avoid" in lower:
+            bias = str(output.get("recommendation_bias", "")).upper()
+            if bias == "SELL":
                 sentiment -= 1
-            if "buy" in lower or "accumulate" in lower:
+            if bias == "BUY":
                 sentiment += 1
 
         base_action = technical_action if technical_action in {"BUY", "SELL", "HOLD"} else "HOLD"
@@ -325,7 +400,7 @@ class FundamentalAgent:
     def _compose_final_summary(
         self,
         symbol: str,
-        role_outputs: dict[str, str],
+        role_outputs: dict[str, dict[str, Any]],
         arbitration: dict[str, Any],
     ) -> str:
         lines = [
@@ -335,8 +410,15 @@ class FundamentalAgent:
             "Role outputs:",
         ]
         for role, output in role_outputs.items():
-            compact = " ".join(output.strip().split())
-            lines.append(f"- {role}: {compact[:320]}")
+            findings = output.get("key_findings", [])
+            finding_text = "; ".join(str(item) for item in findings) if isinstance(findings, list) else ""
+            bias = str(output.get("recommendation_bias", "HOLD"))
+            confidence = str(output.get("confidence", "medium"))
+            summary = str(output.get("summary", "")).strip()
+            lines.append(
+                f"- {role}: bias={bias} confidence={confidence} "
+                f"findings={finding_text[:180]} summary={summary[:220]}"
+            )
         return "\n".join(lines)
 
     async def _get_financial_data(self, symbol: str) -> dict[str, Any] | None:

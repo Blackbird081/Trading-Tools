@@ -671,3 +671,27 @@ Notes:
 - Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0` governance + `LOCAL_PERSONAL_TRADING_ROADMAP.md` + `MARKET_BOARD_MOBILE_FIX_ROADMAP.md`
 - Owner: Codex + project owner
 - Notes: This entry backfills CVF trace completeness and restores plan-to-evidence alignment.
+
+### CVF-TT-20260305-039
+- Date-Time (UTC+7): 2026-03-05 10:55
+- Type: feature
+- Scope: Close remaining completion gaps by wiring live broker runtime into OMS/portfolio routes, enforcing schema-locked AI role outputs, extending websocket observability with correlation-id events, and adding provider parity calibration to reliability automation.
+- Impact:
+  - `orders` live mode now submits/cancels through SSI broker adapter when credentials are present (`ENABLE_LIVE_BROKER=true`) and falls back safely to DLQ with redacted errors.
+  - `portfolio` live mode now attempts SSI broker snapshot and reconcile path with cache fallback + correlation-aware diagnostics.
+  - Fundamental role outputs are schema-locked (`key_findings`, `recommendation_bias`, `confidence`, `summary`) with deterministic fallback parser.
+  - WebSocket `/ws/market` now records connect/message/disconnect observability events with correlation-id propagation via shared `ws_manager`.
+  - Reliability pack includes provider parity calibration metrics (best/worst provider + parity spread) and weekly report renders parity section.
+- Root Cause: Independent re-assessment still identified open productization gaps in live broker readiness, AI output contract control, websocket deep observability, and provider calibration governance.
+- Files Changed: `packages/interface/src/interface/live_broker.py`, `packages/interface/src/interface/rest/orders.py`, `packages/interface/src/interface/rest/portfolio.py`, `packages/interface/src/interface/ws/market_ws.py`, `packages/adapters/src/adapters/ssi/portfolio.py`, `packages/agents/src/agents/fundamental_agent.py`, `tests/integration/test_local_product_api.py`, `tests/integration/test_observability_api.py`, `tests/unit/test_fundamental_agent.py`, `tests/evals/provider_parity_calibration.py`, `tests/evals/run_reliability_pack.py`, `tests/unit/test_reliability_eval_pack.py`, `scripts/run-weekly-reliability-pack.ps1`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `ROADMAP.md`, `docs/reports/AI_RELIABILITY_WEEKLY_LATEST.md`, `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `python -m py_compile packages/interface/src/interface/live_broker.py packages/interface/src/interface/rest/orders.py packages/interface/src/interface/rest/portfolio.py packages/interface/src/interface/ws/market_ws.py packages/adapters/src/adapters/ssi/portfolio.py packages/agents/src/agents/fundamental_agent.py tests/evals/provider_parity_calibration.py tests/evals/run_reliability_pack.py` (pass)
+  - `python -m pytest tests/unit/test_fundamental_agent.py tests/unit/test_reliability_eval_pack.py tests/integration/test_local_product_api.py tests/integration/test_order_safety_controls.py tests/integration/test_observability_api.py -q` with `PYTHONPATH=packages/core/src;packages/adapters/src;packages/agents/src;packages/interface/src;.` (pass, 26 tests)
+  - `powershell -ExecutionPolicy Bypass -File scripts/run-weekly-reliability-pack.ps1` (pass; weekly report refreshed with parity section)
+  - `powershell -ExecutionPolicy Bypass -File scripts/release-validation.ps1` (pass; overall `PASS`)
+- Deployment Target: backend runtime (`orders/portfolio/ws`), AI agent reliability governance, planning/report documentation
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: `N/A` (pending next commit)
+- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` (Phase 3/4, AI-06, AI-R5, OBS-01 updates) + `IMPLEMENTATION_PLAN.md` (`AI-R5`, `OBS-02`, post-closure execution update)
+- Owner: Codex + project owner
+- Notes: Live broker rollout still requires real-account UAT and operational sign-off before unattended live mode.

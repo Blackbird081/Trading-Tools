@@ -224,3 +224,38 @@ class TestFundamentalAgent:
         arbitration = result["ai_role_outputs"]["FPT"]["arbitration"]
         assert arbitration["final_action"] == "HOLD"
         assert arbitration["risk_veto"] is True
+
+    def test_role_output_parser_enforces_schema_with_json_payload(
+        self,
+        mock_engine: AsyncMock,
+        mock_news: MagicMock,
+        prompt_builder: FinancialPromptBuilder,
+    ) -> None:
+        agent = FundamentalAgent(
+            engine=mock_engine,
+            prompt_builder=prompt_builder,
+            news_port=mock_news,
+        )
+        parsed = agent._parse_role_output(
+            '{"key_findings":["Margin improving","Debt stable"],"recommendation_bias":"BUY","confidence":"high","summary":"Fundamentals improving."}'
+        )
+        assert parsed["recommendation_bias"] == "BUY"
+        assert parsed["confidence"] == "high"
+        assert parsed["key_findings"] == ["Margin improving", "Debt stable"]
+        assert parsed["summary"] == "Fundamentals improving."
+
+    def test_role_output_parser_fallback_from_free_text(
+        self,
+        mock_engine: AsyncMock,
+        mock_news: MagicMock,
+        prompt_builder: FinancialPromptBuilder,
+    ) -> None:
+        agent = FundamentalAgent(
+            engine=mock_engine,
+            prompt_builder=prompt_builder,
+            news_port=mock_news,
+        )
+        parsed = agent._parse_role_output("We should avoid this setup and reduce exposure because leverage is high.")
+        assert parsed["recommendation_bias"] == "SELL"
+        assert parsed["confidence"] in {"low", "medium", "high"}
+        assert len(parsed["key_findings"]) >= 1
