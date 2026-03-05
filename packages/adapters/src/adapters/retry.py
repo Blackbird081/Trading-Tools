@@ -5,7 +5,7 @@ import logging
 import random
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeVar
 
 logger = logging.getLogger("retry")
 
@@ -25,6 +25,7 @@ class RetryConfig:
 
 
 _DEFAULT_RETRY_CONFIG = RetryConfig()
+T = TypeVar("T")
 
 
 def calculate_backoff_delay(attempt: int, config: RetryConfig) -> float:
@@ -35,7 +36,7 @@ def calculate_backoff_delay(attempt: int, config: RetryConfig) -> float:
     return delay
 
 
-async def retry_async[T](
+async def retry_async(
     func: Callable[..., Awaitable[T]],
     *args: Any,
     config: RetryConfig = _DEFAULT_RETRY_CONFIG,
@@ -70,3 +71,4 @@ async def retry_async[T](
             await asyncio.sleep(delay)
     assert last_exception is not None
     raise last_exception
+

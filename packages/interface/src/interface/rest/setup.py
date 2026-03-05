@@ -20,62 +20,62 @@ from interface.redaction import redact_mapping, redact_text
 router = APIRouter(tags=["setup"])
 _AI_PROVIDERS = {"deterministic", "openvino", "openai", "anthropic", "gemini", "alibaba"}
 logger = logging.getLogger("interface.setup")
-_DEFAULT_AI_FALLBACK_ORDER = "anthropic,gemini,alibaba,deterministic"
+_DEFAULT_AI_FALLBACK_ORDER = "openai,anthropic,gemini,alibaba,deterministic"
 
 _MODEL_RECOMMENDATION_MATRIX: list[dict[str, object]] = [
     {
         "task": "Screener summary",
         "role": "screener",
         "goal": "Fast ranking + concise rationale",
-        "openai": "gpt-4o-mini",
-        "anthropic": "claude-3-5-haiku-latest",
-        "gemini": "gemini-1.5-flash",
-        "alibaba": "kimi-k2.5",
+        "openai": "gpt-5-mini",
+        "anthropic": "claude-sonnet-4-20250514",
+        "gemini": "gemini-2.5-flash",
+        "alibaba": "qwen3-max",
     },
     {
         "task": "Technical interpretation",
         "role": "technical",
         "goal": "Explain RSI/MACD/price action conflicts",
-        "openai": "gpt-4o-mini",
-        "anthropic": "claude-3-5-haiku-latest",
-        "gemini": "gemini-1.5-pro",
-        "alibaba": "kimi-k2.5",
+        "openai": "gpt-5-mini",
+        "anthropic": "claude-sonnet-4-20250514",
+        "gemini": "gemini-2.5-pro",
+        "alibaba": "qwen3-max",
     },
     {
         "task": "Fundamental thesis",
         "role": "fundamental_thesis",
         "goal": "Narrative + valuation context",
-        "openai": "gpt-4o-mini",
-        "anthropic": "claude-3-5-sonnet-latest",
-        "gemini": "gemini-1.5-pro",
-        "alibaba": "kimi-k2.5",
+        "openai": "gpt-5-mini",
+        "anthropic": "claude-sonnet-4-20250514",
+        "gemini": "gemini-2.5-pro",
+        "alibaba": "qwen3-max",
     },
     {
         "task": "Risk challenge",
         "role": "risk_challenge",
         "goal": "Challenge optimistic assumptions",
-        "openai": "gpt-4o-mini",
-        "anthropic": "claude-3-5-sonnet-latest",
-        "gemini": "gemini-1.5-pro",
-        "alibaba": "kimi-k2.5",
+        "openai": "gpt-5-mini",
+        "anthropic": "claude-sonnet-4-20250514",
+        "gemini": "gemini-2.5-pro",
+        "alibaba": "qwen3-max",
     },
     {
         "task": "Code/refactor helper",
         "role": "coder",
         "goal": "Implement code and bug fixes",
-        "openai": "gpt-4o-mini",
-        "anthropic": "claude-3-5-haiku-latest",
-        "gemini": "gemini-1.5-flash",
-        "alibaba": "qwen2.5-coder-32b-instruct",
+        "openai": "gpt-5-mini",
+        "anthropic": "claude-sonnet-4-20250514",
+        "gemini": "gemini-2.5-flash",
+        "alibaba": "qwen3-coder-plus",
     },
     {
         "task": "Docs/UI writing",
         "role": "writing",
         "goal": "Readable docs and UI copy",
-        "openai": "gpt-4o-mini",
-        "anthropic": "claude-3-5-haiku-latest",
-        "gemini": "gemini-1.5-flash",
-        "alibaba": "minimax-m2.5",
+        "openai": "gpt-5-mini",
+        "anthropic": "claude-sonnet-4-20250514",
+        "gemini": "gemini-2.5-flash",
+        "alibaba": "qwen3.5-plus",
     },
 ]
 
@@ -140,22 +140,22 @@ class SetupValidateRequest(BaseModel):
     ssi_private_key_b64: str = Field(default="", max_length=16384)
     ai_provider: Literal["deterministic", "openvino", "openai", "anthropic", "gemini", "alibaba"] = "deterministic"
     openai_api_key: str = Field(default="", max_length=256)
-    openai_model: str = Field(default="gpt-4o-mini", max_length=120)
-    openai_model_coder: str = Field(default="gpt-4o-mini", max_length=120)
-    openai_model_writing: str = Field(default="gpt-4o-mini", max_length=120)
+    openai_model: str = Field(default="gpt-5-mini", max_length=120)
+    openai_model_coder: str = Field(default="gpt-5-mini", max_length=120)
+    openai_model_writing: str = Field(default="gpt-5-mini", max_length=120)
     anthropic_api_key: str = Field(default="", max_length=256)
-    anthropic_model: str = Field(default="claude-3-5-haiku-latest", max_length=120)
-    anthropic_model_coder: str = Field(default="claude-3-5-haiku-latest", max_length=120)
-    anthropic_model_writing: str = Field(default="claude-3-5-haiku-latest", max_length=120)
+    anthropic_model: str = Field(default="claude-sonnet-4-20250514", max_length=120)
+    anthropic_model_coder: str = Field(default="claude-sonnet-4-20250514", max_length=120)
+    anthropic_model_writing: str = Field(default="claude-sonnet-4-20250514", max_length=120)
     gemini_api_key: str = Field(default="", max_length=256)
-    gemini_model: str = Field(default="gemini-1.5-flash", max_length=120)
-    gemini_model_coder: str = Field(default="gemini-1.5-flash", max_length=120)
-    gemini_model_writing: str = Field(default="gemini-1.5-flash", max_length=120)
+    gemini_model: str = Field(default="gemini-2.5-flash", max_length=120)
+    gemini_model_coder: str = Field(default="gemini-2.5-flash", max_length=120)
+    gemini_model_writing: str = Field(default="gemini-2.5-flash", max_length=120)
     alibaba_api_key: str = Field(default="", max_length=256)
     alibaba_base_url: str = Field(default="https://dashscope-intl.aliyuncs.com/compatible-mode/v1", max_length=256)
-    alibaba_model_coder: str = Field(default="qwen2.5-coder-32b-instruct", max_length=120)
-    alibaba_model_reasoning: str = Field(default="kimi-k2.5", max_length=120)
-    alibaba_model_writing: str = Field(default="minimax-m2.5", max_length=120)
+    alibaba_model_coder: str = Field(default="qwen3-coder-plus", max_length=120)
+    alibaba_model_reasoning: str = Field(default="qwen3-max", max_length=120)
+    alibaba_model_writing: str = Field(default="qwen3.5-plus", max_length=120)
     ai_fallback_order: str = Field(default=_DEFAULT_AI_FALLBACK_ORDER, max_length=240)
     ai_timeout_seconds: float = Field(default=20.0, ge=3.0, le=120.0)
     ai_budget_usd_per_run: float = Field(default=0.25, ge=0.01, le=50.0)
@@ -308,27 +308,27 @@ async def get_setup_status() -> dict[str, object]:
     if ai_provider not in _AI_PROVIDERS:
         ai_provider = "deterministic"
     openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-    openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
-    openai_model_coder = os.getenv("OPENAI_MODEL_CODER", openai_model or "gpt-4o-mini").strip()
-    openai_model_writing = os.getenv("OPENAI_MODEL_WRITING", openai_model or "gpt-4o-mini").strip()
+    openai_model = os.getenv("OPENAI_MODEL", "gpt-5-mini").strip()
+    openai_model_coder = os.getenv("OPENAI_MODEL_CODER", openai_model or "gpt-5-mini").strip()
+    openai_model_writing = os.getenv("OPENAI_MODEL_WRITING", openai_model or "gpt-5-mini").strip()
     anthropic_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
-    anthropic_model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest").strip()
+    anthropic_model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514").strip()
     anthropic_model_coder = os.getenv(
         "ANTHROPIC_MODEL_CODER",
-        anthropic_model or "claude-3-5-haiku-latest",
+        anthropic_model or "claude-sonnet-4-20250514",
     ).strip()
     anthropic_model_writing = os.getenv(
         "ANTHROPIC_MODEL_WRITING",
-        anthropic_model or "claude-3-5-haiku-latest",
+        anthropic_model or "claude-sonnet-4-20250514",
     ).strip()
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-    gemini_model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
-    gemini_model_coder = os.getenv("GEMINI_MODEL_CODER", gemini_model or "gemini-1.5-flash").strip()
-    gemini_model_writing = os.getenv("GEMINI_MODEL_WRITING", gemini_model or "gemini-1.5-flash").strip()
+    gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+    gemini_model_coder = os.getenv("GEMINI_MODEL_CODER", gemini_model or "gemini-2.5-flash").strip()
+    gemini_model_writing = os.getenv("GEMINI_MODEL_WRITING", gemini_model or "gemini-2.5-flash").strip()
     alibaba_key = os.getenv("ALIBABA_API_KEY", "").strip()
-    alibaba_model_coder = os.getenv("ALIBABA_MODEL_CODER", "qwen2.5-coder-32b-instruct").strip()
-    alibaba_model_reasoning = os.getenv("ALIBABA_MODEL_REASONING", "kimi-k2.5").strip()
-    alibaba_model_writing = os.getenv("ALIBABA_MODEL_WRITING", "minimax-m2.5").strip()
+    alibaba_model_coder = os.getenv("ALIBABA_MODEL_CODER", "qwen3-coder-plus").strip()
+    alibaba_model_reasoning = os.getenv("ALIBABA_MODEL_REASONING", "qwen3-max").strip()
+    alibaba_model_writing = os.getenv("ALIBABA_MODEL_WRITING", "qwen3.5-plus").strip()
     alibaba_base_url = os.getenv("ALIBABA_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1").strip()
     ai_fallback_order = os.getenv("AGENT_AI_FALLBACK_ORDER", _DEFAULT_AI_FALLBACK_ORDER).strip()
     ai_timeout_seconds = float(os.getenv("AGENT_AI_TIMEOUT_SECONDS", "20"))
@@ -428,12 +428,12 @@ async def get_setup_status() -> dict[str, object]:
 async def get_model_recommendations() -> dict[str, object]:
     return {
         "provider_defaults": {
-            "openai_reasoning": os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip(),
-            "anthropic_reasoning": os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest").strip(),
-            "gemini_reasoning": os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip(),
-            "alibaba_reasoning": os.getenv("ALIBABA_MODEL_REASONING", "kimi-k2.5").strip(),
-            "alibaba_coder": os.getenv("ALIBABA_MODEL_CODER", "qwen2.5-coder-32b-instruct").strip(),
-            "alibaba_writing": os.getenv("ALIBABA_MODEL_WRITING", "minimax-m2.5").strip(),
+            "openai_reasoning": os.getenv("OPENAI_MODEL", "gpt-5-mini").strip(),
+            "anthropic_reasoning": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514").strip(),
+            "gemini_reasoning": os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip(),
+            "alibaba_reasoning": os.getenv("ALIBABA_MODEL_REASONING", "qwen3-max").strip(),
+            "alibaba_coder": os.getenv("ALIBABA_MODEL_CODER", "qwen3-coder-plus").strip(),
+            "alibaba_writing": os.getenv("ALIBABA_MODEL_WRITING", "qwen3.5-plus").strip(),
         },
         "matrix": _MODEL_RECOMMENDATION_MATRIX,
         "timestamp": datetime.now(UTC).isoformat(),

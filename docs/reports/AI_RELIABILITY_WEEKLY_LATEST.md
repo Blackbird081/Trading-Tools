@@ -1,7 +1,7 @@
 ﻿# AI Reliability Weekly Report (Latest)
 
-- Generated-At (UTC): 2026-03-05T03:46:48.289837+00:00
-- Source Artifact: tests/evals/results/reliability_pack_2026-03-05-034648.json
+- Generated-At (UTC): 2026-03-05T14:17:09.806641+00:00
+- Source Artifact: tests/evals/results/reliability_pack_2026-03-05-141709.json
 - Precision@K: 0.6
 - Hit-rate: 0.5
 - MDD: 0.1554240955666563
@@ -11,7 +11,7 @@
 - Best provider: gemini
 - Worst provider: openai
 - Drift alerts: 4
-- Strict gate: PASS (FailOnDriftSeverity=none)
+- Strict gate: FAIL (FailOnDriftSeverity=high)
 
 ## Threshold Checks
 

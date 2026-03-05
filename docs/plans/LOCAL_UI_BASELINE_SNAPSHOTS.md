@@ -1,51 +1,54 @@
 # Local UI Baseline Snapshots
 
 ## CVF Traceability
-- CVF-Doc-ID: CVF-TT-LOCAL-UI-BASELINE-20260303-R1
-- Last-Updated: 2026-03-03
-- Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` -> Phase 0
-- Purpose: Lock baseline UI behavior before deeper local-product refactor.
+- CVF-Doc-ID: CVF-TT-LOCAL-UI-BASELINE-20260305-R2
+- Last-Updated: 2026-03-05
+- Plan Mapping: `UI_EVALUATION_ROADMAP.md` -> `UI-P0`, `UI-P1`, `UI-P2`
+- Purpose: Lock post-hardening UI baseline before release validation.
 
-## Snapshot Log (Baseline R1)
+## Snapshot Log (Baseline R2)
 
 1. Dashboard
 - Route: `/dashboard`
 - Baseline behavior:
-  - Data loader is user-triggered (`Load`/`Update`), no auto-load.
-  - Market data table renders from cache/store.
-  - Desktop includes session overview panel.
+  - `MarketIndexBar` and data-loader flow are active.
+  - Desktop right panel shows session overview stats.
+  - Legacy dashboard `trading-chart.tsx` path is removed from active UI bundle.
 
 2. Market Board
 - Route: `/market-board`
 - Baseline behavior:
-  - Mobile shows one sector at a time with swipe/category rail.
+  - Mobile sector buttons keep normalized fixed height (`h-14`) and consistent width behavior.
   - Desktop shows paged 3-column sector board.
-  - No duplicate data-loader controls on this screen.
+  - Mobile supports swipe + button navigation by sector.
 
 3. Portfolio
 - Route: `/portfolio`
 - Baseline behavior:
-  - Page renders placeholder NAV/Cash/PnL values.
-  - Positions and PnL chart are UI-first placeholders, not broker-synced.
+  - Portfolio summary and PnL sections follow shared spacing tokens (`p-3 sm:p-4` outer shell).
+  - Data remains sourced from backend portfolio endpoints.
 
 4. Orders
 - Route: `/orders`
 - Baseline behavior:
-  - Order form validates lot-size and local fields.
-  - Actions remain frontend-local (not yet wired to backend order API).
+  - Runtime safety badges are visible above order controls (mode, kill-switch, provider, session).
+  - Order form supports lot-size validation and explicit dry-run/live mode selection.
+  - Order list is wired to backend order APIs.
 
 5. Screener
 - Route: `/screener`
 - Baseline behavior:
-  - Pipeline runner streams staged events.
-  - Current backend path still includes simulated result stream.
+  - Runtime safety badges are visible before pipeline execution.
+  - Pipeline run mode selection (`dry-run`/`live`) is explicit.
+  - Expanded result details display current selected run mode.
 
 6. Settings
 - Route: `/settings`
 - Baseline behavior:
-  - Setup wizard can draft config, validate input format, check runtime setup status, and initialize local data path.
+  - Setup Wizard keeps explicit `Save Draft` / `Apply Draft` / `Revert` actions.
+  - Inline action hint appears after save/apply/revert to reduce operator mistakes.
+  - Page spacing and heading scale match cross-page layout tokens.
 
 ## Notes
-- This artifact is a behavior baseline log; visual image attachments can be stored in external release notes if required.
-- Any intentional behavior change from this baseline should reference this doc in CVF trace entry.
-
+- This artifact tracks behavior baseline for release-gate evidence.
+- Any intentional UI behavior changes after R2 must append CVF trace references.

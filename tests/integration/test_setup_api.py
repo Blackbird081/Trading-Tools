@@ -44,7 +44,7 @@ def test_setup_validate_returns_checks(client: TestClient, tmp_path: Path) -> No
         "ai_budget_usd_per_run": 0.3,
         "ai_max_remote_calls": 20,
         "openai_api_key": "",
-        "openai_model": "gpt-4o-mini",
+        "openai_model": "gpt-5-mini",
         "ai_model_path": str(tmp_path / "model"),
     }
     response = client.post("/api/setup/validate", json=payload)
@@ -75,7 +75,7 @@ def test_setup_validate_supports_anthropic_provider(client: TestClient, tmp_path
         "ssi_private_key_b64": "dGVzdA==",
         "ai_provider": "anthropic",
         "anthropic_api_key": "sk-ant-12345678901234567890",
-        "anthropic_model": "claude-3-5-haiku-latest",
+        "anthropic_model": "claude-sonnet-4-20250514",
         "ai_model_path": str(tmp_path / "model"),
     }
     response = client.post("/api/setup/validate", json=payload)
@@ -97,7 +97,7 @@ def test_setup_validate_supports_gemini_provider(client: TestClient, tmp_path: P
         "ssi_private_key_b64": "dGVzdA==",
         "ai_provider": "gemini",
         "gemini_api_key": "AIza12345678901234567890",
-        "gemini_model": "gemini-1.5-flash",
+        "gemini_model": "gemini-2.5-flash",
         "ai_model_path": str(tmp_path / "model"),
     }
     response = client.post("/api/setup/validate", json=payload)
@@ -120,9 +120,9 @@ def test_setup_validate_supports_alibaba_provider(client: TestClient, tmp_path: 
         "ai_provider": "alibaba",
         "alibaba_api_key": "sk-alibaba-12345678901234567890",
         "alibaba_base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-        "alibaba_model_coder": "qwen2.5-coder-32b-instruct",
-        "alibaba_model_reasoning": "kimi-k2.5",
-        "alibaba_model_writing": "minimax-m2.5",
+        "alibaba_model_coder": "qwen3-coder-plus",
+        "alibaba_model_reasoning": "qwen3-max",
+        "alibaba_model_writing": "qwen3.5-plus",
         "ai_model_path": str(tmp_path / "model"),
     }
     response = client.post("/api/setup/validate", json=payload)

@@ -40,14 +40,14 @@ def test_data_provider_mode_policy(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_build_insight_engine_from_env_provider_selection(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENT_AI_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-12345678901234567890")
-    monkeypatch.setenv("OPENAI_MODEL", "gpt-4o-mini")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-5-mini")
     engine, provider, remote_enabled, model_name = data_loader._build_insight_engine_from_env()  # noqa: SLF001
     assert provider == "openai"
     assert remote_enabled is True
     assert "router(" in model_name
     assert isinstance(engine, data_loader._OpenAIInsightEngine)  # noqa: SLF001
-    assert engine._model_reasoning == "gpt-4o-mini"  # noqa: SLF001
-    assert "gpt-4o-mini" in {  # noqa: SLF001
+    assert engine._model_reasoning == "gpt-5-mini"  # noqa: SLF001
+    assert "gpt-5-mini" in {  # noqa: SLF001
         engine._select_model("Need deep plan and risk reasoning"),  # noqa: SLF001
         engine._select_model("Write docs and UI style notes"),  # noqa: SLF001
         engine._select_model("Refactor API function with unit tests"),  # noqa: SLF001
@@ -55,7 +55,7 @@ def test_build_insight_engine_from_env_provider_selection(monkeypatch: pytest.Mo
 
     monkeypatch.setenv("AGENT_AI_PROVIDER", "anthropic")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-12345678901234567890")
-    monkeypatch.setenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
+    monkeypatch.setenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
     engine, provider, remote_enabled, model_name = data_loader._build_insight_engine_from_env()  # noqa: SLF001
     assert provider == "anthropic"
     assert remote_enabled is True
@@ -64,7 +64,7 @@ def test_build_insight_engine_from_env_provider_selection(monkeypatch: pytest.Mo
 
     monkeypatch.setenv("AGENT_AI_PROVIDER", "gemini")
     monkeypatch.setenv("GEMINI_API_KEY", "AIza12345678901234567890")
-    monkeypatch.setenv("GEMINI_MODEL", "gemini-1.5-flash")
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-2.5-flash")
     engine, provider, remote_enabled, model_name = data_loader._build_insight_engine_from_env()  # noqa: SLF001
     assert provider == "gemini"
     assert remote_enabled is True
@@ -73,17 +73,17 @@ def test_build_insight_engine_from_env_provider_selection(monkeypatch: pytest.Mo
 
     monkeypatch.setenv("AGENT_AI_PROVIDER", "alibaba")
     monkeypatch.setenv("ALIBABA_API_KEY", "sk-alibaba-12345678901234567890")
-    monkeypatch.setenv("ALIBABA_MODEL_CODER", "qwen2.5-coder-32b-instruct")
-    monkeypatch.setenv("ALIBABA_MODEL_REASONING", "kimi-k2.5")
-    monkeypatch.setenv("ALIBABA_MODEL_WRITING", "minimax-m2.5")
+    monkeypatch.setenv("ALIBABA_MODEL_CODER", "qwen3-coder-plus")
+    monkeypatch.setenv("ALIBABA_MODEL_REASONING", "qwen3-max")
+    monkeypatch.setenv("ALIBABA_MODEL_WRITING", "qwen3.5-plus")
     engine, provider, remote_enabled, model_name = data_loader._build_insight_engine_from_env()  # noqa: SLF001
     assert provider == "alibaba"
     assert remote_enabled is True
     assert "router(" in model_name
     assert isinstance(engine, data_loader._AlibabaTaskRouterInsightEngine)  # noqa: SLF001
-    assert engine._select_model("Please refactor this function to improve performance") == "qwen2.5-coder-32b-instruct"  # noqa: SLF001
-    assert engine._select_model("Need deep logic plan with clear workflow and trade-off") == "kimi-k2.5"  # noqa: SLF001
-    assert engine._select_model("Write CSS layout and docs with better UI text") == "minimax-m2.5"  # noqa: SLF001
+    assert engine._select_model("Please refactor this function to improve performance") == "qwen3-coder-plus"  # noqa: SLF001
+    assert engine._select_model("Need deep logic plan with clear workflow and trade-off") == "qwen3-max"  # noqa: SLF001
+    assert engine._select_model("Write CSS layout and docs with better UI text") == "qwen3.5-plus"  # noqa: SLF001
 
     monkeypatch.setenv("AGENT_AI_PROVIDER", "gemini")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
@@ -608,7 +608,7 @@ def test_build_insight_engine_with_explicit_fallback_order(monkeypatch: pytest.M
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("AGENT_AI_FALLBACK_ORDER", "anthropic,deterministic")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-12345678901234567890")
-    monkeypatch.setenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
+    monkeypatch.setenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
     engine, provider, remote_enabled, model_name = data_loader._build_insight_engine_from_env()  # noqa: SLF001
     assert provider == "anthropic"
     assert remote_enabled is True

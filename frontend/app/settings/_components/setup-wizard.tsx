@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 const STORAGE_KEY = "tt.local.setup.draft.v1";
@@ -55,6 +55,11 @@ interface ProfileInfo {
   updated_at: string;
 }
 
+interface ActionHint {
+  tone: "success" | "info" | "warn";
+  text: string;
+}
+
 const DEFAULT_DRAFT: SetupDraft = {
   tradingMode: "dry-run",
   duckdbPath: "data/trading.duckdb",
@@ -65,23 +70,23 @@ const DEFAULT_DRAFT: SetupDraft = {
   ssiPrivateKeyB64: "",
   aiProvider: "deterministic",
   openaiApiKey: "",
-  openaiModel: "gpt-4o-mini",
-  openaiModelCoder: "gpt-4o-mini",
-  openaiModelWriting: "gpt-4o-mini",
+  openaiModel: "gpt-5-mini",
+  openaiModelCoder: "gpt-5-mini",
+  openaiModelWriting: "gpt-5-mini",
   anthropicApiKey: "",
-  anthropicModel: "claude-3-5-haiku-latest",
-  anthropicModelCoder: "claude-3-5-haiku-latest",
-  anthropicModelWriting: "claude-3-5-haiku-latest",
+  anthropicModel: "claude-sonnet-4-20250514",
+  anthropicModelCoder: "claude-sonnet-4-20250514",
+  anthropicModelWriting: "claude-sonnet-4-20250514",
   geminiApiKey: "",
-  geminiModel: "gemini-1.5-flash",
-  geminiModelCoder: "gemini-1.5-flash",
-  geminiModelWriting: "gemini-1.5-flash",
+  geminiModel: "gemini-2.5-flash",
+  geminiModelCoder: "gemini-2.5-flash",
+  geminiModelWriting: "gemini-2.5-flash",
   alibabaApiKey: "",
   alibabaBaseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-  alibabaModelCoder: "qwen2.5-coder-32b-instruct",
-  alibabaModelReasoning: "kimi-k2.5",
-  alibabaModelWriting: "minimax-m2.5",
-  aiFallbackOrder: "anthropic,gemini,alibaba,deterministic",
+  alibabaModelCoder: "qwen3-coder-plus",
+  alibabaModelReasoning: "qwen3-max",
+  alibabaModelWriting: "qwen3.5-plus",
+  aiFallbackOrder: "openai,anthropic,gemini,alibaba,deterministic",
   aiTimeoutSeconds: 20,
   aiBudgetUsdPerRun: 0.25,
   aiMaxRemoteCalls: 40,
@@ -104,6 +109,16 @@ function statusClass(status: "ok" | "warn"): string {
     : "border-amber-800/60 bg-amber-900/20 text-amber-200";
 }
 
+function actionHintClass(tone: ActionHint["tone"]): string {
+  if (tone === "success") {
+    return "border-emerald-800/60 bg-emerald-900/20 text-emerald-200";
+  }
+  if (tone === "warn") {
+    return "border-amber-800/60 bg-amber-900/20 text-amber-200";
+  }
+  return "border-blue-800/60 bg-blue-900/20 text-blue-200";
+}
+
 export function SetupWizard() {
   const [draft, setDraft] = useState<SetupDraft>(DEFAULT_DRAFT);
   const [runtimeChecks, setRuntimeChecks] = useState<CheckItem[]>([]);
@@ -112,11 +127,11 @@ export function SetupWizard() {
   const [runtimeMode, setRuntimeMode] = useState<TradingMode>("dry-run");
   const [runtimeDataPath, setRuntimeDataPath] = useState<string>("-");
   const [runtimeAiProvider, setRuntimeAiProvider] = useState<AiProvider>("deterministic");
-  const [runtimeOpenAiModel, setRuntimeOpenAiModel] = useState<string>("gpt-4o-mini");
-  const [runtimeAnthropicModel, setRuntimeAnthropicModel] = useState<string>("claude-3-5-haiku-latest");
-  const [runtimeGeminiModel, setRuntimeGeminiModel] = useState<string>("gemini-1.5-flash");
-  const [runtimeAlibabaModelReasoning, setRuntimeAlibabaModelReasoning] = useState<string>("kimi-k2.5");
-  const [runtimeFallbackOrder, setRuntimeFallbackOrder] = useState<string>("anthropic,gemini,alibaba,deterministic");
+  const [runtimeOpenAiModel, setRuntimeOpenAiModel] = useState<string>("gpt-5-mini");
+  const [runtimeAnthropicModel, setRuntimeAnthropicModel] = useState<string>("claude-sonnet-4-20250514");
+  const [runtimeGeminiModel, setRuntimeGeminiModel] = useState<string>("gemini-2.5-flash");
+  const [runtimeAlibabaModelReasoning, setRuntimeAlibabaModelReasoning] = useState<string>("qwen3-max");
+  const [runtimeFallbackOrder, setRuntimeFallbackOrder] = useState<string>("openai,anthropic,gemini,alibaba,deterministic");
   const [runtimeTimeoutSeconds, setRuntimeTimeoutSeconds] = useState<number>(20);
   const [runtimeBudgetUsd, setRuntimeBudgetUsd] = useState<number>(0.25);
   const [runtimeMaxRemoteCalls, setRuntimeMaxRemoteCalls] = useState<number>(40);
@@ -133,6 +148,8 @@ export function SetupWizard() {
   const [rotateNewPass, setRotateNewPass] = useState("");
   const [savedDraftJson, setSavedDraftJson] = useState<string>(JSON.stringify(DEFAULT_DRAFT));
   const [lastSavedAt, setLastSavedAt] = useState<string>("");
+  const [actionHint, setActionHint] = useState<ActionHint | null>(null);
+  const actionHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -182,6 +199,14 @@ export function SetupWizard() {
     void fetchModelRecommendations();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (actionHintTimerRef.current) {
+        clearTimeout(actionHintTimerRef.current);
+      }
+    };
+  }, []);
+
   const localReady = useMemo(
     () =>
       runtimeChecks.length > 0 &&
@@ -195,14 +220,24 @@ export function SetupWizard() {
   const draftJson = useMemo(() => JSON.stringify(draft), [draft]);
   const isDraftDirty = draftJson !== savedDraftJson;
 
+  const pushActionHint = (tone: ActionHint["tone"], text: string) => {
+    setActionHint({ tone, text });
+    if (actionHintTimerRef.current) {
+      clearTimeout(actionHintTimerRef.current);
+    }
+    actionHintTimerRef.current = setTimeout(() => setActionHint(null), 7000);
+  };
+
   const saveDraftLocal = () => {
     try {
       localStorage.setItem(STORAGE_KEY, draftJson);
       setSavedDraftJson(draftJson);
       setLastSavedAt(new Date().toLocaleString());
       setMessage("Draft saved locally.");
+      pushActionHint("info", "Draft saved locally only. Use Apply Draft to run validation before trading.");
     } catch {
       setMessage("Cannot save draft to local storage.");
+      pushActionHint("warn", "Save Draft failed. Check browser storage permission.");
     }
   };
 
@@ -214,6 +249,7 @@ export function SetupWizard() {
         setDraft(DEFAULT_DRAFT);
         setSavedDraftJson(fallback);
         setMessage("No saved draft found. Reset to defaults.");
+        pushActionHint("warn", "No saved draft found. Default values loaded.");
         return;
       }
       const parsed = JSON.parse(raw) as Partial<SetupDraft>;
@@ -222,8 +258,10 @@ export function SetupWizard() {
       setDraft(merged);
       setSavedDraftJson(serialized);
       setMessage("Reverted to saved draft.");
+      pushActionHint("info", "Draft reverted to last saved local state.");
     } catch {
       setMessage("Cannot restore saved draft.");
+      pushActionHint("warn", "Revert failed. Saved draft payload is unavailable or corrupted.");
     }
   };
 
@@ -262,11 +300,11 @@ export function SetupWizard() {
       setRuntimeMode(data.mode ?? "dry-run");
       setRuntimeDataPath(data.data_path ?? "-");
       setRuntimeAiProvider(data.ai_provider ?? "deterministic");
-      setRuntimeOpenAiModel(data.openai_model ?? "gpt-4o-mini");
-      setRuntimeAnthropicModel(data.anthropic_model ?? "claude-3-5-haiku-latest");
-      setRuntimeGeminiModel(data.gemini_model ?? "gemini-1.5-flash");
-      setRuntimeAlibabaModelReasoning(data.alibaba_model_reasoning ?? "kimi-k2.5");
-      setRuntimeFallbackOrder(data.ai_fallback_order ?? "anthropic,gemini,alibaba,deterministic");
+      setRuntimeOpenAiModel(data.openai_model ?? "gpt-5-mini");
+      setRuntimeAnthropicModel(data.anthropic_model ?? "claude-sonnet-4-20250514");
+      setRuntimeGeminiModel(data.gemini_model ?? "gemini-2.5-flash");
+      setRuntimeAlibabaModelReasoning(data.alibaba_model_reasoning ?? "qwen3-max");
+      setRuntimeFallbackOrder(data.ai_fallback_order ?? "openai,anthropic,gemini,alibaba,deterministic");
       setRuntimeTimeoutSeconds(typeof data.ai_timeout_seconds === "number" ? data.ai_timeout_seconds : 20);
       setRuntimeBudgetUsd(typeof data.ai_budget_usd_per_run === "number" ? data.ai_budget_usd_per_run : 0.25);
       setRuntimeMaxRemoteCalls(typeof data.ai_max_remote_calls === "number" ? data.ai_max_remote_calls : 40);
@@ -348,13 +386,16 @@ export function SetupWizard() {
     const result = await runValidateDraft();
     if (result === "ok") {
       setMessage("Draft applied and validation passed.");
+      pushActionHint("success", "Apply completed. Runtime config passed validation checks.");
       return;
     }
     if (result === "warn") {
       setMessage("Draft applied with validation warnings.");
+      pushActionHint("warn", "Apply completed with warnings. Review validation panel before running live.");
       return;
     }
     setMessage("Draft saved, but validation request failed.");
+    pushActionHint("warn", "Draft saved, but apply validation call failed.");
   };
 
   const initLocalPath = async () => {
@@ -607,6 +648,14 @@ export function SetupWizard() {
             Revert
           </button>
         </div>
+        {actionHint && (
+          <div className={`mt-2 rounded border px-3 py-2 text-xs ${actionHintClass(actionHint.tone)}`}>
+            {actionHint.text}
+          </div>
+        )}
+        <p className="mt-2 text-[11px] text-zinc-500">
+          Save Draft stores browser-local draft only. Apply Draft runs validation and marks operational readiness.
+        </p>
       </div>
 
       <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
@@ -665,7 +714,7 @@ export function SetupWizard() {
               <input
                 value={draft.openaiModel}
                 onChange={(e) => updateDraft("openaiModel", e.target.value)}
-                placeholder="OPENAI_MODEL_REASONING (e.g. gpt-4o-mini)"
+                placeholder="OPENAI_MODEL_REASONING (e.g. gpt-5-mini)"
                 className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
               />
               <input
@@ -761,19 +810,19 @@ export function SetupWizard() {
               <input
                 value={draft.alibabaModelCoder}
                 onChange={(e) => updateDraft("alibabaModelCoder", e.target.value)}
-                placeholder="ALIBABA_MODEL_CODER (qwen2.5-coder-32b-instruct)"
+                placeholder="ALIBABA_MODEL_CODER (qwen3-coder-plus)"
                 className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
               />
               <input
                 value={draft.alibabaModelReasoning}
                 onChange={(e) => updateDraft("alibabaModelReasoning", e.target.value)}
-                placeholder="ALIBABA_MODEL_REASONING (kimi-k2.5)"
+                placeholder="ALIBABA_MODEL_REASONING (qwen3-max)"
                 className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
               />
               <input
                 value={draft.alibabaModelWriting}
                 onChange={(e) => updateDraft("alibabaModelWriting", e.target.value)}
-                placeholder="ALIBABA_MODEL_WRITING (minimax-m2.5)"
+                placeholder="ALIBABA_MODEL_WRITING (qwen3.5-plus)"
                 className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 sm:col-span-2"
               />
             </>
@@ -859,6 +908,7 @@ export function SetupWizard() {
             </div>
           </div>
         </div>
+
       </div>
 
       <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
@@ -953,6 +1003,7 @@ export function SetupWizard() {
             ))}
           </div>
         </div>
+
       </div>
 
       <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">

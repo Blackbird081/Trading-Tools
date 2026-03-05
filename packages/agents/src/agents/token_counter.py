@@ -16,6 +16,15 @@ logger = logging.getLogger("agents.token_counter")
 
 # Approximate cost per 1M tokens (USD) — update as needed
 COST_PER_1M_INPUT: dict[str, float] = {
+    # Current default stack
+    "gpt-5-mini": 0.25,
+    "claude-sonnet-4": 3.00,
+    "gemini-2.5-flash": 0.30,
+    "gemini-2.5-pro": 1.25,
+    "qwen3-coder-plus": 1.00,
+    "qwen3-max": 0.45,
+    "qwen3.5-plus": 0.40,
+    # Backward compatibility
     "gpt-4o": 2.50,
     "gpt-4o-mini": 0.15,
     "claude-3-5-sonnet": 3.00,
@@ -25,6 +34,15 @@ COST_PER_1M_INPUT: dict[str, float] = {
 }
 
 COST_PER_1M_OUTPUT: dict[str, float] = {
+    # Current default stack
+    "gpt-5-mini": 2.00,
+    "claude-sonnet-4": 15.00,
+    "gemini-2.5-flash": 2.50,
+    "gemini-2.5-pro": 10.00,
+    "qwen3-coder-plus": 5.00,
+    "qwen3-max": 5.40,
+    "qwen3.5-plus": 2.40,
+    # Backward compatibility
     "gpt-4o": 10.00,
     "gpt-4o-mini": 0.60,
     "claude-3-5-sonnet": 15.00,
@@ -32,6 +50,31 @@ COST_PER_1M_OUTPUT: dict[str, float] = {
     "phi-3-mini": 0.0,
     "default": 4.0,
 }
+
+_MODEL_PRICE_ALIASES: dict[str, str] = {
+    "claude-sonnet-4-20250514": "claude-sonnet-4",
+}
+
+_MODEL_PRICE_PREFIX_ALIASES: tuple[tuple[str, str], ...] = (
+    ("claude-sonnet-4-", "claude-sonnet-4"),
+    ("qwen3-max-", "qwen3-max"),
+    ("qwen3-coder-plus-", "qwen3-coder-plus"),
+    ("qwen3.5-plus-", "qwen3.5-plus"),
+)
+
+
+def _resolve_model_pricing_key(model: str) -> str:
+    normalized = model.strip().lower()
+    if not normalized:
+        return "default"
+    normalized = normalized.split("/")[-1]
+    normalized = _MODEL_PRICE_ALIASES.get(normalized, normalized)
+    if normalized in COST_PER_1M_INPUT:
+        return normalized
+    for prefix, alias in _MODEL_PRICE_PREFIX_ALIASES:
+        if normalized.startswith(prefix):
+            return alias
+    return normalized
 
 
 @dataclass
@@ -60,8 +103,9 @@ class TokenUsage:
     @property
     def estimated_cost_usd(self) -> float:
         """Estimate cost in USD based on model pricing."""
-        input_cost_per_1m = COST_PER_1M_INPUT.get(self.model, COST_PER_1M_INPUT["default"])
-        output_cost_per_1m = COST_PER_1M_OUTPUT.get(self.model, COST_PER_1M_OUTPUT["default"])
+        pricing_key = _resolve_model_pricing_key(self.model)
+        input_cost_per_1m = COST_PER_1M_INPUT.get(pricing_key, COST_PER_1M_INPUT["default"])
+        output_cost_per_1m = COST_PER_1M_OUTPUT.get(pricing_key, COST_PER_1M_OUTPUT["default"])
         return (
             self.input_tokens * input_cost_per_1m / 1_000_000
             + self.output_tokens * output_cost_per_1m / 1_000_000

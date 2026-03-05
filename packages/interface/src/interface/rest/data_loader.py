@@ -906,7 +906,7 @@ class _OpenAIInsightEngine:
         timeout_seconds: float = 20.0,
     ) -> None:
         self._api_key = api_key.strip()
-        self._model_reasoning = model_reasoning.strip() or "gpt-4o-mini"
+        self._model_reasoning = model_reasoning.strip() or "gpt-5-mini"
         self._model_coder = model_coder.strip() or self._model_reasoning
         self._model_writing = model_writing.strip() or self._model_reasoning
         self._base_url = base_url.rstrip("/")
@@ -965,7 +965,7 @@ class _AnthropicInsightEngine:
         timeout_seconds: float = 20.0,
     ) -> None:
         self._api_key = api_key.strip()
-        self._model_reasoning = model_reasoning.strip() or "claude-3-5-haiku-latest"
+        self._model_reasoning = model_reasoning.strip() or "claude-sonnet-4-20250514"
         self._model_coder = model_coder.strip() or self._model_reasoning
         self._model_writing = model_writing.strip() or self._model_reasoning
         self._base_url = base_url.rstrip("/")
@@ -1030,7 +1030,7 @@ class _GeminiInsightEngine:
         timeout_seconds: float = 20.0,
     ) -> None:
         self._api_key = api_key.strip()
-        self._model_reasoning = model_reasoning.strip() or "gemini-1.5-flash"
+        self._model_reasoning = model_reasoning.strip() or "gemini-2.5-flash"
         self._model_coder = model_coder.strip() or self._model_reasoning
         self._model_writing = model_writing.strip() or self._model_reasoning
         self._base_url = base_url.rstrip("/")
@@ -1106,9 +1106,9 @@ class _AlibabaTaskRouterInsightEngine:
     ) -> None:
         self._api_key = api_key.strip()
         self._base_url = base_url.rstrip("/")
-        self._model_coder = model_coder.strip() or "qwen2.5-coder-32b-instruct"
-        self._model_reasoning = model_reasoning.strip() or "kimi-k2.5"
-        self._model_writing = model_writing.strip() or "minimax-m2.5"
+        self._model_coder = model_coder.strip() or "qwen3-coder-plus"
+        self._model_reasoning = model_reasoning.strip() or "qwen3-max"
+        self._model_writing = model_writing.strip() or "qwen3.5-plus"
         self._timeout_seconds = max(3.0, float(timeout_seconds))
 
     def _select_model(self, prompt: str) -> str:
@@ -1175,9 +1175,9 @@ def _build_insight_engine_from_env() -> tuple[Any, str, bool, str]:
             if not openai_key:
                 warnings.append("openai key missing")
                 continue
-            model_reasoning = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
-            model_coder = os.getenv("OPENAI_MODEL_CODER", model_reasoning or "gpt-4o-mini").strip()
-            model_writing = os.getenv("OPENAI_MODEL_WRITING", model_reasoning or "gpt-4o-mini").strip()
+            model_reasoning = os.getenv("OPENAI_MODEL", "gpt-5-mini").strip()
+            model_coder = os.getenv("OPENAI_MODEL_CODER", model_reasoning or "gpt-5-mini").strip()
+            model_writing = os.getenv("OPENAI_MODEL_WRITING", model_reasoning or "gpt-5-mini").strip()
             base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").strip()
             model_banner = f"router(coder={model_coder},reasoning={model_reasoning},writing={model_writing})"
             candidates.append(
@@ -1202,11 +1202,11 @@ def _build_insight_engine_from_env() -> tuple[Any, str, bool, str]:
             if not anthropic_key:
                 warnings.append("anthropic key missing")
                 continue
-            model_reasoning = os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest").strip()
-            model_coder = os.getenv("ANTHROPIC_MODEL_CODER", model_reasoning or "claude-3-5-haiku-latest").strip()
+            model_reasoning = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514").strip()
+            model_coder = os.getenv("ANTHROPIC_MODEL_CODER", model_reasoning or "claude-sonnet-4-20250514").strip()
             model_writing = os.getenv(
                 "ANTHROPIC_MODEL_WRITING",
-                model_reasoning or "claude-3-5-haiku-latest",
+                model_reasoning or "claude-sonnet-4-20250514",
             ).strip()
             base_url = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1").strip()
             model_banner = f"router(coder={model_coder},reasoning={model_reasoning},writing={model_writing})"
@@ -1232,9 +1232,9 @@ def _build_insight_engine_from_env() -> tuple[Any, str, bool, str]:
             if not gemini_key:
                 warnings.append("gemini key missing")
                 continue
-            model_reasoning = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
-            model_coder = os.getenv("GEMINI_MODEL_CODER", model_reasoning or "gemini-1.5-flash").strip()
-            model_writing = os.getenv("GEMINI_MODEL_WRITING", model_reasoning or "gemini-1.5-flash").strip()
+            model_reasoning = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+            model_coder = os.getenv("GEMINI_MODEL_CODER", model_reasoning or "gemini-2.5-flash").strip()
+            model_writing = os.getenv("GEMINI_MODEL_WRITING", model_reasoning or "gemini-2.5-flash").strip()
             base_url = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta").strip()
             model_banner = f"router(coder={model_coder},reasoning={model_reasoning},writing={model_writing})"
             candidates.append(
@@ -1259,9 +1259,9 @@ def _build_insight_engine_from_env() -> tuple[Any, str, bool, str]:
             if not alibaba_key:
                 warnings.append("alibaba key missing")
                 continue
-            model_coder = os.getenv("ALIBABA_MODEL_CODER", "qwen2.5-coder-32b-instruct").strip()
-            model_reasoning = os.getenv("ALIBABA_MODEL_REASONING", "kimi-k2.5").strip()
-            model_writing = os.getenv("ALIBABA_MODEL_WRITING", "minimax-m2.5").strip()
+            model_coder = os.getenv("ALIBABA_MODEL_CODER", "qwen3-coder-plus").strip()
+            model_reasoning = os.getenv("ALIBABA_MODEL_REASONING", "qwen3-max").strip()
+            model_writing = os.getenv("ALIBABA_MODEL_WRITING", "qwen3.5-plus").strip()
             base_url = os.getenv("ALIBABA_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1").strip()
             model_banner = f"router(coder={model_coder},reasoning={model_reasoning},writing={model_writing})"
             candidates.append(

@@ -200,7 +200,7 @@ function SummaryCard({
 }
 
 /* ── Expanded Detail Row ────────────────────────────────────── */
-function DetailPanel({ r }: { r: ScreenerResult }) {
+function DetailPanel({ r, runMode }: { r: ScreenerResult; runMode: "dry-run" | "live" }) {
   return (
     <tr>
       <td colSpan={9} className="p-0">
@@ -273,7 +273,7 @@ function DetailPanel({ r }: { r: ScreenerResult }) {
             <span className="text-zinc-800">|</span>
             <span className="flex items-center gap-1">
               <span className="text-zinc-500">Mode:</span>
-              <span className="text-amber-500 font-medium">dry-run</span>
+              <span className={`font-medium ${runMode === "live" ? "text-red-400" : "text-amber-500"}`}>{runMode}</span>
             </span>
             <span className="text-zinc-800">|</span>
             <span className="flex items-center gap-1">
@@ -927,7 +927,7 @@ export function PipelineRunner() {
                     </tr>
 
                     {/* Expanded detail row */}
-                    {isExpanded && <DetailPanel r={r} />}
+                    {isExpanded && <DetailPanel r={r} runMode={runMode} />}
                   </tbody>
                 );
               })}
@@ -1043,3 +1043,4 @@ export function PipelineRunner() {
     </div>
   );
 }
+
