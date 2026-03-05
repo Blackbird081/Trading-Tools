@@ -62,7 +62,7 @@ Status scale:
 - Completion of master gated phases does not close local personal trading phases automatically.
 
 ## Current Gaps (As-Is)
-- Live broker path is integrated for SSI with credential-gated runtime; remaining work is real-account UAT and operational rollout controls.
+- Live broker path is integrated for SSI with credential-gated runtime; remaining work is real-account UAT and operational rollout controls (checklist: `docs/plans/LOCAL_REAL_API_UAT_CHECKLIST.md`).
 - External data quality in live mode depends on broker/data provider availability and credentials.
 - Frontend critical-flow coverage is now above target (`99.52%` lines/statements, `92.88%` branches, `100%` functions); keep gate enforcement strict on every release candidate.
 - AI reliability strict threshold gate is now available; next step is calibrating production thresholds with rolling datasets and policy sign-off.

@@ -19,6 +19,8 @@
 7. Weekly reliability artifact is refreshed:
    - `powershell -ExecutionPolicy Bypass -File scripts/run-weekly-reliability-pack.ps1`
    - Output artifact: `docs/reports/AI_RELIABILITY_WEEKLY_LATEST.md`
+8. Real-key UAT checklist prepared/executed for release candidate:
+   - `docs/plans/LOCAL_REAL_API_UAT_CHECKLIST.md`
 
 ## 2. Local Packaging Validation (Clean Machine)
 1. Clone fresh repo on clean machine.
@@ -71,3 +73,5 @@
    - pass/fail status
    - commit SHA
    - deployment target
+3. If real API keys are enabled for user rollout, attach completed UAT evidence:
+   - `docs/plans/LOCAL_REAL_API_UAT_CHECKLIST.md` (Section 10 filled)
