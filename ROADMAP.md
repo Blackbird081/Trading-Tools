@@ -281,11 +281,11 @@ async def create(cls, conn, max_age_hours=24):
 
 ### 4.5 UI/UX Improvements (Frontend)
 
-- [x] Move `MarketIndexBar` to the footer of the Market Board page
-- [x] Delete `TradingChart` from Dashboard — click on the stock code to open the chart page
+- [ ] Move `MarketIndexBar` to the footer of the Market Board page (current as-is: still on top)
+- [ ] Delete `TradingChart` from codebase (current as-is: not rendered on dashboard, but component file still exists)
 - [ ] Optimistic updates cho order placement
 - [ ] Dark/light theme toggle
-- [ ] Keyboard shortcuts (command palette already available, expandable)
+- [x] Keyboard shortcuts baseline (`Ctrl+K` command palette)
 
 ---
 
@@ -303,7 +303,7 @@ async def create(cls, conn, max_age_hours=24):
 ## 🎯 Success Metrics
 
 - [ ] Zero critical bugs trong production
-- [ ] Test coverage ≥ 85% (latest release validation snapshot on gated scope: frontend lines 99.4%, backend critical 97.51%)
+- [ ] Test coverage ≥ 85% (latest release validation snapshot on gated scope: frontend lines/statements 99.52%, backend critical 97.51%)
 - [ ] P95 latency agent pipeline < 5s
 - [ ] Zero X-Forwarded-For bypass incidents
 - [ ] DuckDB pool never race condition in load test
