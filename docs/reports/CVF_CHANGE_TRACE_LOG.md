@@ -599,3 +599,24 @@ Notes:
 - Plan Mapping: `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`Hardening-A4` closure) + `IMPLEMENTATION_PLAN.md` (`AR-4` gated closure)
 - Owner: Codex + project owner
 - Notes: AR-4 line/statements target is now closed; next follow-up is branch/function depth uplift (`AR-4B`) without regressing lines/statements coverage.
+
+### CVF-TT-20260305-035
+- Date-Time (UTC+7): 2026-03-05 08:30
+- Type: test
+- Scope: Continue post-closure hardening for pre-live readiness by raising AR-4B frontend branch/function depth and adding strict reliability threshold gating with release-validation wiring.
+- Impact: Expanded frontend critical snapshot improved to lines/statements `96.01%`, functions `91.66%`, branches `77.70%`; weekly reliability report now includes threshold table + structured drift severity details; release validation supports strict reliability mode (`-StrictReliability`) that fails on high-severity drift alerts.
+- Root Cause: Remaining pre-live risk after AR-4 closure was limited branch/function-path depth and missing enforceable reliability rejection policy for drift alerts.
+- Files Changed: `frontend/__tests__/integration/order-form.test.tsx`, `frontend/__tests__/integration/market-board-mobile.test.tsx`, `frontend/__tests__/integration/pipeline-runner.test.tsx`, `frontend/__tests__/integration/data-loader.test.tsx`, `scripts/run-weekly-reliability-pack.ps1`, `scripts/release-validation.ps1`, `docs/plans/LOCAL_PERSONAL_TRADING_ROADMAP.md`, `docs/plans/IMPLEMENTATION_PLAN.md`, `docs/reports/AI_RELIABILITY_WEEKLY_LATEST.md`, `docs/reports/LOCAL_RELEASE_VALIDATION_LATEST.md`, `docs/reports/CVF_CHANGE_TRACE_LOG.md`
+- Validation Evidence:
+  - `pnpm -C frontend exec vitest run __tests__/integration/order-form.test.tsx __tests__/integration/market-board-mobile.test.tsx __tests__/integration/pipeline-runner.test.tsx __tests__/integration/data-loader.test.tsx` (pass, 20 tests)
+  - `pnpm -C frontend exec vitest run __tests__/integration/data-loader.test.tsx __tests__/integration/order-form.test.tsx __tests__/integration/pipeline-runner.test.tsx __tests__/integration/market-board-mobile.test.tsx __tests__/stores/market-store.test.ts __tests__/stores/signal-store.test.ts __tests__/lib/market-sectors.test.ts --coverage ...` (pass; critical snapshot lines/statements `96.01%`, branches `77.70%`, functions `91.66%`)
+  - `powershell -ExecutionPolicy Bypass -File scripts/run-weekly-reliability-pack.ps1` (pass; report generated with threshold table)
+  - `powershell -ExecutionPolicy Bypass -File scripts/run-weekly-reliability-pack.ps1 -MinPrecisionAtK 0.55 -MinHitRate 0.45 -MinConsensusHitRate 0.35 -MinAgreementRate 0.30 -MaxDrawdown 0.25 -FailOnDriftSeverity high` (expected fail on drift severity gate)
+  - `powershell -ExecutionPolicy Bypass -File scripts/release-validation.ps1` (pass; overall `PASS`)
+  - `powershell -ExecutionPolicy Bypass -File scripts/release-validation.ps1 -StrictReliability` (expected fail; overall `FAIL` due drift severity gate)
+- Deployment Target: frontend integration quality pack + release/reliability gate scripts + CVF roadmap/docs
+- Deployment Status: local update completed (pending push/deploy)
+- Commit SHA: N/A (pending next commit)
+- Plan Mapping: `IMPLEMENTATION_PLAN.md` Section `0.12` (`AR-4B` continuation + reliability strict gate) + `LOCAL_PERSONAL_TRADING_ROADMAP.md` (`Hardening-A4` follow-up / `AI-09` gate integration)
+- Owner: Codex + project owner
+- Notes: Strict reliability mode is now enforceable but intentionally opt-in until threshold calibration on rolling real-user datasets is completed.

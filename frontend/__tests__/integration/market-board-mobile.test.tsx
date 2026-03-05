@@ -99,6 +99,9 @@ describe("MarketBoard mobile controls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Trước/i }));
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Tiếp$/i }));
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
   });
 
   it("falls back to mock ticks and supports mobile swipe navigation", async () => {
@@ -133,5 +136,21 @@ describe("MarketBoard mobile controls", () => {
     });
 
     expect(secondTab.className).toContain("bg-emerald-600");
+
+    fireEvent.touchStart(swipeContainer as Element, {
+      touches: [{ clientX: 120, clientY: 100 }],
+    });
+    fireEvent.touchEnd(swipeContainer as Element, {
+      changedTouches: [{ clientX: 220, clientY: 101 }],
+    });
+    expect(firstTab.className).toContain("bg-emerald-600");
+
+    fireEvent.touchStart(swipeContainer as Element, {
+      touches: [{ clientX: 220, clientY: 100 }],
+    });
+    fireEvent.touchEnd(swipeContainer as Element, {
+      changedTouches: [{ clientX: 210, clientY: 180 }],
+    });
+    expect(firstTab.className).toContain("bg-emerald-600");
   });
 });

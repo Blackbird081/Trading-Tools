@@ -74,5 +74,39 @@ describe("OrderForm integration", () => {
     expect(screen.getByPlaceholderText("100")).toHaveValue(null);
     expect(screen.getByPlaceholderText("0.00")).toHaveValue(null);
   });
-});
 
+  it("supports sell side submit and falls back to default failure message", async () => {
+    const placeOrderMock = vi.fn().mockResolvedValue({
+      ok: false,
+      message: "",
+    });
+    useOrderStore.setState({ placeOrder: placeOrderMock } as Partial<ReturnType<typeof useOrderStore.getState>>);
+
+    render(<OrderForm />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^bán$/i }));
+    fireEvent.change(screen.getByPlaceholderText("100"), { target: { value: "300" } });
+    fireEvent.change(screen.getByPlaceholderText("0.00"), { target: { value: "22.8" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /bán fpt/i }));
+
+    await waitFor(() => expect(placeOrderMock).toHaveBeenCalledTimes(1));
+    expect(placeOrderMock.mock.calls[0]?.[0]).toMatchObject({
+      side: "SELL",
+      quantity: 300,
+      price: 22.8,
+      mode: "dry-run",
+    });
+    await waitFor(() => expect(screen.getByText("Đặt lệnh thất bại.")).toBeInTheDocument());
+  });
+
+  it("validates non-positive quantity and clears inline error when input is empty", () => {
+    render(<OrderForm />);
+
+    fireEvent.change(screen.getByPlaceholderText("100"), { target: { value: "0" } });
+    expect(screen.getByText(/khối lượng phải là số dương/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("100"), { target: { value: "" } });
+    expect(screen.queryByText(/khối lượng phải là số dương/i)).not.toBeInTheDocument();
+  });
+});

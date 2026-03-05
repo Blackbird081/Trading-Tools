@@ -3,7 +3,7 @@
 ## CVF Traceability
 - CVF-Doc-ID: CVF-TT-LOCAL-20260302-R1
 - Owner: Product + Engineering
-- Last-Updated: 2026-03-04
+- Last-Updated: 2026-03-05
 - Status: In execution
 - Scope: Turn Trading-Tools from demo/mixed-mock to local personal trading product.
 
@@ -32,8 +32,8 @@ Status scale:
 | Hardening-A1 Runtime Security Middleware Wiring | `DONE (gated)` | Added `AuthMiddleware` + runtime wiring of `RateLimitMiddleware` in `interface.app`; added integration coverage in `tests/integration/test_runtime_security_middleware.py` for unauthorized/reject + rate-limit behavior. | Monitor token distribution policy for non-dev protected environments. |
 | Hardening-A2 Real Data Provider Policy | `DONE (gated)` | Added explicit provider contract (`DATA_PROVIDER_MODE=mock/live`) with production guard (`mock` blocked) in `interface.rest.data_loader`; added integration/unit tests (`tests/integration/test_data_loader_api.py`, `tests/unit/test_data_loader_helpers.py`). | Keep live provider dependency (`vnstock`) and source reliability monitored in production. |
 | Hardening-A3 Monetary Precision (`Decimal`) | `DONE (gated)` | Migrated OMS request/risk checks to `Decimal` in `interface.rest.orders` (price/notional/daily-loss/buying-power path); added boundary precision regression test in `tests/integration/test_order_safety_controls.py`. | Continue Decimal migration in downstream analytics/store paths for full end-to-end precision parity. |
-| Hardening-A4 Frontend Coverage Expansion | `DONE (gated)` | Expanded integration packs for dashboard/order/screener/market-board (`frontend/__tests__/integration/{data-loader,order-form,pipeline-runner,market-board-mobile}.test.tsx`), fixed stale preset/year race in loader stream (`frontend/app/(dashboard)/_components/data-loader.tsx`), and widened gate scope in `scripts/pre-live-api-gate.ps1`; latest expanded frontend critical snapshot: lines/statements `94.57%`. | Continue branch/function depth uplift (currently below 90) while preserving >=90 lines/statements gate. |
-| REL-01 Release Quality Gate Uplift (financial-safe) | `DONE (gated)` | `scripts/pre-live-api-gate.ps1` now supports configurable backend threshold and risk-based frontend coverage scope; `scripts/release-validation.ps1` enforces backend + frontend critical gates; latest run passed with backend critical `97.51%` and expanded frontend critical lines/statements `94.57%`. | Keep >=90 expanded critical-flow lines/statements stable across release candidates. |
+| Hardening-A4 Frontend Coverage Expansion | `DONE (gated)` | Expanded integration packs for dashboard/order/screener/market-board (`frontend/__tests__/integration/{data-loader,order-form,pipeline-runner,market-board-mobile}.test.tsx`), fixed stale preset/year race in loader stream (`frontend/app/(dashboard)/_components/data-loader.tsx`), and widened gate scope in `scripts/pre-live-api-gate.ps1`; latest expanded frontend critical snapshot: lines/statements `96.01%`, functions `91.66%`, branches `77.70%`. | Continue branch-path depth uplift (branches < 90) while preserving >=90 lines/statements and functions. |
+| REL-01 Release Quality Gate Uplift (financial-safe) | `DONE (gated)` | `scripts/pre-live-api-gate.ps1` now supports configurable backend threshold and risk-based frontend coverage scope; `scripts/release-validation.ps1` enforces backend + frontend critical gates; latest run passed with backend critical `97.51%` and expanded frontend critical lines/statements `96.01%`. | Keep >=90 expanded critical-flow lines/statements stable across release candidates. |
 | UX-01 Setup Save/Apply Clarity | `DONE (gated)` | `frontend/app/settings/_components/setup-wizard.tsx` now uses explicit `Save Draft`, `Apply Draft`, `Revert` actions with `Saved/Unsaved` status + last-saved timestamp; added integration test `frontend/__tests__/integration/setup-wizard.test.tsx`. | Extend UX consistency to profile import/export rotate flows with same dirty-state semantics. |
 | DATA-01 DuckDB Migration + Backup/Restore + Integrity Gate | `DONE (gated)` | Added cache schema marker + migration metadata + startup integrity probe (`interface.rest.data_loader`, `interface.app`, `interface.rest.setup`) and backup/restore scripts (`scripts/data-cache-backup.ps1`, `scripts/data-cache-restore.ps1`). | Maintain migration marker policy for future schema upgrades. |
 | SEC-01 Secret Redaction Hardening | `DONE (gated)` | Added shared redaction utilities (`interface.redaction`) and applied redaction in setup/data-loader runtime errors, profile decrypt response, and diagnostics paths with tests (`tests/unit/test_redaction.py`, setup/data-loader test updates). | Extend redaction policy to any new external adapter error path. |
@@ -41,7 +41,7 @@ Status scale:
 | AI-06 Single-Provider Multi-Role Subagent Orchestration | `DONE (gated)` | `FundamentalAgent` now runs contextual subroles (`thesis`, `valuation`, `news_catalyst`, `risk_challenge`) via a single AI engine/API key and applies deterministic arbitration (`risk_veto_then_consensus`); pipeline emits role metadata (`ai_role_outputs`, `ai_subroles`, `ai_final_action`). | Add strict JSON schema per role and provider-level benchmark calibration (OpenAI/Claude/Gemini parity). |
 | AI-07 Quant Benchmark Pack (`Precision@K`, `Hit-rate`, `MDD`) | `DONE (baseline)` | Added fixed-dataset benchmark artifacts (`tests/evals/data/recommendation_outcomes_fixed.csv`, `tests/evals/reliability_metrics.py`, `tests/evals/benchmark_fixed_dataset.py`) and unit coverage (`tests/unit/test_reliability_eval_pack.py`). | Promote fixed dataset to versioned rolling snapshots from production-like history. |
 | AI-08 Provider A/B + Consensus Check | `DONE (baseline)` | Added provider A/B dataset and evaluator (`tests/evals/data/provider_ab_consensus_fixed.csv`, `tests/evals/provider_ab_consensus.py`) with agreement/per-provider/consensus metrics and tests. | Extend from offline benchmark to runtime dual-provider experiment mode with strict cost controls. |
-| AI-09 Weekly Drift Monitoring (Recommendation vs Outcome) | `DONE (baseline)` | Added weekly drift evaluator (`tests/evals/weekly_drift_monitor.py`) and unified runner (`tests/evals/run_reliability_pack.py`) producing per-week summary + alerts. | Add scheduled weekly CI/job execution and threshold-based release gate integration. |
+| AI-09 Weekly Drift Monitoring (Recommendation vs Outcome) | `DONE (baseline+)` | Added weekly drift evaluator (`tests/evals/weekly_drift_monitor.py`) and unified runner (`tests/evals/run_reliability_pack.py`) producing per-week summary + alerts; reliability script now supports strict threshold gating (`scripts/run-weekly-reliability-pack.ps1 -FailOnDriftSeverity high`) and is wired into `scripts/release-validation.ps1 -StrictReliability`. | Calibrate threshold profile on rolling real-user datasets before making strict mode default. |
 | AI-10 Native Multi-Provider Runtime (OpenAI + Anthropic + Gemini + Alibaba) | `DONE (baseline)` | Added native provider wiring in runtime/setup/settings (`interface.rest.data_loader`, `interface.rest.setup`, `frontend/app/settings/_components/setup-wizard.tsx`) with provider-specific API key/model fields/validation and task-router model mapping (`coder/reasoning/writing`) across providers. | Add profile-level provider failover policy and runtime cost controls. |
 | AI-11 Task/Role Model Recommendation Matrix | `DONE (baseline)` | Added setup recommendation API (`GET /api/setup/model-recommendations`) and Settings matrix UI for per-task/per-role provider-model guidance. | Keep matrix calibrated with rolling provider eval results. |
 | AI-12 Provider Failover + Cost Control Policy | `DONE (baseline)` | Added configurable policy (`AGENT_AI_FALLBACK_ORDER`, `AGENT_AI_TIMEOUT_SECONDS`, `AGENT_AI_BUDGET_USD_PER_RUN`, `AGENT_AI_MAX_REMOTE_CALLS`) with runtime failover/budget enforcement in screener AI engine. | Add per-profile UI presets and tighter cost telemetry thresholds. |
@@ -64,12 +64,10 @@ Status scale:
 - Real broker execution path still uses guarded placeholder; live adapter integration remains.
 - External data quality in live mode depends on broker/data provider availability and credentials.
 - Frontend global coverage remains below release-grade target.
-- Frontend expanded critical-flow lines/statements gate is now above `90%`; branch/function depth is still lower and should keep improving.
-- Database operational safeguards (schema migration marker, backup/restore/integrity gate) are not yet formalized.
-- Secret redaction hardening in runtime diagnostics/log paths still needs explicit test-backed enforcement.
+- Frontend expanded critical-flow lines/statements/functions are now strong (`96.01%` / `91.66%`), but branch depth remains lower (`77.70%`) and should keep improving.
 - Provider parity calibration across OpenAI/Anthropic/Gemini/Alibaba is not automated yet.
 - Role outputs are currently narrative text; schema-locked role JSON contract is not yet enforced.
-- AI reliability pack automation exists; next step is enforce threshold-based release rejection on alert severity.
+- AI reliability strict threshold gate is now available; next step is calibrating production thresholds with rolling datasets and policy sign-off.
 - Correlation-id observability exists for REST/SSE/order failures; websocket/broker deep-path coverage remains open.
 - Consolidated local operator runbook is in place; continue runbook drills on each release candidate.
 
@@ -356,8 +354,8 @@ Execution update (2026-03-04):
 - `E2` completed (cache schema marker/integrity + backup/restore + secret redaction hardening with tests).
 - `E3` completed baseline (model recommendation matrix + provider failover/cost policy + weekly reliability runner automation).
 - `E4` completed baseline (correlation-id propagation + observability events API + consolidated operator runbook).
-- `Hardening-A4` is now `DONE (gated)` across dashboard/order/screener/market-board with expanded critical snapshot at `94.57%` lines/statements.
-- Next focus: deepen branch/function-path coverage in the same suites while holding `>=90%` lines/statements.
+- `Hardening-A4` is now `DONE (gated)` across dashboard/order/screener/market-board with expanded critical snapshot at lines/statements `96.01%`, functions `91.66%`, branches `77.70%`.
+- Next focus: deepen branch-path coverage in the same suites while holding `>=90%` lines/statements/functions.
 
 Exit policy:
 - Do not move to broader real API-key onboarding until `E1` and `E2` are complete.

@@ -133,8 +133,21 @@ describe("PipelineRunner integration", () => {
 
     fireEvent.click(screen.getByText("SYM01"));
     await waitFor(() => expect(screen.getByText("AI Analysis & Reasoning")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("SYM01"));
+    await waitFor(() => expect(screen.queryByText("AI Analysis & Reasoning")).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Mã"));
+    fireEvent.click(screen.getByText("Mã"));
+    fireEvent.click(screen.getByText("Risk"));
 
     fireEvent.click(screen.getByRole("button", { name: /cuối/i }));
+    expect(screen.getByText(/Trang 2\/2/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /đầu/i }));
+    expect(screen.getByText(/Trang 1\/2/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /cuối/i }));
+    fireEvent.click(screen.getByRole("button", { name: "1" }));
+    expect(screen.getByText(/Trang 1\/2/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "2" }));
     expect(screen.getByText(/Trang 2\/2/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /hiện chi tiết agents/i }));
@@ -175,5 +188,16 @@ describe("PipelineRunner integration", () => {
 
     await waitFor(() => expect(screen.getByText("Pipeline Error")).toBeInTheDocument());
     expect(screen.getByText(/prompts missing/i)).toBeInTheDocument();
+  });
+
+  it("shows HTTP error when run-screener request fails before stream starts", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500 } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PipelineRunner />);
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+
+    await waitFor(() => expect(screen.getByText("Pipeline Error")).toBeInTheDocument());
+    expect(screen.getByText(/http 500/i)).toBeInTheDocument();
   });
 });

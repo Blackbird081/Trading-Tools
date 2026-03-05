@@ -5,7 +5,18 @@ param(
     [ValidateRange(1, 100)]
     [int]$FrontendCoverageThreshold = 80,
     [ValidateRange(1, 100)]
-    [int]$FrontendTargetCoverage = 90
+    [int]$FrontendTargetCoverage = 90,
+    [switch]$StrictReliability,
+    [ValidateRange(0, 1)]
+    [double]$ReliabilityMinPrecisionAtK = 0.55,
+    [ValidateRange(0, 1)]
+    [double]$ReliabilityMinHitRate = 0.45,
+    [ValidateRange(0, 1)]
+    [double]$ReliabilityMinConsensusHitRate = 0.35,
+    [ValidateRange(0, 1)]
+    [double]$ReliabilityMinAgreementRate = 0.30,
+    [ValidateRange(0, 10)]
+    [double]$ReliabilityMaxDrawdown = 0.25
 )
 
 $ErrorActionPreference = "Continue"
@@ -45,7 +56,8 @@ function Run-Step {
 
 Run-Step -Step "Frontend type check" -Command "pnpm -C frontend exec tsc --noEmit"
 Run-Step -Step "Pre-live API quality gate" -Command "powershell -ExecutionPolicy Bypass -File scripts/pre-live-api-gate.ps1 -StrictWarnings -WithFrontend -BackendCoverageThreshold $BackendCoverageThreshold"
-Run-Step -Step "Weekly reliability pack artifact" -Command "powershell -ExecutionPolicy Bypass -File scripts/run-weekly-reliability-pack.ps1"
+$driftFailSeverity = if ($StrictReliability) { "high" } else { "none" }
+Run-Step -Step "Weekly reliability pack artifact" -Command "powershell -ExecutionPolicy Bypass -File scripts/run-weekly-reliability-pack.ps1 -MinPrecisionAtK $ReliabilityMinPrecisionAtK -MinHitRate $ReliabilityMinHitRate -MinConsensusHitRate $ReliabilityMinConsensusHitRate -MinAgreementRate $ReliabilityMinAgreementRate -MaxDrawdown $ReliabilityMaxDrawdown -FailOnDriftSeverity $driftFailSeverity"
 Run-Step -Step "Setup API integration" -Command "python -m pytest tests/integration/test_setup_api.py -q"
 Run-Step -Step "Local product API integration" -Command "python -m pytest tests/integration/test_local_product_api.py -q"
 Run-Step -Step "Backend compile check" -Command "python -m py_compile packages/interface/src/interface/rest/setup.py packages/interface/src/interface/rest/data_loader.py packages/interface/src/interface/rest/orders.py packages/adapters/src/adapters/vnstock/news.py"

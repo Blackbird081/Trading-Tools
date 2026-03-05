@@ -204,6 +204,31 @@ describe("DataLoader (P0 gate)", () => {
     expect(hasLoadCall, `Unexpected fetch urls: ${calledUrls.join(" | ")}`).toBe(true);
   });
 
+  it("supports switching preset back to VN30 before load request", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(mockCachedEmptyResponse())
+      .mockResolvedValueOnce(mockCachedEmptyResponse())
+      .mockResolvedValueOnce(mockCachedEmptyResponse())
+      .mockResolvedValueOnce(mockEmptyStreamResponse());
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DataLoader />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Top 100" }));
+    fireEvent.click(screen.getByRole("button", { name: "VN30" }));
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "4" } });
+    fireEvent.click(await screen.findByRole("button", { name: /^load$/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0] ?? ""));
+    const hasVn30LoadCall = calledUrls.some(
+      (url) => url.includes("/load-data") && url.includes("preset=VN30") && url.includes("years=4"),
+    );
+    expect(hasVn30LoadCall, `Unexpected fetch urls: ${calledUrls.join(" | ")}`).toBe(true);
+  });
+
   it("shows explicit error on load HTTP failure", async () => {
     const fetchMock = vi
       .fn()
@@ -232,5 +257,31 @@ describe("DataLoader (P0 gate)", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /^load$/i }));
     await waitFor(() => expect(screen.getByText("Cancelled by user.")).toBeInTheDocument());
+  });
+
+  it("shows stop control while loading and aborts active stream", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(mockCachedEmptyResponse())
+      .mockImplementationOnce((_url: string, options?: { signal?: AbortSignal }) => {
+        return new Promise<Response>((_resolve, reject) => {
+          options?.signal?.addEventListener("abort", () => {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          });
+        });
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DataLoader />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(await screen.findByRole("button", { name: /^load$/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /^stop$/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /^stop$/i }));
+
+    await waitFor(() => expect(screen.getByText("Cancelled by user.")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /^load$/i })).toBeInTheDocument();
   });
 });
